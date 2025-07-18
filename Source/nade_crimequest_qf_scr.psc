@@ -11,7 +11,7 @@ ReferenceAlias Property Alias_Pillory Auto			;Checks if zazFurniture in ESP (Ali
 
 Function Fragment_3()
 ;force greet
-cfgqst.dhlpSuspend(true)
+cfgqst.dhlpSuspendStatus = true
 if cfgqst.ShowDebugMessages
 	int i = 0
 	ObjectReference o = Alias_Pillory.GetReference()		
@@ -26,7 +26,7 @@ EndFunction
 
 Function Fragment_1()
 ;shutdown stage
-cfgqst.dhlpSuspend(false)
+cfgqst.dhlpSuspendStatus = false
 stop()
 EndFunction
 
@@ -111,7 +111,7 @@ EndFunction
 Function StartWhip()
 	Alias_Talker.Clear()
 ;	Game.ForceThirdPerson()
-	cfgqst.ChangeArousal(10)
+	;cfgqst.ChangeArousal(10)
 	SexLab.StripActor(cfgqst.PlayerRef, cfgqst.PlayerRef, false, false)	
 	BeatScene.Start()
 EndFunction
@@ -165,7 +165,7 @@ Function ApplyTinkle(Int Index = 0)
 	Int exposure
 	if Index == 1
 		if cfgqst.WhipMarks
-			cfgqst.AddTattoo("Cane Marks", "Cane Marks Set")		;can we hook FadeTattoos here?
+			;cfgqst.AddTattoo("Cane Marks", "Cane Marks Set")		;can we hook FadeTattoos here?
 			cfgqst.SyncTattoos()
 		endif
 		if !Alias_Pillory.GetReference()
@@ -177,7 +177,7 @@ Function ApplyTinkle(Int Index = 0)
 			cfgqst.PlayerRef.EquipItem(Armors[Index], false, true)
 			cfgqst.SexLabMoan(cfgqst.PlayerRef)
 		endif
-		cfgqst.ChangeArousal(cfgqst.ExposureChange[1])
+		;cfgqst.ChangeArousal(cfgqst.ExposureChange[1])
 	elseif Index == 2
 		IdleIdx += 1
 		cfgqst.PlayerRef.PlayIdle(zazidles[IdleIdx])	
@@ -192,7 +192,7 @@ Function ApplyTinkle(Int Index = 0)
 			cfgqst.PlayerRef.RemoveItem(Armors[1], 1, true, None)
 			cfgqst.SexLabMoan(cfgqst.PlayerRef)
 		endif
-		cfgqst.ChangeArousal(cfgqst.ExposureChange[1])
+		;cfgqst.ChangeArousal(cfgqst.ExposureChange[1])
 	else
 		if IsFemale
 			cfgqst.PlayerRef.RemoveItem(Armors[1], 1, true, None)

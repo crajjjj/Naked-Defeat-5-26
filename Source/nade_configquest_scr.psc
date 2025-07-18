@@ -4578,7 +4578,7 @@ Function StartRobbery(Actor akRobber)				;#StartRobbery #robbery2
 				if Gold > 1000
 				GoldMin = 1000
 				else
-				GoldMin == Gold
+				GoldMin = Gold
 				endif
 				
 				if Gold > 0
@@ -14049,7 +14049,7 @@ if NymBeta
 	
 	else
 	ScreenMessage("NAKED DEFEAT #ERROR: LOOT Weapon type unknown")
-	Items == "None"
+	Items = "None"
 	endif
 	
 	Debug.Trace("NAKED DEFEAT configquest: Get_JSON_Weapon(): "+Items)
@@ -20209,7 +20209,7 @@ Debug.trace("NAKED DEFEAT configquest: GetEnemyType: "+GetActorName(Hitter))
 		;treat tame trolls as humans (to start defeattypehumans) ;PROBLEMATIC 
 		if RaceKey == ("Trolls")
 			if (Hitter.GetBaseObject().GetName() == "Armored Troll") || (Hitter.GetBaseObject().GetName() == "Armored Frost Troll") || (Hitter.GetBaseObject().GetName() == "Tame Troll")
-			RaceKey == "Humans"
+			RaceKey = "Humans"
 			endif
 		endif
 		
@@ -24486,9 +24486,9 @@ Function ForceOutfit(string items)
 	if items == "random"
 		int random = Utility.RandomInt(1,3)
 		if random == 1
-		items == "Boots"
+		items = "Boots"
 		else
-		items == "Cuirass"
+		items = "Cuirass"
 		endif
 	endif
 	

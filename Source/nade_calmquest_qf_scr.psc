@@ -1455,7 +1455,7 @@ Debug.trace("NAKED DEFEAT calmquest: stage 1000 (Defeat #END)")
 			elseif cfgqst.AbortAll && !NoActors_StartSlavery
 			ScreenMessage("NAKED DEFEAT Aborted")	
 			elseif Rescued && cfgqst.DefeatTypeScenario == "Afterlife"		
-			cfgqst.DefeatTypeScenario == "none"
+			cfgqst.DefeatTypeScenario = "none"
 			ScreenMessage("You are alive. Again?")
 			elseif Rescued 	
 			ScreenMessage("You were miraculously rescued!")
@@ -2135,7 +2135,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		StartPlayerFree()
 		else
 		ScreenMessage("The evil bastards betrayed you!")
-		cfgqst.DefeatTypeScenario == "none"
+		cfgqst.DefeatTypeScenario = "none"
 		cfgqst.Allow_EscapeDifficulty = "Hard"
 		StartPlayerRobbed()
 		StartPlayerCaptured()
@@ -2211,7 +2211,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		StartPlayerFree()	
 		else
 		ScreenMessage("Those bastards still have the strength to bind you!")
-		cfgqst.DefeatTypeScenario == "none"
+		cfgqst.DefeatTypeScenario = "none"
 		cfgqst.Allow_EscapeDifficulty = "Hard"
 		StartPlayerRobbed()
 		StartPlayerCaptured()
@@ -13162,7 +13162,7 @@ Function SexFinished()				;##finished #SexFinished
 		endif
 		
 		if (!cfgqst.AbortAll)
-		Allow_SexScenes == 0
+		Allow_SexScenes = 0
 		endif 
 		
 		if cfgqst.IsNymrasGame()
