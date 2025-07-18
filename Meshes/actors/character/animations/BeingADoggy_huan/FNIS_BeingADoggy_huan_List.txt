@@ -1,0 +1,20 @@
+
+
+AAprefix daf
+AAset _sneakidle 1
+AAset _sneakmt 1
+AAset _mt 1
+AAset _mtx 1
+AAset _mtidle 1
+AAset _mtturn 1
+AAset _1hmidle 3
+AAset _h2hatk 2
+AAset _h2hatkpow 2
+AAset _1hmatk 1
+AAset _1hmmt 1
+
+
+'index 2 of aa is for npc only, make them looks like crawling when attacking
+
+b -a bad_petting bad_petting.hkx
+b -a bad_kickAss bad_kickAss.hkx

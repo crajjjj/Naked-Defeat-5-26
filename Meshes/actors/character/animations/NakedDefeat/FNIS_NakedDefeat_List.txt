@@ -1,0 +1,181 @@
+Version V1.0
+
+' Human/Humanoid Surrender Poses 
+b -h nade_HumanSurrender_01 nade_HumanSurrender_01.hkx			' original static, hands behind head
+b -h nade_HumanSurrender_02 nade_HumanSurrender_02.hkx			' gunslicer
+b -h nade_HumanSurrender_03 nade_HumanSurrender_03.hkx			' zap stuff
+b -h nade_HumanSurrender_04 nade_HumanSurrender_04.hkx			' zap stuff
+b -h nade_HumanSurrender_05 nade_HumanSurrender_05.hkx			' gunslicer
+b -h nade_HumanSurrender_06 nade_HumanSurrender_06.hkx			' gunslicer
+
+' Animal Surrender Poses 
+b -h nade_AnimalSurrender_01 nade_AnimalSurrender_01.hkx			' doggy moving
+b -h nade_AnimalSurrender_02 nade_AnimalSurrender_02.hkx			' doggy moving
+b -h nade_AnimalSurrender_03 nade_AnimalSurrender_03.hkx			' doggy moving
+
+' IdlesDefeatCuffs
+b -h nade_IdlesDefeatCuffs_01 nade_WriStruggle11.hkx			' WriStruggle11
+b -h nade_IdlesDefeatCuffs_02 nade_WriStruggle12.hkx			' WriStruggle12
+b -h nade_IdlesDefeatCuffs_03 nade_WriStruggle13.hkx			' WriStruggle13
+b -h nade_IdlesDefeatCuffs_04 nade_WriStruggle14.hkx			' WriStruggle14
+b -h nade_IdlesDefeatCuffs_05 nade_WriStruggle15.hkx			' WriStruggle15
+b -h nade_IdlesDefeatCuffs_06 nade_APC001.hkx			' ZazAPC001	furnituregame
+b -h nade_IdlesDefeatCuffs_07 nade_APC002.hkx			' ZazAPC002	furnituregame
+b -h nade_IdlesDefeatCuffs_08 nade_APC003.hkx			' ZazAPC003	furnituregame
+b -h nade_IdlesDefeatCuffs_09 nade_APC004.hkx			' ZazAPC004	furnituregame
+b -h nade_IdlesDefeatCuffs_10 nade_APC005.hkx			' ZazAPC005	furnituregame
+b -h nade_IdlesDefeatCuffs_11 nade_APC007.hkx			' ZazAPC007
+b -h nade_IdlesDefeatCuffs_12 nade_APC008.hkx			' ZazAPC008
+b -h nade_IdlesDefeatCuffs_13 nade_APC009.hkx			' ZazAPC009
+b -h nade_IdlesDefeatCuffs_14 nade_APC010.hkx			' ZazAPC010
+b -h nade_IdlesDefeatCuffs_15 nade_APC014.hkx			' ZazAPC014
+b -h nade_IdlesDefeatCuffs_16 nade_APC016.hkx			' ZazAPC016
+b -h nade_IdlesDefeatCuffs_17 nade_APC017.hkx			' ZazAPC017
+b -h nade_IdlesDefeatCuffs_18 nade_APC019.hkx			' ZazAPC019
+b -h nade_IdlesDefeatCuffs_19 nade_APC058.hkx			' ZazAPC058
+b -h nade_IdlesDefeatCuffs_20 nade_APC206.hkx			' ZazAPC206
+
+' IdlesDefeatCuffsStruggle
+b -h nade_IdlesDefeatCuffsStruggle_01 nade_WriStruggle01.hkx			' 
+b -h nade_IdlesDefeatCuffsStruggle_02 nade_WriStruggle02.hkx			' 
+b -h nade_IdlesDefeatCuffsStruggle_03 nade_WriStruggle03.hkx			' 
+b -h nade_IdlesDefeatCuffsStruggle_05 nade_WriStruggle05.hkx			' 
+b -h nade_IdlesDefeatCuffsStruggle_06 nade_WriStruggle06.hkx			' 
+b -h nade_IdlesDefeatCuffsStruggle_07 nade_WriStruggle07.hkx			' 
+b -h nade_IdlesDefeatCuffsStruggle_08 nade_WriStruggle08.hkx			' not for whipping but wayne
+b -h nade_IdlesDefeatCuffsStruggle_09 nade_WriStruggle09.hkx			' 
+b -h nade_IdlesDefeatCuffsStruggle_10 nade_WriStruggle10.hkx			' 
+
+' IdlesBathingStanding
+b -h nade_IdlesBathingStanding_00 nade_bath_standing_00.hkx		
+b -h nade_IdlesBathingStanding_01 nade_bath_standing_01.hkx		
+b -h nade_IdlesBathingStanding_02 nade_bath_standing_02.hkx		
+b -h nade_IdlesBathingStanding_03 nade_bath_standing_03.hkx			
+b -h nade_IdlesBathingStanding_04 nade_bath_standing_04.hkx			
+b -h nade_IdlesBathingStanding_05 nade_bath_standing_05.hkx	
+b -h nade_IdlesBathingStanding_06 nade_bath_standing_06.hkx			
+b -h nade_IdlesBathingStanding_07 nade_bath_standing_07.hkx			
+b -h nade_IdlesBathingStanding_08 nade_bath_standing_08.hkx		
+
+' IdlesDefeatUnbound
+b -h nade_IdlesDefeatUnbound_01 nade_APC202.hkx			' ZazAPC202
+b -h nade_IdlesDefeatUnbound_02 nade_APC204.hkx			' ZazAPC204
+
+' IdlesDefeatYoke
+b -h nade_IdlesDefeatYoke_01 nade_YokeBleedoutIdle.hkx		 
+b -h nade_IdlesDefeatYoke_02 nade_YokeBlowjob01_A1_S2.hkx			 
+b -h nade_IdlesDefeatYoke_03 nade_YokeForeplay01_A2_S2.hkx			 
+b -h nade_IdlesDefeatYoke_04 nade_YokePose01.hkx			 
+b -h nade_IdlesDefeatYoke_05 nade_YokePose03.hkx			 
+b -h nade_IdlesDefeatYoke_06 nade_YokePose04.hkx			
+b -h nade_IdlesDefeatYoke_07 nade_YokePose05.hkx			 
+b -h nade_IdlesDefeatYoke_08 nade_YokePose06.hkx			 
+b -h nade_IdlesDefeatYoke_09 nade_YokePose07.hkx			 
+b -h nade_IdlesDefeatYoke_10 nade_YokePose08.hkx			 
+b -h nade_IdlesDefeatYoke_11 nade_YokePose09.hkx			 
+b -h nade_IdlesDefeatYoke_12 nade_YokePose10.hkx			 
+b -h nade_IdlesDefeatYoke_13 nade_YokePose11.hkx			 
+b -h nade_IdlesDefeatYoke_14 nade_YokePose12.hkx			 
+b -h nade_IdlesDefeatYoke_15 nade_YokePose14.hkx			 
+b -h nade_IdlesDefeatYoke_16 nade_YokeSkullFuck01_A1_S1.hkx			 
+b -h nade_IdlesDefeatYoke_17 nade_YokeSkullFuck01_A1_S2.hkx			 
+
+' IdlesDefeatYokeStruggle
+b -h nade_IdlesDefeatYokeStruggle_01 nade_YokeHorny01.hkx		 
+b -h nade_IdlesDefeatYokeStruggle_02 nade_YokeHorny02.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_03 nade_YokeHorny03.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_04 nade_YokeStruggle01.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_05 nade_YokeStruggle02.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_06 nade_YokeStruggle03.hkx			
+b -h nade_IdlesDefeatYokeStruggle_07 nade_YokeStruggle05.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_08 nade_YokeStruggle06.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_09 nade_YokeStruggle07.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_10 nade_YokeStruggle08.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_11 nade_YokeStruggle09.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_12 nade_YokeStruggle10.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_13 nade_YokeStruggle11.hkx	 
+b -h nade_IdlesDefeatYokeStruggle_14 nade_YokeStruggle12.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_15 nade_YokeStruggle13.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_16 nade_YokeStruggle14.hkx			 
+b -h nade_IdlesDefeatYokeStruggle_17 nade_YokeStruggle15.hkx	
+
+' BOUND with Yoke (for struggle game)
+o -h nade_Yoke_01_BOUND_01 nade_Yoke_01_BOUND_01.hkx AOnade_WristL AOnade_WristR
+o -h nade_Yoke_01_BOUNDstruggle_01 nade_Yoke_01_BOUNDstruggle_01.hkx AOnade_WristL AOnade_WristR
+o -h nade_Yoke_01_BOUNDstruggle_02 nade_Yoke_01_BOUNDstruggle_02.hkx AOnade_WristL AOnade_WristR
+
+o -h nade_Yoke_02_BOUND_01 nade_Yoke_02_BOUND_01.hkx AOnade_WristL AOnade_WristR
+o -h nade_Yoke_02_BOUND_02 nade_Yoke_02_BOUND_02.hkx AOnade_WristL AOnade_WristR
+o -h nade_Yoke_02_BOUNDstruggle_01 nade_Yoke_02_BOUNDstruggle_01.hkx AOnade_WristL AOnade_WristR
+
+' IdlesDefeatUnbound
+b -h nade_IdlesDefeatUnbound_01 nade_IdlesDefeatUnbound_01.hkx	 	' TepiStiSpread
+b -h nade_IdlesDefeatUnbound_02 nade_IdlesDefeatUnbound_02.hkx	 	' ZaZAPCSHFB1 
+b -h nade_IdlesDefeatUnbound_03 nade_IdlesDefeatUnbound_03.hkx	 	' ZaZAPCSHFC1 
+b -h nade_IdlesDefeatUnbound_04 nade_IdlesDefeatUnbound_04.hkx	 	' ZaZAPCSHFD1 
+b -h nade_IdlesDefeatUnbound_05 nade_IdlesDefeatUnbound_05.hkx	 	' ZaZAPCSHFE1 
+b -h nade_IdlesDefeatUnbound_06 nade_IdlesDefeatUnbound_06.hkx	 	' ZaZAPCSHFE2 
+b -h nade_IdlesDefeatUnbound_07 nade_IdlesDefeatUnbound_07.hkx	 	' ZaZAPCSHFE3 
+b -h nade_IdlesDefeatUnbound_08 nade_IdlesDefeatUnbound_08.hkx	 	' ZaZAPCSHMA1 
+b -h nade_IdlesDefeatUnbound_09 nade_IdlesDefeatUnbound_09.hkx	 	' ZaZAPCSHMB1 
+b -h nade_IdlesDefeatUnbound_10 nade_IdlesDefeatUnbound_10.hkx	 	' ZaZAPCSHMC1 
+b -h nade_IdlesDefeatUnbound_11 nade_IdlesDefeatUnbound_11.hkx	 	' ZaZAPCSHMD1 
+b -h nade_IdlesDefeatUnbound_12 nade_IdlesDefeatUnbound_12.hkx	 	' ZaZAPCSHME1 
+b -h nade_IdlesDefeatUnbound_13 nade_IdlesDefeatUnbound_13.hkx	 	' ZaZAPCSHME2 
+b -h nade_IdlesDefeatUnbound_14 nade_IdlesDefeatUnbound_14.hkx	 	' ZazGround_rightsleepnaughty 
+b -h nade_IdlesDefeatUnbound_15 nade_IdlesDefeatUnbound_15.hkx	 	' ZaZMOMFreeFurn01 
+b -h nade_IdlesDefeatUnbound_16 nade_IdlesDefeatUnbound_16.hkx	 	' ZaZMOMFreeFurn03 
+b -h nade_IdlesDefeatUnbound_17 nade_IdlesDefeatUnbound_17.hkx	 	' ZazSexyPoseLaying
+
+b nade_FixHair_01 nade_FixHair_01.hkx	 	' 
+
+' IdlesDefeatPillory
+o -h nade_IdlesDefeatPillory_01 nade_IdlesDefeatPillory_01.hkx AOnade_Pillory_01 		' PilloryDoggy_A1_S1
+o -h nade_IdlesDefeatPillory_02 nade_IdlesDefeatPillory_02.hkx AOnade_Pillory_01		' PilloryDoggy_A1_S3
+o -h nade_IdlesDefeatPillory_03 nade_IdlesDefeatPillory_03.hkx AOnade_Pillory_01		' PilloryHardDoggy_A1_S5
+o -h nade_IdlesDefeatPillory_04 nade_IdlesDefeatPillory_04.hkx AOnade_Pillory_01		' PilloryMMMMFA1_s9 
+o -h nade_IdlesDefeatPillory_05 nade_IdlesDefeatPillory_05.hkx AOnade_Pillory_01		' ZazAPCAO009 
+o -h nade_IdlesDefeatPillory_06 nade_IdlesDefeatPillory_06.hkx AOnade_Pillory_01		' ZazAPFPillSingle01 
+o -h nade_IdlesDefeatPillory_07 nade_IdlesDefeatPillory_07.hkx AOnade_Pillory_01		' ZazAPPillSXBOEND01B 
+o -h nade_IdlesDefeatPillory_08 nade_IdlesDefeatPillory_08.hkx AOnade_Pillory_01		' ZazAPPillSXBOEnterLoopB 
+o -h nade_IdlesDefeatPillory_09 nade_IdlesDefeatPillory_09.hkx AOnade_Pillory_01		' ZazAPPillSXHip01B 
+o -h nade_IdlesDefeatPillory_10 nade_IdlesDefeatPillory_10.hkx AOnade_Pillory_01		' ZazAPPillSXHold01B 
+o -h nade_IdlesDefeatPillory_11 nade_IdlesDefeatPillory_11.hkx AOnade_Pillory_01		' Billyy_PilloryFuck1_A1_S4 
+o -h nade_IdlesDefeatPillory_12 nade_IdlesDefeatPillory_12.hkx AOnade_Pillory_01		' Billyy_PilloryFuck1_A1_S5 
+
+' IdlesDefeatPilloryStruggle
+o -h nade_IdlesDefeatPilloryStruggle_01 nade_IdlesDefeatPilloryStruggle_01.hkx AOnade_Pillory_01	 	' PilloryDoggy_A1_S5
+o -h nade_IdlesDefeatPilloryStruggle_02 nade_IdlesDefeatPilloryStruggle_02.hkx AOnade_Pillory_01	 	' PilloryDoggyRedone_A1_S4 
+o -h nade_IdlesDefeatPilloryStruggle_03 nade_IdlesDefeatPilloryStruggle_03.hkx AOnade_Pillory_01	 	' PilloryMMMMFA1_s1 
+o -h nade_IdlesDefeatPilloryStruggle_04 nade_IdlesDefeatPilloryStruggle_04.hkx AOnade_Pillory_01	 	' PilloryMMMMFA1_s2 
+o -h nade_IdlesDefeatPilloryStruggle_05 nade_IdlesDefeatPilloryStruggle_05.hkx AOnade_Pillory_01	 	' PilloryMMMMFA1_s3 
+o -h nade_IdlesDefeatPilloryStruggle_06 nade_IdlesDefeatPilloryStruggle_06.hkx AOnade_Pillory_01	 	' PilloryMMMMFA1_s4 
+o -h nade_IdlesDefeatPilloryStruggle_07 nade_IdlesDefeatPilloryStruggle_07.hkx AOnade_Pillory_01 		' ZazAPFPillSingle02 
+o -h nade_IdlesDefeatPilloryStruggle_08 nade_IdlesDefeatPilloryStruggle_08.hkx AOnade_Pillory_01	 	' ZazAPFPillSingle04 
+o -h nade_IdlesDefeatPilloryStruggle_09 nade_IdlesDefeatPilloryStruggle_09.hkx AOnade_Pillory_01	 	' ZazAPFPillSingle05 
+o -h nade_IdlesDefeatPilloryStruggle_10 nade_IdlesDefeatPilloryStruggle_10.hkx AOnade_Pillory_01	 	' ZazAPPillSXBO01B 
+o -h nade_IdlesDefeatPilloryStruggle_11 nade_IdlesDefeatPilloryStruggle_11.hkx AOnade_Pillory_01	 	' ZazAPPillSXBOEnterB 
+o -h nade_IdlesDefeatPilloryStruggle_12 nade_IdlesDefeatPilloryStruggle_12.hkx AOnade_Pillory_01	 	' ZazAPPillSXBOLick01B 
+o -h nade_IdlesDefeatPilloryStruggle_13 nade_IdlesDefeatPilloryStruggle_13.hkx AOnade_Pillory_01	 	' ZazAPPillSXEnterLoopB 
+o -h nade_IdlesDefeatPilloryStruggle_14 nade_IdlesDefeatPilloryStruggle_14.hkx AOnade_Pillory_01	 	' ZazAPPillSXHip03B 
+o -h nade_IdlesDefeatPilloryStruggle_15 nade_IdlesDefeatPilloryStruggle_15.hkx AOnade_Pillory_01	 	' ZazAPPillSXHold02B 
+o -h nade_IdlesDefeatPilloryStruggle_16 nade_IdlesDefeatPilloryStruggle_16.hkx AOnade_Pillory_01	 	' ZazAPPillSXSpank01B 
+o -h nade_IdlesDefeatPilloryStruggle_17 nade_IdlesDefeatPilloryStruggle_17.hkx AOnade_Pillory_01	 	' zBillyy_PilloryFuck1_A1_S2
+
+' IdlesDefeatCrux
+o nade_IdlesDefeatCrux_01 nade_IdlesDefeatCrux_01.hkx AOnade_Crux_01	 	' ZazAPCAO253
+o nade_IdlesDefeatCrux_02 nade_IdlesDefeatCrux_02.hkx AOnade_Crux_01	 	' ZazAPCAO254 
+o nade_IdlesDefeatCrux_03 nade_IdlesDefeatCrux_03.hkx AOnade_Crux_01 		' ZazAPCAO255 
+
+' IdlesDefeatImpaled
+o nade_IdlesDefeatImpaled_01 nade_IdlesDefeatImpaled_01.hkx AOnade_Impaled_01	 	' Proxy Impaled Stage 1
+
+' IdlesDefeatBigPoleStruggle
+
+o nade_IdlesDefeatBigPoleStruggle_00 nade_BigPoleStruggle_00.hkx AOnade_BondagePole06 	' 
+o nade_IdlesDefeatBigPoleStruggle_01 nade_BigPoleStruggle_01.hkx AOnade_BondagePole06 	'  
+o nade_IdlesDefeatBigPoleStruggle_02 nade_BigPoleStruggle_02.hkx AOnade_BondagePole06 	'  is double (00 and 02 are identical)
+o nade_IdlesDefeatBigPoleStruggle_03 nade_BigPoleStruggle_03.hkx AOnade_BondagePole06	'  
+o nade_IdlesDefeatBigPoleStruggle_04 nade_BigPoleStruggle_04.hkx AOnade_BondagePole06 	'  
+o nade_IdlesDefeatBigPoleStruggle_05 nade_BigPoleStruggle_05.hkx AOnade_BondagePole06	'  
+o nade_IdlesDefeatBigPoleStruggle_06 nade_BigPoleStruggle_06.hkx AOnade_BondagePole06	'  

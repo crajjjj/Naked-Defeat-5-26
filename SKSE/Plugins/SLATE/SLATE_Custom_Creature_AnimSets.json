@@ -1,0 +1,275 @@
+{
+    "stringList" :
+    {
+        "slate.customcreatureanimsets" :
+        [
+            /* DO NOT EDIT ANYTHING ABOVE THIS LINE!                                   */
+
+            /* You can add your own animation sets here. Below are some examples.      */
+            /* See the comments in the first example for explanation of the parameters */
+            /* Note: ALL 6 parameters need to be provided for an animation set.        */
+            /* If a parameter should stay empty, set it to ""                          */
+
+            /* Tips for creating sets                                                  */
+            /* - Assuming that you use SexLab 1.60 or higher, SexLab will always       */
+            /*   automatically add the correct gender tag based on the genders set on  */
+            /*   the animation's position slots. Use this to your advantage when       */
+            /*   building animation sets for particular combinations of genders.       */
+            /* - A Gender tag first lists the females (F), then the males (M) and      */
+            /*   then the creatures (C). So any animations intended for a male, and 2  */
+            /*   females will have the automatically created "FFM" tag.                */
+            /* - Automatically generated gender tags say nothing about the order. If   */
+            /*   there is a female in the 1st position, a male in the 2nd and another  */
+            /*   female in the 3rd, the automatically generated tag will still be FFM  */
+            /* - If you only have 1 tag in the TagsToAdd parameter, it can help to add */
+            /*   the same tag to the excluded tags. That way, each time you have added */
+            /*   the tag to an animation, it will be removed from the list.            */
+            /* - If an animation has the Oral tag, it will increase the Oral counter   */
+            /*   (and eventually level) of the actors in the animation. Likewise for   */
+            /*   the Anal tag which increases Anal level and Vaginal tag for Vaginal   */
+            /*   level. These levels can be seen in the SexLab MCM Sex Journal and     */
+            /*   can be read and used by SexLab mods.                                  */
+            /* - Use an empty value ("") for the TagsToAdd parameter to use the list   */
+            /*   of standard tags. This list consists of all tags used by the          */
+            /*   animations included with SexLab 1.62 and will be dynamically extended */
+            /*   with the gender tags appropriate for the number of actors in the      */
+            /*   animation set.                                                        */
+            /* - Limits:                                                               */
+            /*   * Maximum number of animation sets that can be loaded      : 128      */
+            /*   * Maximum number of tags in the TagsToAdd parameter        : 128      */
+            /*   * Maximum number of tags in the Tags/ExcludeTags parameters: Unknown, presumably 128                                       */
+            /*   * Maximum length of the AnimationSet Name                  : 32 characters or so for proper display without cut-off        */
+
+            /* Add Oral tag to BJ/Cunni anims: searches for animations including any oral action that don't have the Oral tag yet and lets you add the Oral tag so they count towards       */
+            /*                                 the SexLab Oral level                                                                                                                        */
+            "Add Oral tag to BJ/Cunni anims",               /* Name          : Name of the animation set                                                                                    */
+            "2",                                            /* ActorCount    : Search for animations with this number of actors                                                             */
+            "BJ,Blowjob,Cunnilingus,Licking,69,SixtyNine",  /* Tags          : Search for animations with these tags (comma-separated list)                                                 */
+            "FALSE",                                        /* RequireAllTags: TRUE = All above tags have to be included, FALSE = at least one of the above tags needs to be included       */
+            "Oral",                                         /* ExcludeTags   : Exclude animations that contain any of these tags (comma-separated list)                                     */
+            "Oral",                                         /* TagsToAdd     : List of tags that can be added/removed for this set (comma-separated list). Leave empty to use standard tags */
+
+            "Add MC tag to FC Blowjob non-Vaginal anims",
+            "2",
+            "FC,Blowjob",
+            "TRUE",
+            "Vaginal, Pussy, Cunnilingus, MC",
+            "MC",
+
+            "Add MC tag to FC Anal non-Vaginal anims",
+            "2",
+            "FC,Anal",
+            "TRUE",
+            "Vaginal, Pussy, Cunnilingus, MC",
+            "MC",
+
+            /* Add Vaginal tag to non-Anal/Oral anims: searches for Missionary or DoggyStyle anims without Vaginal,Anal,Oral,MM tags and lets you add the Vaginal tag  to them so they      */
+            /*                                         count towards the SexLab Vaginal level                                                                                               */
+            "Add Vaginal tag to non-Anal/Oral anims",
+            "2",
+            "Missionary,DoggyStyle",
+            "FALSE",
+            "Vaginal,Anal,Oral",
+            "Vaginal",
+
+            "Add CreatureSub tag to MC Vaginal anims",
+            "2",
+            "MC,Vaginal",
+            "TRUE",
+            "CreatureSub",
+            "CreatureSub",
+			
+            /* Make Doggy tags uniform: searches for animations with any of the tags 'Doggy,Doggie,Dogy,Dogie' but without 'DoggyStyle' and lets you add 'DoggyStyle' to them */
+            "Make Doggy tags uniform",
+            "2",
+            "Doggy,Doggie,Dogy,Dogie",
+            "FALSE",
+            "DoggyStyle",
+            "DoggyStyle",
+
+            /* Make all Couples Creature tags uniform: searches for creature animations without 'Creature' and lets you add the 'Creature' to them */
+            "Make all Couples Creature tags uniform",
+            "2",
+            "",
+            "FALSE",
+            "Creature",
+            "Creature",
+
+            /* Make all 3Somes Creature tags uniform: searches for creature animations without 'Creature' and lets you add the 'Creature' to them */
+            "Make all 3Somes Creature tags uniform",
+            "3",
+            "",
+            "FALSE",
+            "Creature",
+            "Creature",
+
+            /* Make all 4Somes Creature tags uniform: searches for creature animations without 'Creature' and lets you add the 'Creature' to them */
+            "Make all 4Somes Creature tags uniform",
+            "4",
+            "",
+            "FALSE",
+            "Creature",
+            "Creature",
+
+            /* Make all 5Somes Creature tags uniform: searches for creature animations without 'Creature' and lets you add the 'Creature' to them */
+            "Make all 5Somes Creature tags uniform",
+            "5",
+            "",
+            "FALSE",
+            "Creature",
+            "Creature",
+
+            /* Make all Couples Furniture tags uniform: searches for furniture animations without 'Furniture' and lets you add the 'Furniture' to them */
+            "Make all Couples Furniture tags uniform",
+            "2",
+            "InvFurn,InvisFurn,InvisibleFurniture,InvFurniture,Invisible Obj,WallHole,FuckMachine,LowTable,Hay,JavTable,Machine,GloryHole,GloryHoleM,PilloryX,Mimic,Tub,HotTub,FuroTub,Sofa,Gallows,GallowsUpsideDown,AlchemyWorkbench,Bench,BenchTable,Chair,Coffin,Counter,EnchantingWorkbench,HorizontalPole,Pillory,Pole,RPost1,RPost2,RPost3,RPost4,RPost5,RPost6,Rack,ShackleWall,Stockade,Table,Throne,TiltedWheel,Wall,WoodenHorse,XCross,workbench",
+            "FALSE",
+            "Furniture,Bed,Beds,BedOnly,DoubleBed,SingleBed",
+            "Furniture",
+
+            /* Make all 3Somes Furniture tags uniform: searches for furniture animations without 'Furniture' and lets you add the 'Furniture' to them */
+            "Make all 3Somes Furniture tags uniform",
+            "3",
+            "InvFurn,InvisFurn,InvisibleFurniture,InvFurniture,Invisible Obj,WallHole,FuckMachine,LowTable,Hay,JavTable,Machine,GloryHole,GloryHoleM,PilloryX,Mimic,Tub,HotTub,FuroTub,Sofa,Gallows,GallowsUpsideDown,AlchemyWorkbench,Bench,BenchTable,Chair,Coffin,Counter,EnchantingWorkbench,HorizontalPole,Pillory,Pole,RPost1,RPost2,RPost3,RPost4,RPost5,RPost6,Rack,ShackleWall,Stockade,Table,Throne,TiltedWheel,Wall,WoodenHorse,XCross,workbench",
+            "FALSE",
+            "Furniture,Bed,Beds,BedOnly,DoubleBed,SingleBed",
+            "Furniture",
+
+            /* 3Somes no MCC,Pussy,Vaginal: searches for 3Somes BJ animations without the tags 'MCC,Pussy,Vaginal' and allows you to add the MCC tag to it */
+            "Add MCC tag to FCC 3Somes non-Vaginal",
+            "3",
+            "FCC",
+            "TRUE",
+            "MCC,Pussy,Vaginal",
+            "MCC",
+
+            /* 3Somes no FCC,BJ: searches for 3Somes animations without the tag 'FCC,BJ,BlowJob' and allows you to add the FCC tag to it */
+            "Add MCC tag to FCC 3Somes no BlowJob",
+            "3",
+            "FCC",
+            "TRUE",                         /* doesn't really matter in this case as no tags are searched for, FALSE results in the same animations */
+            "MCC,BJ,BlowJob",
+            "MCC",
+
+            "Aggr. Couples no AggressiveDefault",
+            "2",
+            "Aggressive",
+            "TRUE",
+            "AggressiveDefault",
+            "AggressiveDefault",
+
+            "Aggr. 3somes no AggressiveDefault",
+            "3",
+            "Aggressive",
+            "TRUE",
+            "AggressiveDefault",
+            "AggressiveDefault",
+
+            "Aggr. 4Somes no AggressiveDefault",
+            "4",
+            "Aggressive",
+            "TRUE",
+            "AggressiveDefault",
+            "AggressiveDefault",
+
+            "Aggr. 5Somes no AggressiveDefault",
+            "5",
+            "Aggressive",
+            "TRUE",
+            "AggressiveDefault",
+            "AggressiveDefault",
+
+            "Add AGGRESSIVE to Rape/Forced Couples",
+            "2",
+            "Rape,Forced",
+            "FALSE",
+            "",
+            "Aggressive,AggressiveDefault",
+
+            "Add AGGRESSIVE to Rape/Forced 3Somes",
+            "3",
+            "Rape,Forced",
+            "FALSE",
+            "",
+            "Aggressive,AggressiveDefault",
+
+            "Add AGGRESSIVE to Rape/Forced 4Somes",
+            "4",
+            "Rape,Forced",
+            "FALSE",
+            "",
+            "Aggressive,AggressiveDefault",
+
+            "Add AGGRESSIVE to Rape/Forced 5Somes",
+            "5",
+            "Rape,Forced",
+            "FALSE",
+            "",
+            "Aggressive,AggressiveDefault",
+
+            /* Stuff */
+
+            "ALL FURNITURE Couples",
+            "2",
+            "Furniture",
+            "TRUE",
+            "",
+            "",
+
+            "ALL FURNITURE 3Somes",
+            "3",
+            "Furniture",
+            "TRUE",
+            "",
+            "",
+
+            /* Make Solo Magic animations tags uniform: searches for animations with any of the tags 'MageFemale,MageMale,MagicDildo,Magic,MindControl,SoulGem,Staff,Spell,SpellTome,Scroll' and lets you add the Mage tag to them */
+            "Make Solo Magic animations tags uniform",
+            "1",
+            "MageFemale,MageMale,MagicDildo,Magic,MindControl,SoulGem,Staff,Spell,SpellTome,Scroll",
+            "False",
+            "Mage",
+            "Mage",
+			
+            /* Make Couples Magic animations tags uniform: searches for animations with any of the tags 'MageFemale,MageMale,MagicDildo,Magic,MindControl,SoulGem,Staff,Spell,SpellTome,Scroll' and lets you add the Mage tag to them */
+            "Make Couples Magic animations tags uniform",
+            "2",
+            "MageFemale,MageMale,MagicDildo,Magic,MindControl,SoulGem,Staff,Spell,SpellTome,Scroll",
+            "False",
+            "Mage",
+            "Mage",
+			
+            /* Make 3Somes Magic animations tags uniform: searches for animations with any of the tags 'MageFemale,MageMale,MagicDildo,Magic,MindControl,SoulGem,Staff,Spell,SpellTome,Scroll' and lets you add the Mage tag to them */
+            "Make 3Somes Magic animations tags uniform",
+            "3",
+            "MageFemale,MageMale,MagicDildo,Magic,MindControl,SoulGem,Staff,Spell,SpellTome,Scroll",
+            "False",
+            "Mage",
+            "Mage",
+			
+            /* Add MageFemale tag to Couples Mage&FemDom anims: searches for animations including any Mage and FemDom tag that don't have the MageFemale tag yet and lets you add the MageFemale tag */
+            "Add MageFemale Tags to Couples Mage&FemDom",
+            "2",
+            "Mage,FemDom",
+            "TRUE",
+            "MageFemale",
+            "MageFemale",
+
+            "Necro Couples",
+            "2",
+            "Necro,Paralyzed",
+            "FALSE",
+            "",
+            "",
+
+            "Necro 3Somes",
+            "3",
+            "Necro,Paralyzed",
+            "FALSE",
+            "",
+            ""
+
+            /* DO NOT EDIT ANYTHING BELOW THIS LINE!                                   */
+        ]
+    }
+}
