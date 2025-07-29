@@ -502,7 +502,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 			endif 
 		
 			if asEventName == "JumpFall"
-			PlayMoaningSound()
+			;PlayMoaningSound()
 			endif
 		
 			if StartFalling ;is FALSE usually, so this case should not happen
@@ -546,7 +546,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 		elseif StartFalling ;we are still falling/jumping
 		Debug.Trace("NAKED DEFEAT configquest: #FALLING END# OnAnimationEvent("+asEventName+")")	
 			
-			SendModEvent("Moan")
+			;SendModEvent("Moan")
 			
 			bool IsDead = false
 			StartFalling = false
@@ -567,13 +567,13 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 					HealthAfterFall = 0.0
 					
 					;---- Check if we reached a "resting" place ----;
-					SendModEvent("Moan")
+					;SendModEvent("Moan")
 					WaitUntilPlayerStationary()
 					
 				;	if Ragdolling
 				;	NymTrace("We Are Ragdolling")
 
-						SendModEvent("Moan")
+						;SendModEvent("Moan")
 				;		endwhile 
 				;	endif 
 					
