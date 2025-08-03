@@ -7,7 +7,7 @@ EndFunction
 ;nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Nipples")
 ;nade_DDInt.IsWearingDDs(PlayerRef, "Lockable")
 
-Bool Function IsWearingDDs(actor akActor, String sType) Global
+Bool Function IsWearingDDs(actor akActor, String sType) Global			;#IsWearingDDs
 	DDTrace("WornDevices("+sType+")")
 	
 	Quest q =  nade_GetDDQuest()
@@ -785,7 +785,8 @@ Function EquipDDtoActor(actor akActor, String sVariant) Global
 	iDevice = ( Game.GetFormFromFile(0x0003C7FB, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Breast Yoke	
 	libs.LockDevice(akActor, iDevice, false)	
 	elseif sVariant == "DD Iron Prisoner Chains"
-	iDevice = ( Game.GetFormFromFile(0x1202FA8B, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Prisoner Chains 		
+	iDevice = ( Game.GetFormFromFile(0x1203D2E6, "Devious Devices - Expansion.esm" ) as Armor ) 	;Steel Manacles	INSTEAD
+	;iDevice = ( Game.GetFormFromFile(0x1202FA8B, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Prisoner Chains ;BUGGED/SUCK	
 	libs.LockDevice(akActor, iDevice, false)	
 	elseif sVariant == "DD Steel Manacles"
 	iDevice = ( Game.GetFormFromFile(0x1203D2E6, "Devious Devices - Expansion.esm" ) as Armor ) 	;Steel Manacles		
@@ -811,7 +812,145 @@ Function EquipDDtoActor(actor akActor, String sVariant) Global
 	iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
 	libs.LockDevice(akActor, iDevice, false)	
 	
+	elseif sVariant == "DD Iron Gag Bit"
+	iDevice = ( Game.GetFormFromFile(0x1201F6C9, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Gag (Bit)
+	libs.LockDevice(akActor, iDevice, false)		
+
+	elseif sVariant == "DD Iron Nipple Piercings"
+	iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Nipple Piercings
+	libs.LockDevice(akActor, iDevice, false)		
+		
+	elseif sVariant == "DD Iron Nipple Clamps"
+	iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
+	libs.LockDevice(akActor, iDevice, false)		
+		
+	
+	elseif sVariant == "Random Binds" 
+	
+			
+			;---- Nipple Torture -----;		
+			if (Utility.RandomInt(1,100) < 75) && !FullOutfitEquiped
+				
+				i = Utility.Randomint(1,2)	
+				DDTrace("Nipple Torture: "+i)			
+				if i == 1
+				iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Nipple Piercings
+				elseif i == 2
+				iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
+				endif 
+				
+				if iDevice
+				libs.LockDevice(akActor, iDevice, false)
+				else
+				DDTrace("Nipple Torture NO DEVICE: "+i)
+				endif 
+				
+			endif 
+	
+			;---- Gag ----:
+			if Utility.RandomInt(1,100) < 75		
+				if Utility.RandomInt(1,100) < 5
+				iDevice = ( Game.GetFormFromFile(0x1201E69B, "Devious Devices - Expansion.esm" ) as Armor ) 	;Mask of Shame
+				elseif Utility.RandomInt(1,100) < 50
+				iDevice = ( Game.GetFormFromFile(0x1201AB0E, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Scold's Bridle (Light)
+				else 
+				iDevice = ( Game.GetFormFromFile(0x1201F6C9, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Gag (Bit)
+				endif 
+				
+				if iDevice
+				libs.LockDevice(akActor, iDevice, false)
+				else
+				DDTrace("Gag NO DEVICE: "+i)
+				endif 
+			endif 
+	
+			;---- Random Bondage -----;
+			i = Utility.Randomint(2,12)
+			DDTrace("RandomBondage: "+i)
+			if i == 1			;BUGGED - TEST
+			iDevice = ( Game.GetFormFromFile(0x120486E9, "Devious Devices - Expansion.esm" ) as Armor ) 	;Rope Body Restraint ;BUGGED?
+			IsBodyBlocked = true
+			elseif i == 2
+			iDevice = ( Game.GetFormFromFile(0x12039C78, "Devious Devices - Expansion.esm" ) as Armor ) 	;Black Leather Straitjacket (Open, Legbinder)
+			IsBodyBlocked = true
+			elseif i == 3 
+			iDevice = ( Game.GetFormFromFile(0x12039C7E, "Devious Devices - Expansion.esm" ) as Armor ) 	;Black Leather Straitjacket (Topless)
+			IsBodyBlocked = true
+			elseif i == 4
+			iDevice = ( Game.GetFormFromFile(0x12A2002D, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Yoke (Fiddle)
+			elseif i == 5 
+			iDevice = ( Game.GetFormFromFile(0x0003C7FB, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Breast Yoke		
+			elseif i == 6
+			iDevice = ( Game.GetFormFromFile(0x12053625, "Devious Devices - Expansion.esm" ) as Armor ) 	;Hooked Elbow Shackles
+			elseif i == 7 
+			iDevice = ( Game.GetFormFromFile(0x1202FA8B, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Prisoner Chains 	
+			elseif i == 8
+			iDevice = ( Game.GetFormFromFile(0x12037C17, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Handcuffs
+			elseif i == 9 
+			iDevice = ( Game.GetFormFromFile(0x1203D2E1, "Devious Devices - Expansion.esm" ) as Armor ) 	;Steel Yoke
+			elseif i == 10
+			iDevice = ( Game.GetFormFromFile(0x120486DD, "Devious Devices - Expansion.esm" ) as Armor ) 	;Strict Rope Armbinder
+			elseif i == 11
+			iDevice = ( Game.GetFormFromFile(0x120486E3, "Devious Devices - Expansion.esm" ) as Armor ) 	;Rope Armbinder
+			elseif i == 12
+			iDevice = ( Game.GetFormFromFile(0x1203D2E6, "Devious Devices - Expansion.esm" ) as Armor ) 	;Steel Manacles
+			elseif i == 13
+			iDevice = ( Game.GetFormFromFile(0x00000000, "Devious Devices - Expansion.esm" ) as Armor ) 	;0x00000000		
+			elseif i == 14
+			iDevice = ( Game.GetFormFromFile(0x00000000, "Devious Devices - Expansion.esm" ) as Armor ) 	;0x00000000
+			elseif i == 15 
+			iDevice = ( Game.GetFormFromFile(0x00000000, "Devious Devices - Expansion.esm" ) as Armor ) 	;0x00000000	
+			elseif i == 16
+			iDevice = ( Game.GetFormFromFile(0x00000000, "Devious Devices - Expansion.esm" ) as Armor ) 	;0x00000000
+			elseif i == 17 
+			iDevice = ( Game.GetFormFromFile(0x00000000, "Devious Devices - Expansion.esm" ) as Armor ) 	;0x00000000
+			endif 
+			
+			if iDevice
+			libs.LockDevice(akActor, iDevice, false)
+			else
+			DDTrace("RandomBondage NO DEVICE: "+i)
+			endif 
+
+	
 	elseif sVariant == "Random" 
+	
+			;---- Plugs -----;	
+		if Utility.RandomInt(1,100) < 75
+			
+			i = Utility.Randomint(1,3)	
+			DDTrace("Plugs: "+i)				
+			if i == 1
+			iDevice = ( Game.GetFormFromFile(0x1202EA47, "Devious Devices - Expansion.esm" ) as Armor ) 	;Plug (Tail) ("Eostre")   -- ANAL
+			elseif i == 2
+			iDevice = ( Game.GetFormFromFile(0x1201B5E5, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Pear of Anuish (Bell) (Anal)	- ANAL
+			elseif i == 3
+			iDevice = ( Game.GetFormFromFile(0x1201B5E8, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Pear of Anuish (Chain) (Vaginal) --- VAG
+			endif 
+			
+			if iDevice
+			libs.LockDevice(akActor, iDevice, false)
+			else
+			DDTrace("Plugs NO DEVICE: "+i)
+			endif 
+		endif 
+	
+			;---- Gag ----:
+		if Utility.RandomInt(1,100) < 75		
+			if Utility.RandomInt(1,100) < 5
+			iDevice = ( Game.GetFormFromFile(0x1201E69B, "Devious Devices - Expansion.esm" ) as Armor ) 	;Mask of Shame
+			elseif Utility.RandomInt(1,100) < 50
+			iDevice = ( Game.GetFormFromFile(0x1201AB0E, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Scold's Bridle (Light)
+			else 
+			iDevice = ( Game.GetFormFromFile(0x1201F6C9, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Gag (Bit)
+			endif 
+			
+			if iDevice
+			libs.LockDevice(akActor, iDevice, false)
+			else
+			DDTrace("Gag NO DEVICE: "+i)
+			endif 
+		endif 
 			
 		if Utility.RandomInt(1,100) < 5
 			DDTrace("Full Chain Harness")
@@ -833,23 +972,7 @@ Function EquipDDtoActor(actor akActor, String sVariant) Global
 			iDevice = ( Game.GetFormFromFile(0x1203D2E1, "Devious Devices - Expansion.esm" ) as Armor ) 	;Steel Yoke	
 			libs.LockDevice(akActor, iDevice, false)				
 		endif 	
-			
-		;---- Gag ----:
-		if Utility.RandomInt(1,100) < 75		
-			if Utility.RandomInt(1,100) < 5
-			iDevice = ( Game.GetFormFromFile(0x1201E69B, "Devious Devices - Expansion.esm" ) as Armor ) 	;Mask of Shame
-			elseif Utility.RandomInt(1,100) < 50
-			iDevice = ( Game.GetFormFromFile(0x1201AB0E, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Scold's Bridle (Light)
-			else 
-			iDevice = ( Game.GetFormFromFile(0x1201F6C9, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Gag (Bit)
-			endif 
-			
-			if iDevice
-			libs.LockDevice(akActor, iDevice, false)
-			else
-			DDTrace("Gag NO DEVICE: "+i)
-			endif 
-		endif 
+
 		
 		;---- Nipple Torture -----;		
 		if (Utility.RandomInt(1,100) < 75) && !FullOutfitEquiped
@@ -869,27 +992,7 @@ Function EquipDDtoActor(actor akActor, String sVariant) Global
 			endif 
 			
 		endif 
-		
-		;---- Plugs -----;	
-		if Utility.RandomInt(1,100) < 75
-			
-			i = Utility.Randomint(1,3)	
-			DDTrace("Plugs: "+i)				
-			if i == 1
-			iDevice = ( Game.GetFormFromFile(0x1202EA47, "Devious Devices - Expansion.esm" ) as Armor ) 	;Plug (Tail) ("Eostre")   -- ANAL
-			elseif i == 2
-			iDevice = ( Game.GetFormFromFile(0x1201B5E5, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Pear of Anuish (Bell) (Anal)	- ANAL
-			elseif i == 3
-			iDevice = ( Game.GetFormFromFile(0x1201B5E8, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Pear of Anuish (Chain) (Vaginal) --- VAG
-			endif 
-			
-			if iDevice
-			libs.LockDevice(akActor, iDevice, false)
-			else
-			DDTrace("Plugs NO DEVICE: "+i)
-			endif 
-		endif 
-		
+
 		;---- Bondage / Binds ----:
 		
 			

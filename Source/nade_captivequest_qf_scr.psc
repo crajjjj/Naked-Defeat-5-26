@@ -424,6 +424,10 @@ int loosenDiff = 1
 Bool PunishmentTypeInfo = false 
 Bool PunishmentHarshInfo = false 
 Bool PunishmentPeeInfo = false 
+
+
+
+
   
 Event OnKeyDown (Int KeyCode)				;CAN I ADD A "ON HIT" bool to break the PC free? Meaning if he is attacked he will automatically end the quest? #key
 
@@ -557,6 +561,8 @@ if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu")
 			endif
 		endif
 		
+		calmqst.RestoreVictimFurnitures()
+
 		;>>>>>>>>>>>>> WIGGLE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		
 		 Debug.Trace("NAKED DEFEAT: captivequest Keypress DefeatKey (STRUGGLE)")
@@ -1265,6 +1271,24 @@ Function StartPunishmentEffect(string type)	;#shader2 	;#spells		;#StartPunishme
 	;if cfgqst.IsNymrasGame() && D100(50
 	;type = "shock"
 	;endif 
+	
+	if type == "Varied"
+	int varied = Utility.RandomInt(1,4)
+		if varied == 1
+		type = "Shock"
+		elseif varied == 2
+		type = "Frost"
+		elseif varied == 3
+		type = "Fire"	
+		elseif varied == 4 
+		type = "Random"	
+		elseif varied == 5 
+		type = "HotnCold"	
+		elseif varied == 6 
+		type = "Pain"	
+		endif 
+	endif 
+		
 	
 	if type == "Shock"
 	cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"

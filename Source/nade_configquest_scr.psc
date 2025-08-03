@@ -12,6 +12,7 @@ EndFunction
 
 import JsonUtil
 
+
 ;import PO3_SKSEFunctions
 
 Function RegisterModEvents()		;#RegisterModEvents	#Register1
@@ -69,8 +70,13 @@ Function RegisterModEvents()		;#RegisterModEvents	#Register1
 	
 	RegisterForKey(57)	;SPACE
 	RegisterForKey(207)	;End
+	
+
+	
+	;https://ck.uesp.net/wiki/Input_Script
 
 	if IsNymrasGame()
+	RegisterForKey(16)	;End
 	;0x15    21  Y
 	UnregisterForKey(21)	;Y (for Potion) ;nono need Z
 	RegisterForKey(44)	;Z (for Potion)
@@ -211,6 +217,7 @@ endif
 				Utility.Wait(2.0)
 				DefeatTypeScenario = "Afterlife"					;AfterLife Starts here
 				StartDeviousTrapStarted = false
+				StartRobberyAtLocation()
 				SendModevent("StartNakedAfterlife")
 				
 	
@@ -357,10 +364,12 @@ Debug.Trace("NAKED DEFEAT configquest: OnStartPlayerDestiny")
 		
 		;--- SLAVERY ---;
 		elseif (i == 2) && D100(DestinySlaveryChance)
+		StartRobberyAtLocation()
 		SendModEvent("SSLV Entry")
 		
 		;--- DEATH ---;
 		elseif (i == 3) && D100(DestinyDeathChance)
+		StartRobberyAtLocation()
 		SendModevent("StartNakedAfterlife")
 		
 		else
@@ -419,7 +428,7 @@ Float PlayerZ = PlayerRef.GetPositionZ()
 	endwhile 
 
 	if Nym() 
-	PlayCombatBlockingSound()
+;	PlayCombatBlockingSound()
 	endif 
 
 
@@ -470,7 +479,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 	elseif (asEventName == "SoundPlay.FSTSwimSwim") 	 ;#DODGE 
 		
 		if NakedDrowning && Nym()
-		Debug.Messagebox("Start Swiimming")
+	;	Debug.Messagebox("Start Swiimming")
 			Utility.Wait(2.0)
 		
 			;if cfgqst.PlayerRef.IsSwimming()
@@ -498,11 +507,11 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 			if Nym() && Debugpunishmenttype > 0
 			;Debug.Messagebox("Jump Start")
 			
-			PlaySoundOnActor(PlayerRef, "Item does not fit", 1.0)
+			;PlaySoundOnActor(PlayerRef, "Item does not fit", 1.0)
 			endif 
 		
 			if asEventName == "JumpFall"
-			;PlayMoaningSound()
+		;	PlayMoaningSound()
 			endif
 		
 			if StartFalling ;is FALSE usually, so this case should not happen
@@ -540,9 +549,9 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 		
 		if !StartFalling && Nym() && Debugpunishmenttype > 0
 		Debug.Trace("NAKED DEFEAT configquest: #FALLING END# OnAnimationEvent("+asEventName+") Already Landed (or never started jumping...")
-		PlayCombatBlockingSound()
-		Utility.Wait(0.5)
-		PlayCombatBlockingSound()
+	;	PlayCombatBlockingSound()
+	;	Utility.Wait(0.5)
+	;	PlayCombatBlockingSound()
 		elseif StartFalling ;we are still falling/jumping
 		Debug.Trace("NAKED DEFEAT configquest: #FALLING END# OnAnimationEvent("+asEventName+")")	
 			
@@ -567,7 +576,7 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 					HealthAfterFall = 0.0
 					
 					;---- Check if we reached a "resting" place ----;
-					;SendModEvent("Moan")
+				;	SendModEvent("Moan")
 					WaitUntilPlayerStationary()
 					
 				;	if Ragdolling
@@ -620,14 +629,16 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 						  InfoMessage("DefeatChance: "+UnconciousnessChance)  
 
 							if !PlayerDownAlready
+							SendModEvent("Moan")
 							ScreenMessage("You have fallen to your death.")
 							FallingEventStarted = true	
 							DefeatTypeScenario = "Afterlife"					;AfterLife Starts here
+							StartRobberyAtLocation()
 							SendModevent("StartNakedAfterlife")
-							
-						  
+
 							elseif D100(UnconciousnessChance)
 								if PartyInCombat()		;Falling in Combat
+								SendModEvent("Moan")
 								FallingEventStarted = true
 								ScreenMessage("You hurt your ankle from the fall and are defeated!")
 								;allowsurrender = false	
@@ -685,10 +696,15 @@ Event OnAnimationEvent(ObjectReference akSource, string asEventName)		;#ragdoll	
 	
 	elseif asEventName == "RemoveCharacterControllerFromWorld"
 	Ragdolling = true
+	
+	NymMessage("Ragdoll Start")
+	
+	
 	;RagdollGetUpScan()
 	elseif asEventName == "getupend"
 	Utility.Wait(1.5)
 	Ragdolling = false
+	NymMessage("Ragdoll End")
 	endif
 	
 EndEvent
@@ -1057,6 +1073,8 @@ if SSHandling
 	SlaveAuction = true
 	
 	FollowersStripWeapons()
+	
+	folqst.FollowerStripUpdate()
 		
 	;if (CalmQuest.GetStage() == 1000) || (CalmQuest.GetStage() == 0)
 	;CalmQuest.Start()
@@ -1068,7 +1086,7 @@ if SSHandling
 	
 	int i = 0
 	
-	FollowerStripCompletely()
+	FollowersStripCompletely()
 	FollowersStripWeapons()
 	
 	while SlaveAuction && ModEnabled && PlayerRef.IsInLocation(AuctionRoom)	
@@ -2354,6 +2372,9 @@ int Group3PchanceOID_S
 int FindSpotTimeOID_S
 int ScenarioChanceOID_S
 
+
+int Property DefeatDDChance_OID_S Auto
+
 int DebugPunishmentTypeOID_S
 int RagdollOID_B
 int DefeatRobberyGoldOID_B
@@ -2844,6 +2865,8 @@ Int[] Property ExposureChange Auto
 
 ;>>>>>>>>	FLOAT	   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #float
 
+
+float Property DefeatDDChance Auto
 float Property IndecencyRapeProb Auto
 float Property ValidWhipper Auto
 float Property IndecencyRobberyProb Auto
@@ -3339,12 +3362,19 @@ Float Property Leniency Auto
 
 Bool HasKWDSexlabNoStrip = false 
 
+;##Keyword
+
+
+
 Keyword Property nade_HairGrowth Auto
 Keyword Property KWDLootCooldownEffect Auto
 Keyword Property KWDPotionDurationHealthEffect Auto
 Keyword Property KWDPotionDurationMagickaEffect Auto
 
 Keyword Property KWD_Zaz_InventoryDevice Auto
+Keyword Property KWD_nade_Gag Auto
+Keyword Property KWD_nade_Collar Auto
+Keyword Property KWD_nade_Bondage Auto
 
 ;Keyword Property KWDPotionDurationStaminaEffect Auto
 
@@ -3607,6 +3637,22 @@ EndFunction
 
 Bool Function IsSuspended()
 
+NymTrace("#REMOVE IsSuspended()")
+
+if Nym()
+	
+
+	
+	if IsFucking(PlayerRef)
+
+	NymTrace("#REMOVE IsSuspended(IsFucking)")
+
+	SendModEvent("StartNakedSexExpressions")
+	endif 
+
+endif 
+
+
 if IsDefeatRunning()
 return true
 endif
@@ -3654,7 +3700,7 @@ endIf
 
 EndFunction
 
-Bool Function IsFucking(Actor akactor)
+Bool Function IsFucking(Actor akactor)			;#IsFucking()
 if akactor.IsInFaction(SexLabAnimatingFaction)
 return true
 else
@@ -3896,6 +3942,26 @@ EndFunction
 
 Bool Function IsPlayerBarefoot()
 	return !PlayerRef.GetWornForm(0x00000080)
+EndFunction
+
+
+Bool Function IsPlayerGagged()
+
+	;Form a
+	;a = PlayerRef.GetWornForm(0x00004000)	
+	
+	;if a && a.HasKeyWord(KWD_nade_Gag) 
+	if PlayerRef.WornHasKeyword(KWD_nade_Gag)
+	Gagged = true
+	return true
+	elseif ModDDframework && nade_DDint.IsWearingDDs(PlayerRef, "Gag")
+	Gagged = true
+	return true 
+	else 
+	Gagged = False
+	return false
+	endif 
+	
 EndFunction
 
 ;---------------------------------------------------------------------------------------------------------------------------
@@ -4426,7 +4492,12 @@ Function OnCellLoadFunction()
 			
 			endif
 		endif
-		
+			
+		if Nym()
+		Utility.Wait(2.0)
+		Game.SaveGame("Location Change")
+		endif 
+
 	;	SendModevent("nade_FuckStates")
 	;	SendModevent("nade_FuckStates")
 	;	SendModevent("nade_FuckStates")
@@ -4578,7 +4649,7 @@ Function StartRobbery(Actor akRobber)				;#StartRobbery #robbery2
 				if Gold > 1000
 				GoldMin = 1000
 				else
-				GoldMin = Gold
+				GoldMin == Gold
 				endif
 				
 				if Gold > 0
@@ -4684,7 +4755,7 @@ EndFunction
 
 
 ;0x15    21  Y
-Function DrinkPotion()
+Function DrinkPotion()	;#potion
 	Debug.trace("Naked Defeats configquest - DrinkPotion()")
 	Int iFormIndex = PlayerRef.GetNumItems()	
 	Int iFormCount
@@ -4693,6 +4764,7 @@ Function DrinkPotion()
 	int WantHealth = 0 
 	int WantStamina = 0 
 	int WantMagicka = 0
+	String sTempMessage
 	
 	Keyword VendorItemPotion
 ;	MagicEffect RestoreHealth	0003EB15
@@ -4715,7 +4787,12 @@ Function DrinkPotion()
 	float PCHealthMax = playerref.GetActorValueMax("health")
 	float PCHealthCurrent = playerref.GetAV("health")
 	bool PotionFound = false
+	
+	NymTrace("#DEBUG #Potions PCHealthMax: "+PCHealthMax+" PCHealthCurrent "+PCHealthCurrent)
+
 	if PCHealthMax != PCHealthCurrent ;I was smart
+	
+	
 		if (PCHealthMax/PCHealthCurrent) >= 10 	;100/10 (10 % health) --- lower than 10% health
 		;NymTrace("PC health lower than 10%")
 		WantHealth = 3
@@ -4727,6 +4804,8 @@ Function DrinkPotion()
 		WantHealth = 1
 		endif 
 	endif 
+	
+	NymTrace("#DEBUG #Potions WantHealth: "+WantHealth)
 	
 	if !VendorItemPotion
 	VendorItemPotion = (Game.GetFormFromFile(0x0008CDEC, "Skyrim.esm") As Keyword)
@@ -4741,6 +4820,10 @@ Function DrinkPotion()
 		endif 
 		if ItemToCheck && ItemToCheck.HasKeyword(VendorItemPotion)
 		ItemName = ItemToCheck.GetName()
+		
+		NymTrace("#DEBUG #Potions ItemName: "+ItemName)
+		
+		
 			if WantHealth > 0
 				if (WantHealth > 2) && (CheckBestHealthPotions(ItemName) || CheckMediumHealthPotions(ItemName) || CheckLightHealthPotions(ItemName))
 				PlayerRef.EquipItem(ItemToCheck)	
@@ -4751,13 +4834,20 @@ Function DrinkPotion()
 				elseif (WantHealth > 0) && (CheckLightHealthPotions(ItemName) || CheckMediumHealthPotions(ItemName) || CheckBestHealthPotions(ItemName))
 				PlayerRef.EquipItem(ItemToCheck)
 				PotionFound = true
+		
+				elseif CheckDurationSpell("magicka") && (WantHealth > 0) && (CheckLightMagickaPotions(ItemName) || CheckMediumMagickaPotions(ItemName) || CheckBestMagickaPotions(ItemName))
+				PlayerRef.EquipItem(ItemToCheck)
+				PotionFound = true
+				NymMessage("Drinking Magicka Potion (for Health), yeah!")
+				
+				
 				else 
 				
 					if !CheckDurationSpell("magicka") ;NO stamina effect active
 					WantStamina = 1
-					ScreenMessage("No Health Potion left, we drink Stamina isntead!")
+					sTempMessage = "No Health Potion left, we drink Stamina instead!"
 					else 
-					ScreenMessage("No Health Potion left!")
+					sTempMessage = "No Health Potion left!"
 					endif 
 				endif 
 			endif 
@@ -4772,8 +4862,15 @@ Function DrinkPotion()
 				elseif (WantStamina > 0) && (CheckLightStaminaPotions(ItemName) || CheckMediumStaminaPotions(ItemName) || CheckBestStaminaPotions(ItemName))
 				PlayerRef.EquipItem(ItemToCheck)
 				PotionFound = true
+				
+				elseif  CheckDurationSpell("health") && (WantStamina > 0) && (CheckLightMagickaPotions(ItemName) || CheckMediumMagickaPotions(ItemName) || CheckBestMagickaPotions(ItemName))
+				PlayerRef.EquipItem(ItemToCheck)
+				PotionFound = true
+				NymMessage("Drinking Magicka Potion (for Stamina), yeah!")
+				
+				
 				else 
-				ScreenMessage("No Stamina Potion left!")
+				sTempMessage = "No Stamina Potion left!"
 				endif 
 			endif 
 		endif 	
@@ -5691,6 +5788,8 @@ Event OnPageReset(String page)
 		SearchRadiusInteriorOID_S = AddSliderOption("$nade_SearchRadiusInterior", SearchRadiusInterior, "{0} units")			;SearchRadiusInterior
 		AddHeaderOption("")
 		ScenarioChanceOID_S = AddSliderOption("$nade_ScenarioChance", ScenarioChance, "{0}%")				;ScenarioChance
+		DefeatDDChance_OID_S = AddSliderOption("<font color='#6a5acd'>$nade_DefeatDDChance</font>", DefeatDDChance, "{0}%")
+		
 		DefeatPeeProbOID_S = AddSliderOption("$nade_DefeatPeeProb", DefeatPeeProb, "{0}%")				;Forced bathing event chance 
 		Group5PchanceOID_S = AddSliderOption("$nade_Group5Pchance", Group5Pchance, "{0}%")					;Gangrape chance
 		Group4PchanceOID_S = AddSliderOption("$nade_Group4Pchance", Group4Pchance, "{0}%")					;Gangrape chance
@@ -6760,7 +6859,7 @@ Int Function KeyShowWheelMenuTEST() 		;##test
 	; --- Test [2] --------------------------------------------------------------
 	elseif selectedIndex == 1
 	
-	FollowerStripCompletely()
+	FollowersStripCompletely()
 	Utility.Wait(3.0)
 	FollowerLoadOutfit()
 	
@@ -7483,22 +7582,22 @@ Int Function ShowWheelMenuAction() 		;#wheel ##action
 	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 0, value = "Start Bathing ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 1, value = "Cost: 1000 septims ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 2, value = "Cost: risky outcome ")
-	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 3, value = "Load Ini File ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 3, value = "Test Ambush ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 4, value = "Test Afterlife ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 5, value = "Test Hostile Slavery ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 6, value = "Test Public Slavery ")
-	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 7, value = "Start Simple Slavery ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 7, value = "MoveActorToLocation ")
 																						
 	;OPTION TEXT 																	    ;"XXXXXXXXXXXXXXXXXXXXXXX" <--- available space
 	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 0, value = "Bathing ")
 																						;  "Start Naked Travel"
 	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 1, value = "Save Travel Ritual ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 2, value = "Risky Travel Ritual ")
-	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 3, value = "Load Ini File ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 3, value = "Test Ambush ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 4, value = "Test Afterlife ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 5, value = "Test Hostile Slavery ")
 	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 6, value = "Test Public Slavery ")
-	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 7, value = "Test Slavery ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 7, value = "MoveActorToLocation ")
 	
 	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 0, value = true)
 	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 1, value = true)
@@ -7524,6 +7623,9 @@ Int Function ShowWheelMenuAction() 		;#wheel ##action
 	
 ;	if IsNymrasGame()
 		if HasPlayerEnoughGold(1000)
+		
+		PlayerRef.RemoveItem(Gold001, 1000, false, none)
+		
 		KeyStartFastTravelRitual()
 		DefeatEntranceVia = "Travel Ritual Save"
 		else
@@ -7557,6 +7659,9 @@ Int Function ShowWheelMenuAction() 		;#wheel ##action
 	; --- NONE --------------------------------------------------------------
 	elseif selectedIndex == 3
 		
+		
+	StartAmbush()	
+		
 ;if Nym()		
 ;		Save_JSON_Ini()
 ;endif 		
@@ -7586,9 +7691,12 @@ Int Function ShowWheelMenuAction() 		;#wheel ##action
 	
 		;calmqst.StripFollower(0)	I need a convenient FollowerStrip Function 
 		;calmqst.StripFollower(1)
-		FollowerStripCompletely()
-		StartRobberyAtLocation()
-		SendModEvent("SSLV Entry")
+		;FollowerStripCompletely()
+		;StartRobberyAtLocation()
+		;SendModEvent("SSLV Entry")
+		
+		
+		MoveActorToLocation(PlayerRef, "Random Mountain", false)
 
 	;	if D100(50)
 	;	ScreenMessage("Test Slavery Location (Public) Started") 
@@ -7763,6 +7871,13 @@ Event OnOptionSliderOpen(Int option)
 		SetSliderDialogDefaultValue(50.0)
 		SetSliderDialogRange(0.0, 100.0)
 		SetSliderDialogInterval(1.0)
+		
+	elseif (option == DefeatDDChance_OID_S)
+		SetSliderDialogStartValue(DefeatDDChance)
+		SetSliderDialogDefaultValue(0.0)
+		SetSliderDialogRange(0.0, 100.0)
+		SetSliderDialogInterval(1.0)		
+
 	elseif (option == DebugPunishmentTypeOID_S)
 		SetSliderDialogStartValue(DebugPunishmentType)
 		SetSliderDialogDefaultValue(0.0)
@@ -8322,6 +8437,14 @@ Event OnOptionSliderAccept(Int option, Float value)
 	elseif (option == ScenarioChanceOID_S)
 		ScenarioChance = value
 		SetSliderOptionValue(ScenarioChanceOID_S, ScenarioChance, "{0}%")
+		
+	elseif (option == DefeatDDChance_OID_S)
+		DefeatDDChance = value
+		SetSliderOptionValue(DefeatDDChance_OID_S, DefeatDDChance, "{0}%")
+			
+		
+		
+		
 	elseif (option == DebugPunishmentTypeOID_S)
 		DebugPunishmentType = value
 		SetSliderOptionValue(DebugPunishmentTypeOID_S, DebugPunishmentType, "{0}")
@@ -9716,7 +9839,13 @@ Event OnOptionHighlight(Int option)
 	elseif (option == Group5PchanceOID_S)
 		SetInfoText("$nade_Group5PchanceHL")
 	elseif (option == ScenarioChanceOID_S)
-		SetInfoText("$nade_ScenarioChanceHL")		
+		SetInfoText("$nade_ScenarioChanceHL")	
+
+	elseif (option == DefeatDDChance_OID_S)
+		SetInfoText("$nade_DefeatDDChanceHL")
+
+
+		
 	elseif (option == DebugPunishmentTypeOID_S)
 		SetInfoText("$nade_DebugPunishmentTypeHL")		
 	elseif (option == DefeatBreakClothingOID_S)
@@ -10442,15 +10571,17 @@ Debug.trace ("NAKED DEFEAT confiquest: NakedBathing()")
 		
 		if !AbortBathing && !PartyInCombat()
 		PlayerRef.PlayIdle(IdlesBathingStanding[8])
-			if folqst.Actor_Follower01
-			folqst.Actor_Follower01.UnequipAll()
-			folqst.Actor_Follower01.PlayIdle(IdlesBathingStanding[7])
-			endif 
-			if folqst.Actor_Follower02
-			folqst.Actor_Follower02.UnequipAll()
-			folqst.Actor_Follower02.PlayIdle(IdlesBathingStanding[6])
-			endif 
-		endif 	
+		
+			if folqst.NakedFollowerCount > 0
+			FollowersStripCompletely()
+				if folqst.Actor_Follower01
+				folqst.Actor_Follower01.PlayIdle(IdlesBathingStanding[7])
+				endif 
+				if folqst.Actor_Follower02
+				folqst.Actor_Follower02.PlayIdle(IdlesBathingStanding[6])
+				endif 
+			endif 	
+		endif 
 
 		if DefeatQuestRunning || CivilRapeRunning
 		RealWaiting(2.0)
@@ -10709,6 +10840,7 @@ int PressedTimes = 0
 
 ;mfg reset via ConsoleUtil, or using ResetExpressionOverrides() or ClearExpressionOverride()
 
+int QuickSaveCount
 	
 Event OnKeyDown(Int KeyCode)				;#keydown	
 				
@@ -10740,10 +10872,16 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 	elseif !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu") && !PlayerRef.IsOnMount() ;&& !SexLab.IsRunning	;changed 03-01-2024 --- Sexlab running is not imporant here
 	
 		bool AltPressed = false
+				
+
+		; >>>> Q (pressed) >>>>>>		
+		if (KeyCode == 16)
+		QuickSaveCount += 1
+		Game.SaveGame("Quick Save "+QuickSaveCount)			
 					
 		; >>>> NUMBER (pressed) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		if ((KeyCode == 2) || (KeyCode == 3) || (KeyCode == 4) || (KeyCode == 5) || (KeyCode == 6) || (KeyCode == 7) || (KeyCode == 8) || (KeyCode == 9) || (KeyCode == 10) || (KeyCode == 11))
-		Debug.trace ("NAKED DEFEAT confiquest: Keypress NUMBER (pressed)")	
+		elseif ((KeyCode == 2) || (KeyCode == 3) || (KeyCode == 4) || (KeyCode == 5) || (KeyCode == 6) || (KeyCode == 7) || (KeyCode == 8) || (KeyCode == 9) || (KeyCode == 10) || (KeyCode == 11))
+		Debug.trace ("NAKED DEFEAT confiquest: Keypress NUMBER "+KeyCode+" pressed")	
 			
 			; --- OUTFIT UTILITY --- SHIFT + .... -- ;
 			if !IsDefeatRunning()
@@ -10766,7 +10904,7 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 					
 						if folqst.Actor_Follower01 || folqst.Actor_Follower02
 						ScreenMessage("Your followers do the same.")
-						FollowersRedress()
+						;FollowersRedress()
 						folqst.FollowerStripUpdate()
 						endif 
 					
@@ -10774,14 +10912,20 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 					elseif KeyCode == 4 ;3
 					ScreenMessage("You strip completely naked [UnequipAll]")
 					NymTrace("Immobilize(true) for Stripping Naked")
-					Immobilize(true)
-					IdleEquipBody()
-					Utility.Wait(1.5)
-					PlayerRef.UnequipAll()
-					Utility.Wait(1.5)
-					IdleEquipFinish()
-					Utility.Wait(1)
-					Immobilize(false)
+					
+						if IsDefeatRunning()
+						PlayerStripCompletely(0,0,0,0,0)
+						else 
+						Immobilize(true)
+						IdleEquipBody()
+						 
+						Utility.Wait(1.5)
+						PlayerStripCompletely(0,0,0,0,0)
+						Utility.Wait(1.5)
+						IdleEquipFinish()
+						Utility.Wait(1)
+						Immobilize(false)
+						endif
 					endif
 				
 				; --- EQUIP OUTFIT --- ALT + 1,2,3,4,5,6,7,8,9,0 --- ;
@@ -10799,18 +10943,27 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 
 				; --- EQUIP WEAPON --- 1,2,3,4,5,6,7,8,9,0 --- ;
 				else		
-					String WeaponNum 
+					String WeaponNum = "empty"
 					Int TempKeyCode = KeyCode
-					Int TempInt			
-					if KeyCode == 11
-					WeaponNum = "10"
+					Int TempInt		
+
+					if Nym() && KeyCode == 10  ;10 is 9.... fuck all
+					;do nothing atm
+					
 					else
-					TempKeyCode -= 1
-					WeaponNum = "0"+TempKeyCode
-					endif
-					Debug.trace ("NAKED DEFEAT confiquest: Keypress LOAD_WEAPON NUM: "+WeaponNum)			
-					Load_JSON_Weapon(WeaponNum, true)
-					AddRandomHarness()
+						if KeyCode == 11
+						WeaponNum = "10"
+						else
+						TempKeyCode -= 1
+						WeaponNum = "0"+TempKeyCode
+						endif
+						Debug.trace ("NAKED DEFEAT confiquest: Keypress LOAD_WEAPON NUM: "+WeaponNum)			
+						Load_JSON_Weapon(WeaponNum, true)
+						if WeaponNum != "empty"
+						AddRandomHarness()
+						endif  
+						
+					endif 
 				endif 
 			endif 
 		; >>>>>>>>>>>> Z (y on german keybaords...) <<<<<<<<<<<<<<< ;
@@ -10823,6 +10976,17 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 		; >>>>>>>>>>>> K <<<<<<<<<<<<<<< ;
 		elseif KeyCode == DefeatKey
 		Debug.trace ("NAKED DEFEAT confiquest: Keypress DefeatKey (pressed)")
+		
+			if Nym()
+							
+					if PlayerRef.IsWeaponDrawn() 
+					NymTrace("#DEBUG -- Weapon Drawn")
+					;Debug.Messagebox("Weapon Drawn")
+					;PlayerRef.SheatheWeapon() 
+					endif
+				
+			endif 
+		
 		;if K is ressed we check further conditions here. ALL of them	
 								
 			;if IsNymrasGame() && (DefeatStateChapter != "Free") 
@@ -10836,7 +11000,12 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 			;	endif 
 			;	
 			;endif 
-							
+			
+			if SexScene
+			SetExpression(1)
+			calmqst.OpenMouth()
+			endif 								
+						
 			if !IsDefeatRunning() ;&& (DefeatStatePlayer == "none")
 			DefeatStatePlayer = "Free"
 			elseif !IsDefeatRunning() && (DefeatStatePlayer != "Free")
@@ -11104,11 +11273,19 @@ Function KeyEscapeFindSpot()
 			;	ScreenMessage("You found a good spot and prepare for your fate...")
 			;	Immobilize(true)		
 				;SlowDownPlayer(false)	
-
+					
+								
+					if Nym()
+						if PlayerRef.IsWeaponDrawn()
+						NymTrace("#DEBUG WeaponDrawn")
+						ForceSheatheWeapon(true)
+						endif 
+					else 
 					Utility.Wait(2.0)
+					endif 
 					
 					DefeatStatePlayer = "SpotFound"
-					
+					NymTrace("######################## DefeatStatePlayer = SpotFound ######################")
 				endif
 EndFunction
 
@@ -11230,6 +11407,54 @@ bool Evaded = false
 		
 EndFunction
 
+Function StartAmbush()
+
+	Debug.Trace("NAKED DEFEAT configquest: StartAmbush()")
+
+
+	PlayerDownAlready = true		;PREVENT DOUBLE STARTS!!! NEW 2025
+	
+	DefeatStatePlayer = "Ambush"
+
+	SPE_Actor.SetActorCalmed(PlayerRef, true)
+	calmqst.CalmFollowers(true)
+	
+	ScreenMessage("You are ambushed in a helpless situation")	;DEFEAT MESSAGE surrender
+	AddVictimsToCalmFactions(true)
+	DefeatQuestRunning = true				;#0 -- THIS ORDER HAS TO BE KEPT!!!!!
+	;DefeatViaSurrender = true				;#1 ----> NOTHING else should now trigger or process   
+	FirstStartUp = true						;#2  
+
+;	ProximityQuestDefeatScenarioScanStart()	;____-WE NEED TO SCAN FOR ENEMIES IN CASE WE HAVE !!! NO HiTs !!! On PC 
+	
+	;TempSender = "Via Key Combat Surrender"
+	AllegianceScanType = "CombatSurrenderStart"
+	SendModEvent("StartAllegianceQuest") 	;#3
+	ProcessCrimeGold()
+	
+	Immobilize(true)
+
+	if PlayerRef.IsWeaponDrawn() 
+	PlayerRef.SheatheWeapon()
+	Utility.Wait(1.0)
+	endif
+	
+	StripWeapons()
+	
+	calmqst.PlayPoseOnActor(PlayerRef, "Surrender", false)
+	PlayerRef.AddToFaction(ProtectedActorFaction)
+	
+	ResetEnemies()
+	PlayerRef.AddToFaction(DownedFaction)
+	
+	DefeatEntranceVia = "Ambush"
+	
+	StartDefeat()
+
+
+EndFunction 
+
+
 Function KeySurrender(String Scenario)		;#surrender
 
 bool allowsurrender = false
@@ -11282,7 +11507,7 @@ bool allowsurrender = false
 				
 				DefeatStatePlayer = "Surrendering"
 				
-					if Scenario == "CombatSurrender"
+					if Scenario == "CombatSurrender" || Scenario == "Forced Surrender"
 					ScreenMessage("You willingly surrender to your enemies")	;DEFEAT MESSAGE surrender
 					AddVictimsToCalmFactions(true)
 					DefeatQuestRunning = true				;#0 -- THIS ORDER HAS TO BE KEPT!!!!!
@@ -11503,35 +11728,33 @@ Function RestoreHeelsEffectOnActor(actor akActor)
 EndFunction 
 
 
-Function RemoveAllDDevices(Bool bDestroy, String sRemovalException01, String sRemovalException02, String sRemovalException03, String sRemovalException04, String sRemovalException05)
+Function RemoveAllDDevices(Bool bDestroy = false, String sRemovalException01 ="", String sRemovalException02="", String sRemovalException03="", String sRemovalException04="", String sRemovalException05="")
 Debug.Trace("NAKED DEFEAT configquest: RemoveAllDDevices()")
 		
 		NymTrace("sRemovalException01: "+sRemovalException01)
 		
-		if Quest.GetQuest("zadQuest") != none
+		if ModDDframework && Quest.GetQuest("zadQuest") != none
 		
 		PlaySoundOnActor(PlayerRef, "DDs Removed", 1.0)
 
 			NymTrace("Quest.GetQuest(ZAD FUCKD DDD WAD ) != none")	
 			nade_DDInt.RemoveAll_DDs_FromActor(PlayerRef, bDestroy, sRemovalException01, sRemovalException02, sRemovalException03, sRemovalException04, sRemovalException05)
 			
-		
-		
 
 			if folqst.IsWithUs_Follower(0) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower01, "Lockable")
-			nade_DDInt.RemoveDevicesFromActor(folqst.Actor_Follower01, true)
+			nade_DDInt.RemoveDevicesFromActor(folqst.NakedFollower[0], true)
 			Endif
 			if folqst.IsWithUs_Follower(1) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower02, "Lockable")
-			nade_DDInt.RemoveDevicesFromActor(folqst.Actor_Follower02, true)
+			nade_DDInt.RemoveDevicesFromActor(folqst.NakedFollower[1], true)
 			Endif		
 			if folqst.IsWithUs_Follower(2) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower03, "Lockable")
-			nade_DDInt.RemoveDevicesFromActor(folqst.Actor_Follower03, true)
+			nade_DDInt.RemoveDevicesFromActor(folqst.NakedFollower[2], true)
 			Endif		
 			if folqst.IsWithUs_Follower(3) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower04, "Lockable")
-			nade_DDInt.RemoveDevicesFromActor(folqst.Actor_Follower04, true)
+			nade_DDInt.RemoveDevicesFromActor(folqst.NakedFollower[3], true)
 			Endif				
 			if folqst.IsWithUs_Follower(4) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower05, "Lockable")
-			nade_DDInt.RemoveDevicesFromActor(folqst.Actor_Follower05, true)
+			nade_DDInt.RemoveDevicesFromActor(folqst.NakedFollower[4], true)
 			Endif	
 
 		endif
@@ -11540,10 +11763,24 @@ EndFunction
 
 
 Function KeyHairAndMaintenance()
-Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaintenance
+Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaintenance	##HAIR
 	int Test = 0		;##K
 	bool DevicesRemovedByCheat = false
 	
+	
+	if Nym()
+	
+		if RapersNearby()
+		ScreenMessage("RAPERS NEARBY")
+		else
+		ScreenMessage("NO RAPERS NEARBY")
+		endif 
+		
+	endif 
+
+	
+	
+	FadeToBlack(false)
 
 	;/
 	if Nym()
@@ -11566,16 +11803,47 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 	
 	endif 
 	/;
-
-	If Nym() && PlayerRef.IsSneaking()
-	RemoveAllDDevices(false, "empty01", "empty02", "empty03", "empty04", "empty05")
-	DevicesRemovedByCheat = true
-		;NymTrace("Inventory Weight: "+PO3_SKSEFunctions.GetEquippedWeight(PlayerRef))
-	NymTrace("IsOverEncumbered(): "+PlayerRef.IsOverEncumbered())
 	
-		if PlayerRef.IsInFaction(ProtectedActorFaction)
-		Debug.MessageBox("#ERROR Was in ProtectedActorFaction")
-		PlayerRef.RemoveFromFaction(ProtectedActorFaction)
+	if DefeatGagAdded > 0
+	DefeatGagAdded = 0
+	endif 
+	
+	if SexScene
+	Debug.messageBox("#ERROR SexScene Detection was on. Fixed now. Sorry. You can proceed")
+	SexScene = false
+	endif 
+
+	If Nym() 
+	
+	;FollowersRedress()
+	
+
+		
+	;	if folqst.IsTravellingWithUsFollower("01")
+	;	NymTrace("#DEBUG Removed DDs 01")
+	;	nade_DDInt.RemoveAll_DDs_FromActor(folqst.Actor_Follower01, true, "empty01", "empty02", "empty03", "empty04", "empty05")
+	;	endif 
+	;	if folqst.IsTravellingWithUsFollower("02")
+	;	NymTrace("#DEBUG Removed DDs 02")
+	;	nade_DDInt.RemoveAll_DDs_FromActor(folqst.Actor_Follower02, true, "empty01", "empty02", "empty03", "empty04", "empty05")
+	;	endif 
+	
+		if PlayerRef.IsWeaponDrawn()
+		NymTrace("Weapon Drawn")
+		else
+		NymTrace("Weapon NOT Drawn")
+		endif
+		
+		if PlayerRef.IsSneaking()
+		RemoveAllDDevices(false, "empty01", "empty02", "empty03", "empty04", "empty05")
+		DevicesRemovedByCheat = true
+			;NymTrace("Inventory Weight: "+PO3_SKSEFunctions.GetEquippedWeight(PlayerRef))
+		NymTrace("IsOverEncumbered(): "+PlayerRef.IsOverEncumbered())
+		
+			if PlayerRef.IsInFaction(ProtectedActorFaction)
+			Debug.MessageBox("#ERROR Was in ProtectedActorFaction")
+			PlayerRef.RemoveFromFaction(ProtectedActorFaction)
+			endif 
 		endif 
 	endif 
 
@@ -11664,22 +11932,39 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 ;	Crawl(PlayerRef, false)	
 ;	endif
 
+	;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	;::::::::::::::::::: [DD NG] Wiggle Free from DDs (Action Key):::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	
+	
 	;PRE CHECK PIERCINGS 
 	Bool OnlyPiercings = false
-
-	if DeviousPiercingEffects
+	Bool OnlyPiercingsNoBench = false
+	Bool DDWiggle = false
+	if !AlreadyImmobilized && ModDDNG && DeviousPiercingEffects
+	NymTrace("DeviousPiercingEffects")
+	
 		if nade_DDInt.IsWearingDDs(PlayerRef, "Only Piercings") ;|| nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Vaginal")
 		;	if !nade_DDInt.IsWearingDDs(PlayerRef, "BlockingSex")
-		ScreenMessage("You need a nearby workbench to get rid of the piercings.")
-		OnlyPiercings = true
+			if !IsWorkbenchNearby()
+			ScreenMessage("You need a nearby workbench to get rid of the piercings.")
+			OnlyPiercingsNoBench = true
+			endif 
+			OnlyPiercings = true
 		else 
-		OnlyPiercings = false
+		OnlyPiercings = false ;what is this for? ah, different idles!
 		endif			
 		
 	endif 
+	
+	if !OnlyPiercingsNoBench && !AlreadyImmobilized && !DevicesRemovedByCheat && ModDDNG && (KeyDDWiggleFreeChance > 0) && nade_DDInt.IsWearingDDs(PlayerRef, "Lockable")
+	NymTrace("IsWearingDDs")
+		if Nym()
+		AddRapeTears()	
+		endif
 
-	if !OnlyPiercings && !DevicesRemovedByCheat && ModDDNG && (KeyDDWiggleFreeChance > 0) && nade_DDInt.IsWearingDDs(PlayerRef, "Lockable")
-		
+	DDWiggle = true
+	
 		NymTrace("Immobilize(true) for DD Wiggle Free")
 		Immobilize(True)
 		
@@ -11690,6 +11975,7 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 		
 		WhipAgain = true
 		ScreenMessage("You try to wiggle free from the Devices.")
+		SetExpression(Utility.RandomInt(1,6))
 	;	DefeatStateBindings = "Cuffs"
 		calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Wiggling", false)
 		
@@ -11712,17 +11998,28 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 		
 			PlayMoaningSound()
 			Utility.Wait(3.0)
+				SetExpression(Utility.RandomInt(1,6))
 			PlayerRef.DamageAV("Stamina", 100)
 			PlayerRef.RestoreAV("Stamina", 100)
-			
+			if Nym()
+			StartPunishmentEffect("Varied")
+			endif 
 			calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Wiggling", false)
 						
 			PlayBreathingSound()
 			Utility.Wait(3.0)
+					if Nym()
+			StartPunishmentEffect("Varied")
+			endif 
+				SetExpression(Utility.RandomInt(1,6))
 			PlayerRef.DamageAV("Stamina", 100)
 			PlayerRef.RestoreAV("Stamina", 100)
 			PlayMoaningSound()	
 			Utility.Wait(3.0)
+					if Nym()
+			StartPunishmentEffect("Varied")
+			endif 
+				SetExpression(Utility.RandomInt(1,6))
 			PlayerRef.DamageAV("Stamina", 100)
 			PlayerRef.RestoreAV("Stamina", 100)
 		
@@ -11730,14 +12027,21 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 		calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Wiggling", false)
 			PlayMoaningSound()
 			Utility.Wait(3.0)
+					if Nym()
+			StartPunishmentEffect("Varied")
+			endif 
+				SetExpression(Utility.RandomInt(1,6))
 		WhipAgain = false
 		endif 
 		
 		calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Resting", false)
 			PlayBreathingSound()
 			Utility.Wait(Utility.RandomInt(2, 4))
+			
+				SetExpression(Utility.RandomInt(1,6))
 			PlayBreathingSound()
 			Utility.Wait(Utility.RandomInt(2, 4))
+				SetExpression(Utility.RandomInt(1,6))
 		
 		Float WiggleFreeChanceTemp
 		
@@ -11749,7 +12053,7 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 			
 		if D100(WiggleFreeChanceTemp)
 		
-			if DeviousPiercingEffects && nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Nipples")
+			if ModDDframework && DeviousPiercingEffects && nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Nipples")
 				if IsWorkbenchNearby()
 				ScreenMessage("You could wiggle free from the Devices and remove the piercings.")
 				RemoveAllDDevices(false, "empty01", "empty02", "empty03", "empty04", "empty05")				
@@ -11767,14 +12071,27 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 		calmqst.PlayPoseOnActor(PlayerRef, "reset", false)
 		;DefeatStateBindings = "Unbound"
 	
+	
+	
 		elseif D100(KeyDDWiggleFreeFailChance)
 		;............ooooooooooooooooOOOOOOOOOOOOO	FADE TO BLACK TRUE OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-		FadeToBlack(true) 
+			FadeToBlack(true) 
 			PlayMoaningSound()
 			Utility.Wait(4.0)
+				SetExpression(Utility.RandomInt(1,6))
 			PlayMoaningSound()
-		Immobilize(False)		
-			if D100(66)
+			Immobilize(False)		
+
+			if Nym()
+			ProximityQuestStart("RaperScan")
+			endif 
+			
+			if ProxActorDetected > 0
+
+			ScreenMessage("Your moaning and wiggling attracts somebody (B)")
+			KeySurrender("Forced Surrender") ;<<<<--- IMPROVE!
+				
+			elseif D100(50)
 			StartRobberyAtLocation()
 			SendModEvent("SSLV Entry")
 			else
@@ -11782,12 +12099,14 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 			SendModevent("StartNakedAfterlife")
 			endif 
 		else 
-		ScreenMessage("You could not wiggle free. Try again")
-		calmqst.PlayPoseOnActor(PlayerRef, "Wait", false)
+		
+		calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Resting", false)
 			PlayBreathingSound()
 			Utility.Wait(2.0)
+				SetExpression(Utility.RandomInt(1,6))
 			PlayBreathingSound()
 			Utility.Wait(2.0)
+				SetExpression(Utility.RandomInt(1,6))
 		Immobilize(False)
 		calmqst.PlayPoseOnActor(PlayerRef, "Reset", false)
 		
@@ -11806,20 +12125,26 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 			if folqst.IsWithUs_Follower(4)
 			calmqst.PlayPoseOnActor(PlayerRef, "Reset", false)
 			Endif	
-		
-		
+			SetExpression(Utility.RandomInt(1,6))
+		ScreenMessage("You could not wiggle free. Try again")
+		Utility.Wait(1.0)
+		ResetExpressions()
 		DefeatStateBindings = "Unbound"
 		endif 
+		
+		
+		folqst.FollowerStripUpdate()
 		
 		if HeelsFix
 		;RestoreHeelsEffectOnActor(PlayerRef)
 		;not required, we currently only use standing poses
 		endif 
-	;endif 
+	endif 
+	;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	;::::::::::::::::::: Change Hair (Action Key Primary):::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+	;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	
-	
-	;------- CHANGE / RESET HAIR / DEBUG ---------------------------------------------------------------------------------------
-	elseif ResetHair || ChangeHair			
+	if !DDWiggle && !AlreadyImmobilized && (ResetHair || ChangeHair)			
 	
 		SendModEvent("Moan")
 		
@@ -11881,16 +12206,31 @@ EndFunction
 		
 		
 Bool Function IsWorkbenchNearby()
-
+		NymTrace("IsWorkbenchNearby()")
 		ObjectReference ClosestWorkbench 
+
+		
 
 		Form Workbench = Game.GetFormFromFile(0x000D932F, "Skyrim.esm") as Form
 
-		ClosestWorkbench = Game.FindClosestReferenceOfTypeFromRef(Workbench, PlayerRef, 100.0)
+		if Workbench
+		NymTrace("IsWorkbenchNearby(Workbench filled)")
+		else 
+		NymTrace("IsWorkbenchNearby(Workbench NOT filled)")
+		endif 
+		
+		ClosestWorkbench = Game.FindClosestReferenceOfTypeFromRef(Workbench, PlayerRef, 150.0)
+		
+		if !ClosestWorkbench
+		ClosestWorkbench = Game.FindClosestReferenceOfTypeFromRef(Workbench, PlayerRef, 300.0)
+		ScreenMessage("Move closer to the Workbench!")
+		endif 
 		
 		if ClosestWorkbench
+		NymTrace("IsWorkbenchNearby(Workbench FOUND)")
 		return true
 		else
+		NymTrace("IsWorkbenchNearby(Workbench NOT FOUND)")
 		return false
 		endif
 
@@ -11981,7 +12321,7 @@ EndFunction
 
 
 Function ResetExpressions()			;#Expressions
-
+Debug.Trace("NAKED DEFEAT configquest: ResetExpressions()")	
 			PlayerRef.ClearExpressionOverride()
 			MfgConsoleFunc.ResetPhonemeModifier(PlayerRef)
 							
@@ -12503,17 +12843,17 @@ EndFunction
 
 Function FixExpressions()
 	
+	
+	;possible cause: https://www.loverslab.com/topic/146560-immersive-hair-growth-and-styling-sse-yps-devious-immersive-fashion-2020-05-09/page/19/#findComment-3929832
+	
 	Headpart TempHeadpartHair
 
 	if Nym()
 	TempHeadpartHair = GetCurrentHair()
 		NymTrace("FixExpressions: GetCurrentHair NAME A: "+TempHeadpartHair.GetPartName())
 			if TempHeadpartHair
-		
-		;	Debug.Messagebox("HairFound")
 			PlayerRef.ChangeHeadPart(TempHeadpartHair) 
 			endif 
-		
 		PlayerRef.ChangeHeadPart(TempHeadpartHair) 
 		
 		TempHeadpartHair = GetCurrentHair()
@@ -12538,6 +12878,7 @@ Function ChangeHairStyle()			;#hair2 #ChangeHairStyle
 			endif 
 		
 			NymMessage("Your new Hairstyle: "+ChosenHair)
+			NymTrace("#HAIR Your new Hairstyle: "+ChosenHair)
 		
 			TempHeadpartHair = HeadPart.GetHeadPart(ChosenHair)
 			PlayerRef.ChangeHeadPart(TempHeadpartHair) 
@@ -12676,6 +13017,7 @@ Function ChangeHairStyle()			;#hair2 #ChangeHairStyle
 
 				PlayerRef.ChangeHeadPart(HairStages[i]) 
 				NymMessage("NYMRA - Your new Hairstyle: "+HairStages[i].GetName())
+				NymTrace("#HAIR - Your new Hairstyle: "+HairStages[i].GetName())
 		
 				;endif
 			;for dragon crown ;CHANGE(WIP)
@@ -14049,7 +14391,7 @@ if NymBeta
 	
 	else
 	ScreenMessage("NAKED DEFEAT #ERROR: LOOT Weapon type unknown")
-	Items = "None"
+	Items == "None"
 	endif
 	
 	Debug.Trace("NAKED DEFEAT configquest: Get_JSON_Weapon(): "+Items)
@@ -15446,7 +15788,7 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 	
 	;int Fuckoff
 	;Bool AnimatedEquip = True
-		;loops as long as we do NOT wear armor on Slot OR we search all outfits
+	;loops as long as we do NOT wear armor on Slot OR we search all outfits
 		
 		
 	PlayerRef.GetAllForms(FormlistInventory)	
@@ -15454,8 +15796,9 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 	NymTrace("Formlist Length: "+FormlistInventory.GetSize())	
 		
 		NymTrace("Immobilize(true) for Random Outfit")
+		
 		Immobilize(true)
-		IsCheat = true
+		;IsCheat = true ;WHY WAS THIS TRUE????
 		;currently searches from 10 to 1. I want it to search from 1 to 10...
 		
 		;MAIN--- HEAD -----------------------------------------------------------------------------------------------
@@ -16160,9 +16503,7 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 				endif
 			endif 
 		endwhile			
-						If Nym()
-		;Utility.Wait(1.2)
-		endif 
+	
 		;i = 10
 		i = 1	
 		
@@ -16192,9 +16533,7 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 				endif
 			endif 
 		endwhile	
-						If Nym()
-		;Utility.Wait(1.2)
-		endif 
+
 		;i = 10
 		i = 1	
 		
@@ -16225,9 +16564,6 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 			endif 
 		endwhile
 
-				If Nym()
-		;Utility.Wait(1.2)
-		endif 
 		;i = 10
 		i = 1
 		
@@ -16257,9 +16593,7 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 				endif
 			endif 
 		endwhile
-				If Nym()
-		;Utility.Wait(1.2)
-		endif 
+
 		;i = 10
 		i = 1	
 		
@@ -16289,9 +16623,7 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 				endif
 			endif 
 		endwhile	
-				If Nym()
-		;Utility.Wait(1.2)
-		endif 
+
 		;i = 10
 		i = 1	
 		
@@ -16326,10 +16658,7 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 		i = 1
 		
 		;secondary--- 58 -----------------------------------------------------------------------------------------------
-				If Nym()
-		;Utility.Wait(1.2)
-		endif 
-		
+
 		while !CheckArmor58() && (i < 11)
 		
 			NymTrace("EquipRandomOutFitLoops (Pauldron 58): "+i)
@@ -16363,9 +16692,6 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 		;i = 10
 		i = 1
 		
-				If Nym()
-		;Utility.Wait(1.2)
-		endif 
 		;secondary--- 59 -----------------------------------------------------------------------------------------------
 		
 		while !CheckArmor59() && (i < 11)
@@ -16395,10 +16721,7 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 
 		;i = 10
 		i = 1	
-		
-				If Nym()
-		;Utility.Wait(1.2)
-		endif 
+		 
 		;secondary--- 60 -----------------------------------------------------------------------------------------------
 		
 		while !CheckArmor60() && (i < 11)
@@ -16426,9 +16749,6 @@ Function EquipRandomOutfit()			;#EquipRandomOutfit()
 			endif 
 		endwhile	
 
-		If Nym()
-		;Utility.Wait(1.2)
-		endif 
 		
 		;secondary--- 61 -----------------------------------------------------------------------------------------------
 		
@@ -16546,7 +16866,7 @@ Debug.Trace("NAKED DEFEAT configquest: Load_JSON_Outfit - EquipOnly: "+EquipOnly
 					
 			if Items != "All"	
 				;HELMET ONLY (slot 31 or 42) -------------------------------------------------------------------
-				if Items == "Helmet"					
+				if Items == "Helmet" || Items == "Circlet"					
 					
 					if !IsCheat
 					PlayerRef.PlayIdle(IdlesFixHair[1])
@@ -16588,7 +16908,7 @@ Debug.Trace("NAKED DEFEAT configquest: Load_JSON_Outfit - EquipOnly: "+EquipOnly
 				;	endif
 				
 				;"Gauntlets ONLY" -------------------------------------------------------------------
-				elseif Items == "Gauntlets"
+				elseif Items == "Gauntlets" || Items == "Gloves"
 					if !IsCheat
 					PlayerRef.PlayIdle(IdlesBathingStanding[2])
 					Utility.Wait(1.0)
@@ -16606,7 +16926,7 @@ Debug.Trace("NAKED DEFEAT configquest: Load_JSON_Outfit - EquipOnly: "+EquipOnly
 					endif
 					
 				;"Boots ONLY" -------------------------------------------------------------------
-				elseif Items == "Boots"			
+				elseif Items == "Boots"	 || Items == "Shoes"			
 					if !IsCheat
 					PlayerRef.PlayIdle(IdlesBathingStanding[3])	
 					Utility.Wait(1.0)
@@ -19136,6 +19456,10 @@ If PapyrusUtil.GetVersion() > 1
 		
 		Group3Pchance = GetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "Group3Pchance")
 		ScenarioChance = GetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "ScenarioChance")
+		DefeatDDChance = GetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "DefeatDDChance")
+		
+		
+		
 		DefeatChainProb = GetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "DefeatChainProb")
 		DefeatForeplayChance = GetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "DefeatForeplayChance")	
 		;>>>>>> LOADING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -19614,8 +19938,13 @@ If PapyrusUtil.GetVersion() > 1
 		
 		SetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "Group3Pchance", Group3Pchance)
 		SetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "ScenarioChance", ScenarioChance)
+		SetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "DefeatDDChance", DefeatDDChance)
+		
+		
 		SetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "DefeatChainProb", DefeatChainProb)
 		SetFloatValue("../Naked Defeat/profile" +Profile+ ".json", "DefeatForeplayChance", DefeatForeplayChance)
+		
+		
 		
 		
 		
@@ -19905,6 +20234,8 @@ Debug.Trace("NAKED DEFEAT configquest: ResetBools()")
 ;	PlayerRef.RemoveItem(SlowDownItem, 1, true, None)
 	
 	ResetPlayer()
+	
+	DefeatGagAdded = 0
 	
 	DisableCollisionOnActor(PlayerRef, false)
 	
@@ -20209,7 +20540,7 @@ Debug.trace("NAKED DEFEAT configquest: GetEnemyType: "+GetActorName(Hitter))
 		;treat tame trolls as humans (to start defeattypehumans) ;PROBLEMATIC 
 		if RaceKey == ("Trolls")
 			if (Hitter.GetBaseObject().GetName() == "Armored Troll") || (Hitter.GetBaseObject().GetName() == "Armored Frost Troll") || (Hitter.GetBaseObject().GetName() == "Tame Troll")
-			RaceKey = "Humans"
+			RaceKey == "Humans"
 			endif
 		endif
 		
@@ -20335,6 +20666,110 @@ Debug.trace("NAKED DEFEAT configquest: GetEnemyType: "+GetActorName(Hitter))
 
 
 EndFunction
+
+
+
+
+
+Function StartPunishmentEffect(string type)	;#shader2 	;#spells		;#StartPunishmentEffect
+	;if IsNymrasGame() && D100(50
+	;type = "shock"
+	;endif 
+	
+	if type == "Varied"
+	int varied = Utility.RandomInt(1,4)
+		if varied == 1
+		type = "Shock"
+		elseif varied == 2
+		type = "Frost"
+		elseif varied == 3
+		type = "Fire"	
+		elseif varied == 4 
+		type = "Random"	
+		elseif varied == 5 
+		type = "HotnCold"	
+		elseif varied == 6 
+		type = "Pain"	
+		endif 
+	endif 
+		
+	
+	if type == "Shock"
+	ShockSpell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
+	SoundSpell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
+	
+	SpellOnVictims(type)
+		if D100(33)
+		PlaySoundOnActor(PlayerRef, "Punishment Shock Extra", 1.0)
+		endif 
+	
+	elseif type == "Frost"
+	Frostspell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	
+	SpellOnVictims(type)
+
+	elseif type == "Fire"
+	Firespell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	
+	SpellOnVictims(type)
+
+	elseif type == "Random"
+		int randomeffect = Utility.RandomInt(1,4)
+		if randomeffect == 1		
+		ShockSpell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
+		SoundSpell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"		
+		SpellOnVictims("Shock")
+		elseif randomeffect == 2
+		Frostspell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)
+		SpellOnVictims("Frost")
+
+		elseif randomeffect == 3
+		Firespell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)
+		SpellOnVictims("Fire")
+		elseif randomeffect == 4
+		Painspell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)
+		SpellOnVictims("Pain")
+		endif
+	elseif type == "HotnCold"
+		int randomeffect = Utility.RandomInt(1,2)
+		if randomeffect == 1
+		Frostspell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)
+			if D100(50)
+			SpellOnVictims("Fire")
+			else 
+			SpellOnVictims("Frost")
+			endif 
+		elseif randomeffect == 2
+		Firespell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)
+		Frostspell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)
+			if D100(50)
+			SpellOnVictims("Fire")
+			else 
+			SpellOnVictims("Frost")
+			endif 
+		endif		
+	elseif type == "Pain"
+		if D100(33)	;play shock extra sometimes
+		ShockSpell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
+		SoundSpell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
+			if D100(50)
+			SpellOnVictims("Shock")
+			else 
+			SpellOnVictims("Pain")
+			endif 
+			
+			if D100(20)
+			PlaySoundOnActor(PlayerRef, "Punishment Shock Extra", 1.0)
+			elseif D100(33)
+			PlaySoundOnActor(PlayerRef, "Item does not Fit", 1.0)
+			endif 
+		endif
+		Painspell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)	
+		SpellOnVictims("Pain")
+
+	endif
+
+EndFunction
+
+
 
 ;----- RACEKEY--------------------------------------------------------------------------
 
@@ -21504,7 +21939,7 @@ EndFunction
 ;-----------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-Bool Function IsForbiddenActor(String HasRaceKey)
+Bool Function IsForbiddenActor(String HasRaceKey)		;#IsForbiddenActor
 	
 	;we sort out ALL forbidden racekeys first, then we can work better with the rest. 
 	
@@ -21533,6 +21968,11 @@ Bool Function IsForbiddenActor(String HasRaceKey)
 	return true
 	elseif HasRaceKey == ("Wisps") && !AllowElementalsMale
 	return true
+	
+	elseif HasRaceKey == ("Spriggans") && !AllowSpriggans
+	return true
+	
+	
 
 	;FALMERS 	
 	elseif ((HasRaceKey == ("Falmers")) || (HasRaceKey == ("BoarsAny"))) && !AllowFalmers
@@ -21551,14 +21991,21 @@ Bool Function IsForbiddenActor(String HasRaceKey)
 	return true
 	elseif HasRaceKey == ("Cows") && !AllowCows
 	return true
+	elseif HasRaceKey == ("Chicken") && !AllowChicken
+	return true
+	elseif RaceKey == ("Deers") && !AllowDeers
+	return true
+
+	elseif RaceKey == ("Foxes") && !AllowFoxes
+	return true
 
 	;SABRECATS			
-	elseif HasRaceKey == ("SabreCats") && AllowSabrecats
+	elseif HasRaceKey == ("Sabrecats") && !AllowSabreCats
 	return true
 	;BEARS	
-	elseif HasRaceKey == ("Bears") && AllowBears
+	elseif HasRaceKey == ("Bears") && !AllowBears
 	return true
-	elseif HasRaceKey == ("Mammoths") && AllowMammoths
+	elseif HasRaceKey == ("Mammoths") && !AllowMammoths
 	return true
 	
 	;DWARVEN
@@ -21567,13 +22014,34 @@ Bool Function IsForbiddenActor(String HasRaceKey)
 	
 	;RIEKLINGS  	 
 	elseif (HasRaceKey == ("Rieklings")) || (HasRaceKey == ("Boars")) || (HasRaceKey == ("BoarsAny")) || (HasRaceKey == ("BoarsMounted")) && !AllowRieklings	
+	return true
+	else
 	return false
+	
 	endif 
 	
 EndFunction 
 
 
 ;Bool IsAcheronBridge = false
+
+Bool Function RapersNearby()	;#RapersNearby()
+
+;need to improve this... Surrender Scan before?
+
+ProximityQuestStart("RaperScan")
+NymTrace("RapersNearby(WE ARE HERE: A)")
+
+DefeatType = "none"
+
+if ProxActorDetected > 0
+ProxActorDetected = 0
+return true 
+else 
+return false 
+endif 
+
+EndFunction 
 
 
 
@@ -21583,8 +22051,10 @@ Actor a = akActor; as Actor
 string HasRaceKey = GetRaceKey(a)
 Float CheckDistance
 Float TempDistance =  a.GetDistance(PlayerRef); > CheckDistance
+int iType = Type
 
-Debug.Trace("NAKED DEFEAT configquest: AllowActor: " +aName+" Type:"+Type+" Distance:"+TempDistance+" Racekey:"+HasRaceKey)
+
+Debug.Trace("NAKED DEFEAT configquest: AllowActor: " +aName+" Type:"+Type+" Distance:"+TempDistance+" Racekey:"+HasRaceKey+" DefeatType:" +DefeatType)
 
 ;/
 if ShowDebugMessages
@@ -21596,6 +22066,21 @@ Debug.Trace("NAKED DEFEAT configquest: AllowActor: HasRaceKey: " +HasRaceKey)
 endIf
 /;
 ;sort out enemies, hopefully
+
+	if iType == 0 
+	NymTrace("AllowActor 01")
+		if SexLab.GetGender(a) < 2
+		NymTrace("AllowActor 02")
+		iType = 1 ;Humans
+		else 
+		iType = 2 ;Creatures 
+		endif
+		
+	DefeatType = "Funny"	
+	NymTrace("AllowActor 03 DefeatType "+DefeatType)
+		
+	endif 
+
 		
 	if !Sexlab.IsValidActor(akActor)
 	Debug.Trace("NAKED DEFEAT configquest: AllowActor("+aName+") NO -> Sexlab: Is NOT a Valid Actor")
@@ -21650,7 +22135,9 @@ if NewSystem
 		Debug.Trace("NAKED DEFEAT configquest: #Demonic Creature Name: "+a.GetActorBase().GetName()+" Racekey: "+HasRaceKey)
 		AllowDemCreature = true 
 	
-			if (aName == "Mushroom") || (aName == "Red Squirrel")
+			if HasRaceKey == "Slaughterfishes"
+			AllowDemCreature = false
+			elseif (aName == "Mushroom") || (aName == "Red Squirrel")
 			AllowDemCreature = false
 			endif
 			return AllowDemCreature
@@ -21726,7 +22213,7 @@ if NewSystem
 ;	endif
 	
 	;HUMANS
-	if Type == 1 
+	if iType == 1 
 				
 		;NEW SYSTEM. EnemyFaction always allowed? At least for Humans? 
 		if a.IsInFaction(EnemyFaction)		
@@ -21815,7 +22302,7 @@ if NewSystem
 		endif
 
 	;CREATURES
-	elseif Type == 2
+	elseif iType == 2
 	
 		if Nym() && !HasRaceKey
 		Debug.Messagebox("NO RACEKEY")
@@ -22090,9 +22577,9 @@ if NewSystem
 			endif	
 		
 		;SABRECATS		
-		elseif DefeatType == ("SabreCats")
+		elseif DefeatType == ("Sabrecats")
 
-			if HasRaceKey == ("SabreCats") && AllowSabrecats
+			if HasRaceKey == ("Sabrecats") && AllowSabrecats
 			return true
 			else
 			return false
@@ -22228,7 +22715,7 @@ if NewSystem
 			;endif
 	;	return true
 
-		elseif (DefeatType == "funny") 
+		elseif (DefeatType == "Funny") 
 		Debug.trace("NAKED DEFEAT configquest: #NOTE: FUNNY Everything is allowed")
 		;	if CheckEnemiesFor(HasRaceKey)
 		return true
@@ -22409,9 +22896,9 @@ Function Immobilize(Bool disable = true)				; #immobilize
 		
 	;ENABLE CONTROLS
 	else
-		if IsNymrasGame() && AlreadyImmobilized && Game.IsMovementControlsEnabled()
-		Debug.MessageBox("#ERROR cfgqst: WAS Immobilized but PC can move!")
-		endif
+	;	if Nym() && AlreadyImmobilized && Game.IsMovementControlsEnabled()
+	;	Debug.MessageBox("#ERROR cfgqst: WAS Immobilized but PC can move!")
+	;	endif
 	
 		AlreadyImmobilized = false
 		;ToggleFreeCamera()
@@ -22483,17 +22970,92 @@ endFunction
 
 bool Function FollowersInCombat(int iDistance)		;#combatscan #PartyInCombat()
 
+NymTrace("FollowersInCombat(START)")
+
 if folqst.IsFollowerPresent()
-	if folqst.IsWithUs_Follower(0) && folqst.NakedFollower[0].IsInCombat() && folqst.NakedFollower[0].GetDistance(PlayerRef) < iDistance
+
+	int Fol0state
+	int Fol1state
+	int Fol2state
+	int Fol3state
+	int Fol4state
+	
+		if Nym() && folqst.IsWithUs_Follower(0)
+		
+		NymTrace("#DEBUG Follower 0 IsInCombat = "+folqst.NakedFollower[0].IsInCombat())
+		NymTrace("#DEBUG Follower 0 IsWeaponDrawn = "+folqst.NakedFollower[0].IsWeaponDrawn())
+		NymTrace("#DEBUG Follower 0 GetDistance = "+(folqst.NakedFollower[0].GetDistance(PlayerRef)))
+		endif 
+		
+		if folqst.NakedFollower[0]
+		Fol0state = PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[0])
+			
+		;	if SPE_Actor.IsActorCalmed(folqst.NakedFollower[0])
+		;		if Nym()
+		;		Debug.Messagebox("NakedFollower[0] is calmed")
+		;		endif 
+		;	SPE_Actor.SetActorCalmed(folqst.NakedFollower[0], false)
+		;	endif
+			
+		;	if !folqst.NakedFollower[0].IsWeaponDrawn()
+		;	Debug.Messagebox("NakedFollower[0] is passive")
+		;	folqst.NakedFollower[0].DrawWeapon()
+		;	endif 
+		endif
+				
+		if folqst.NakedFollower[1]
+		Fol1state = PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[1])
+		;	if SPE_Actor.IsActorCalmed(folqst.NakedFollower[1])
+		;		if Nym()
+		;		Debug.Messagebox("NakedFollower[1] is calmed")
+		;		endif 
+		;	SPE_Actor.SetActorCalmed(folqst.NakedFollower[1], false)
+		;	endif
+			
+		;	if !folqst.NakedFollower[1].IsWeaponDrawn()
+		;	Debug.Messagebox("NakedFollower[1] is passive")
+		;	folqst.NakedFollower[1].DrawWeapon()
+		;	endif 
+	
+		endif 	
+		
+		if folqst.NakedFollower[2]
+		Fol2state = PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[2])
+		endif 	
+		if folqst.NakedFollower[3]
+		Fol3state = PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[3])
+		endif 
+		if folqst.NakedFollower[4]
+		Fol3state = PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[4])
+		endif 
+		
+		NymTrace("GetActorState[0] = "+Fol0state)
+		NymTrace("GetActorState[1] = "+Fol1state)
+		
+		;/
+		GetActorState
+		Alive	0
+		Dying	1
+		Dead	2
+		Unconscious	3
+		Reanimate	4
+		Recycle	5
+		Restrained	6
+		EssentialDown	7
+		Bleedout	8
+			/;
+
+	;if folqst.IsWithUs_Follower(0) && (folqst.NakedFollower[0].IsInCombat() || folqst.NakedFollower[0].IsWeaponDrawn()) && (folqst.NakedFollower[0].GetDistance(PlayerRef) < iDistance)
+	if folqst.IsWithUs_Follower(0) && (folqst.NakedFollower[0].GetDistance(PlayerRef) < iDistance) && folqst.NakedFollower[0].IsInCombat() ;|| (Fol0state == 0))
 	NymTrace("FollowersInCombat(Follower[0] in Combat)")
 	return true
-	elseif folqst.IsWithUs_Follower(1) && folqst.NakedFollower[1].IsInCombat() && folqst.NakedFollower[1].GetDistance(PlayerRef) < iDistance
+	elseif folqst.IsWithUs_Follower(1) && (folqst.NakedFollower[1].GetDistance(PlayerRef) < iDistance) && folqst.NakedFollower[1].IsInCombat(); || (Fol1state == 0))
 	return true	
-	elseif folqst.IsWithUs_Follower(2) && folqst.NakedFollower[2].IsInCombat() && folqst.NakedFollower[2].GetDistance(PlayerRef) < iDistance
+	elseif folqst.IsWithUs_Follower(2) && (folqst.NakedFollower[2].GetDistance(PlayerRef) < iDistance) && folqst.NakedFollower[2].IsInCombat() ;|| (Fol2state == 0))
 	return true
-	elseif folqst.IsWithUs_Follower(3) && folqst.NakedFollower[3].IsInCombat() && folqst.NakedFollower[3].GetDistance(PlayerRef) < iDistance
+	elseif folqst.IsWithUs_Follower(3) && (folqst.NakedFollower[3].GetDistance(PlayerRef) < iDistance) && folqst.NakedFollower[3].IsInCombat() ;|| (Fol3state == 0))
 	return true
-	elseif folqst.IsWithUs_Follower(4) && folqst.NakedFollower[4].IsInCombat() && folqst.NakedFollower[4].GetDistance(PlayerRef) < iDistance
+	elseif folqst.IsWithUs_Follower(4) && (folqst.NakedFollower[4].GetDistance(PlayerRef) < iDistance) && folqst.NakedFollower[4].IsInCombat() ;|| (Fol4state == 0))
 	return true	
 	else
 	NymTrace("FollowersInCombat(NO Follower in Combat)")
@@ -22849,7 +23411,7 @@ Function SlowDownPlayer(String sAction)	;#tidy MOVE TO CALMQUEST  ;#SlowDownPlay
 		;	TestSpell = (Game.GetFormFromFile(0x00000804, "HeelsFix.esp") As Spell)
 		;	TestSpell.RemoteCast(PlayerRef, PlayerRef, PlayerRef)
 		;	endif 
-			if PlayerRef.IsOverEncumbered() || nade_DDInt.IsWearingDDs(PlayerRef, "Forced Walk")
+			if PlayerRef.IsOverEncumbered() || (ModDDframework && nade_DDInt.IsWearingDDs(PlayerRef, "Forced Walk"))
 			;do nothing, we are already too slow
 			else
 			PlayerRef.AddItem(SlowDownItem, 1, true)			;HANDS	
@@ -24486,9 +25048,9 @@ Function ForceOutfit(string items)
 	if items == "random"
 		int random = Utility.RandomInt(1,3)
 		if random == 1
-		items = "Boots"
+		items == "Boots"
 		else
-		items = "Cuirass"
+		items == "Cuirass"
 		endif
 	endif
 	
@@ -24566,7 +25128,7 @@ Function LootScript(Form akBaseObject, Bool WeAreInStore = false)	;#LootScript		
 	IsItArmor = true 
 	endif 
 	
-	if DeviousPiercingEffects && IsItArmor  
+	if ModDDframework && DeviousPiercingEffects && IsItArmor  
 		if nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Nipples")
 			if IsItem("Armor Cuirass", akBaseObject) || IsItem("Clothes Body", akBaseObject)
 			PiercedNipples = true
@@ -24584,7 +25146,7 @@ Function LootScript(Form akBaseObject, Bool WeAreInStore = false)	;#LootScript		
 	if IsItem("Jewelery", akBaseObject) 
 	;LootScriptRunning = false
 	ProcessLoot = false
-	DebugMessage("#DEBUG: Jewellerey, allowed to equip")
+	DebugMessage("#DEBUG: Jewelerey, allowed to equip")
 	;END
 
 	; -- PIERCED NIPPLES (DD)-- ; 	(NOT allowed wearing Body Armor)
@@ -24592,13 +25154,13 @@ Function LootScript(Form akBaseObject, Bool WeAreInStore = false)	;#LootScript		
 	elseif PiercedNipples || PiercedVagina
 	DebugMessage("DEBUG LOOT: Pierced Nipples, no Body armor allowed TRUE")
 	
-	if PiercedNipples && PiercedVagina
-	ScreenMessage("The painful piercings prevent you from wearing body armor.")
-	elseif PiercedNipples
-	ScreenMessage("The painful nipple piercings prevent you from wearing body armor.")
-	elseif PiercedVagina
-	ScreenMessage("The painful vagina piercings prevent you from wearing body armor.")
-	endif 
+		if PiercedNipples && PiercedVagina
+		ScreenMessage("The painful piercings prevent you from wearing body armor.")
+		elseif PiercedNipples
+		ScreenMessage("The painful nipple piercings prevent you from wearing body armor.")
+		elseif PiercedVagina
+		ScreenMessage("The painful vagina piercings prevent you from wearing body armor.")
+		endif 
 	
 	PlayerRef.UnEquipItem(akBaseObject, false, true)	
 
@@ -25041,14 +25603,12 @@ bool Function IsLootScriptRunning()
 EndFunction
 	
 ;OFFICIAL LATEST STRIPPING COMPLETE	
-Function StripCompletely(int Exception1, int Exception2, int Exception3, int Exception4, int Override)		;#StripCompletely
+Function PlayerStripCompletely(int Exception1, int Exception2, int Exception3, int Exception4, int Override)		;#StripCompletely()
 		
 		if Override < 3
 		OverrideStripOptions = Override 		;0 unequip, 1 drop, 2 destroy
 		endif
-		
-		
-		
+
 		int a = 30
 		
 		while a < 62
@@ -25140,8 +25700,8 @@ Function FollowerLoadOutfit()
 		/;
 EndFunction 	
 
-Function FollowersRedress()
-	
+Function FollowersRedress() ;NEEDS UPDATE --- > we stopped working on this. We only need this if we want to force outfits on the followers
+	NymTrace("FollowersRedress()")
 	Formlist akFormlist; = Outfit_JSON_FList[2]	;Bikini Armor 
 
 		int OutfitSize ;= (akFormlist.GetSize()) 
@@ -25186,7 +25746,7 @@ Function FollowersStripWeapons()
 
 EndFunction
 		
-Function FollowerStripCompletely()
+Function FollowersStripCompletely()
 		
 if folqst.Actor_Follower01
 Strip(31, folqst.Actor_Follower01) ;Helmet 
@@ -25229,67 +25789,145 @@ FollowersStripWeapons()
 
 EndFunction 
 
+
+Function DebugFollowerBindingsBridge()
+
+calmqst.DebugFollowerBindings()
+
+EndFunction 
+
 Function FollowerStripUpdate()
+nymTrace("FollowerStripUpdate()")	
 	
 ;checks if Follower is allowed to have Slot X equipped.
 ;if not, strips that slot 
+
+	folqst.FollowerStripUpdate()
+;/
+
+	if folqst.Actor_Follower01
+
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Helmet31:"+folqst.Follower01_Helmet31)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Body32:"+folqst.Follower01_Body32)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Hands33:"+folqst.Follower01_Hands33)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Feet37:"+folqst.Follower01_Feet37)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Circlet42:"+folqst.Follower01_Circlet42)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_BikiniBottom52:"+folqst.Follower01_BikiniBottom52)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_BikiniThigh53:"+folqst.Follower01_BikiniThigh53)
+
+
+			if folqst.Follower01_Helmet31 == 0
+			Strip(31, folqst.Actor_Follower01) 
+			elseif folqst.Follower01_Body32 == 0
+			Strip(32, folqst.Actor_Follower01) 
+			elseif folqst.Follower01_Hands33 == 0
+			Strip(33, folqst.Actor_Follower01) 		
+			elseif folqst.Follower01_Feet37 == 0
+			Strip(37, folqst.Actor_Follower01) 					
+			elseif folqst.Follower01_Circlet42 == 0
+			Strip(42, folqst.Actor_Follower01) 
+			elseif folqst.Follower01_BikiniBottom52 == 0
+			Strip(52, folqst.Actor_Follower01) 
+			elseif folqst.Follower01_BikiniThigh53 == 0
+			Strip(53, folqst.Actor_Follower01) 
+			endif 
+	endif 
+
+	if folqst.Actor_Follower02
+
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Helmet31:"+folqst.Follower02_Helmet31)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Body32:"+folqst.Follower02_Body32)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Hands33:"+folqst.Follower02_Hands33)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Feet37:"+folqst.Follower02_Feet37)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Circlet42:"+folqst.Follower02_Circlet42)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_BikiniBottom52:"+folqst.Follower02_BikiniBottom52)
+			Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_BikiniThigh53:"+folqst.Follower02_BikiniThigh53)
+
+			if folqst.Follower02_Helmet31 == 0
+			Strip(31, folqst.Actor_Follower02) 
+			elseif folqst.Follower02_Body32 == 0
+			Strip(32, folqst.Actor_Follower02) 
+			elseif folqst.Follower02_Hands33 == 0
+			Strip(33, folqst.Actor_Follower02) 		
+			elseif folqst.Follower02_Feet37 == 0
+			Strip(37, folqst.Actor_Follower02) 					
+			elseif folqst.Follower02_Circlet42 == 0
+			Strip(42, folqst.Actor_Follower02) 
+			elseif folqst.Follower02_BikiniBottom52 == 0
+			Strip(52, folqst.Actor_Follower02) 
+			elseif folqst.Follower02_BikiniThigh53 == 0
+			Strip(53, folqst.Actor_Follower02) 
+			endif 
+	endif 	
+
+/; 		
+
 		
-if folqst.Actor_Follower01
-
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Helmet31:"+folqst.Follower01_Helmet31)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Body32:"+folqst.Follower01_Body32)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Hands33:"+folqst.Follower01_Hands33)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Feet37:"+folqst.Follower01_Feet37)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Circlet42:"+folqst.Follower01_Circlet42)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_BikiniBottom52:"+folqst.Follower01_BikiniBottom52)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_BikiniThigh53:"+folqst.Follower01_BikiniThigh53)
-
-
-		if folqst.Follower01_Helmet31 == 0
-		Strip(31, folqst.Actor_Follower01) 
-		elseif folqst.Follower01_Body32 == 0
-		Strip(32, folqst.Actor_Follower01) 
-		elseif folqst.Follower01_Hands33 == 0
-		Strip(33, folqst.Actor_Follower01) 		
-		elseif folqst.Follower01_Feet37 == 0
-		Strip(37, folqst.Actor_Follower01) 					
-		elseif folqst.Follower01_Circlet42 == 0
-		Strip(42, folqst.Actor_Follower01) 
-		elseif folqst.Follower01_BikiniBottom52 == 0
-		Strip(52, folqst.Actor_Follower01) 
-		elseif folqst.Follower01_BikiniThigh53 == 0
-		Strip(53, folqst.Actor_Follower01) 
-		endif 
-endif 
-
-if folqst.Actor_Follower02
-
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Helmet31:"+folqst.Follower02_Helmet31)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Body32:"+folqst.Follower02_Body32)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Hands33:"+folqst.Follower02_Hands33)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Feet37:"+folqst.Follower02_Feet37)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_Circlet42:"+folqst.Follower02_Circlet42)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_BikiniBottom52:"+folqst.Follower02_BikiniBottom52)
-		Debug.Trace("NAKED DEFEAT configquest: folqst.Follower02_BikiniThigh53:"+folqst.Follower02_BikiniThigh53)
-
-		if folqst.Follower02_Helmet31 == 0
-		Strip(31, folqst.Actor_Follower02) 
-		elseif folqst.Follower02_Body32 == 0
-		Strip(32, folqst.Actor_Follower02) 
-		elseif folqst.Follower02_Hands33 == 0
-		Strip(33, folqst.Actor_Follower02) 		
-		elseif folqst.Follower02_Feet37 == 0
-		Strip(37, folqst.Actor_Follower02) 					
-		elseif folqst.Follower02_Circlet42 == 0
-		Strip(42, folqst.Actor_Follower02) 
-		elseif folqst.Follower02_BikiniBottom52 == 0
-		Strip(52, folqst.Actor_Follower02) 
-		elseif folqst.Follower02_BikiniThigh53 == 0
-		Strip(53, folqst.Actor_Follower02) 
-		endif 
-endif 
-
 Endfunction
+
+Function GroupStripMaintenance()		;#GroupStripMaintenance()
+	NymTrace("GroupStripMaintenance()") 
+	
+	;PLAYER EQUIPMENT STATUS
+	int PlayerNakedMainSlots = 0		
+	if !PlayerRef.GetWornForm(0x00000004)	;32 - BODY
+	NymTrace("GroupStripMaintenance(Naked Body)") 
+	PlayerNakedMainSlots += 1
+	folqst.Follower01_Body32 = 0
+	folqst.Follower02_Body32 = 0
+	else 
+	NymTrace("GroupStripMaintenance(Dressed Body)") 
+	folqst.Follower01_Body32 = 1
+	folqst.Follower02_Body32 = 1	
+	endif 
+	if !PlayerRef.GetWornForm(0x00000080)	;FEET 
+	NymTrace("GroupStripMaintenance(Naked Feet)") 
+	PlayerNakedMainSlots += 1
+	folqst.Follower01_Feet37 = 0
+	folqst.Follower02_Feet37 = 0
+	else
+	NymTrace("GroupStripMaintenance(Dressed Feet)") 
+	folqst.Follower01_Feet37 = 1
+	folqst.Follower02_Feet37 = 1	
+	endif	
+	if !PlayerRef.GetWornForm(0x00000008)	;HANDS 
+	NymTrace("GroupStripMaintenance(Naked Hands)") 
+	PlayerNakedMainSlots += 1
+	folqst.Follower01_Hands33 = 0
+	folqst.Follower02_Hands33 = 0
+	else
+	NymTrace("GroupStripMaintenance(Dressed Hands)") 
+	folqst.Follower01_Hands33 = 1
+	folqst.Follower02_Hands33 = 1
+	endif	
+	if !PlayerRef.GetWornForm(0x00000008) && PlayerRef.GetWornForm(0x00001000) ;31 - Hair / HELMET	 && ;42 - Circlet
+	NymTrace("GroupStripMaintenance(Naked Head)") 
+	PlayerNakedMainSlots += 1
+	folqst.Follower01_Helmet31 = 0
+	folqst.Follower02_Helmet31 = 0
+	folqst.Follower01_Circlet42 = 0
+	folqst.Follower02_Circlet42 = 0
+	else 
+	NymTrace("GroupStripMaintenance(Dressed Head)") 
+	folqst.Follower01_Helmet31 = 1
+	folqst.Follower02_Helmet31 = 1
+	folqst.Follower01_Circlet42 = 1
+	folqst.Follower02_Circlet42 = 1	
+	endif 
+
+	Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Helmet31:"+folqst.Follower01_Helmet31)
+	Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Body32:"+folqst.Follower01_Body32)
+	Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Hands33:"+folqst.Follower01_Hands33)
+	Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Feet37:"+folqst.Follower01_Feet37)
+	Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_Circlet42:"+folqst.Follower01_Circlet42)
+	Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_BikiniBottom52:"+folqst.Follower01_BikiniBottom52)
+	Debug.Trace("NAKED DEFEAT configquest: folqst.Follower01_BikiniThigh53:"+folqst.Follower01_BikiniThigh53)
+
+	;FollowerStripUpdate()
+	folqst.FollowerStripUpdate()
+		
+EndFunction 
+
 
 Function FollowerStripCombat()			;#Lydia 
 Debug.Trace("NAKED DEFEAT configquest: FollowerStripCombat()")
@@ -25374,7 +26012,9 @@ int OverrideStripOptions = 3		;does nothing??? no, needed....
 ;OFFICIAL LATEST STRIPPING	---> #baustelle #todo needs OVERRIDE OPTION
 ;#move
 Function Strip(int slot, actor akactor)			;#strip
-
+	
+	NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+"Strip Slot: "+slot)
+	
 	bool AllowStripping = true
 	
 
@@ -25393,7 +26033,11 @@ Function Strip(int slot, actor akactor)			;#strip
 		elseif (Slot == 31) && !BlockSlot[1]
 		a = akactor.GetWornForm(0x00000002) 	;31 - hair/HELMET
 		elseif (Slot == 32) 
+		NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+"Strip Slot 32")
 		a = akactor.GetWornForm(0x00000004)	;32 - BODY
+		
+		
+		
 		elseif (Slot == 33)
 		a = akactor.GetWornForm(0x00000008)	;33 - HANDS
 		elseif (Slot == 34)
@@ -25456,9 +26100,11 @@ Function Strip(int slot, actor akactor)			;#strip
 
 		;#GUIDE: Followers only unequip their items and do not respect the MCM settings (for now) 
 		int StripBehaviour
+		bool StripOverride = false
 		if akactor == PlayerRef 
 		StripBehaviour = StripOptions
 		
+		;/
 		elseif NymBeta && (akactor == folqst.Actor_Follower01) 	;#Lydia
 		;Debug.Trace("NAKED DEFEAT configquest: LydiaA")
 			if Slot == 31 && !IsNymrasGame() ;Nymra dont strip Helmets for now... 
@@ -25499,12 +26145,15 @@ Function Strip(int slot, actor akactor)			;#strip
 			endif 
 			
 		StripBehaviour = 0
-		
+		/;
 		else
+		NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+" Strip Behaviour = 0")
 		StripBehaviour = 0
+		StripOverride = true 
 		endif
 
 		if OverrideStripOptions < 3 
+		NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+" OverrideStripOptions")
 		StripBehaviour = OverrideStripOptions
 		endif
 		
@@ -25512,20 +26161,47 @@ Function Strip(int slot, actor akactor)			;#strip
 ;Loot_Handles_Weapons_TOGGLE
 
 		if a
-			Weapon TempCheckForm = a as weapon
-				;Enchanted Armor Override 
-				if TempCheckForm && TempCheckForm.GetEnchantment() && Strip_EnchantedArmor_VALUE < 4
-				StripBehaviour = Strip_EnchantedArmor_VALUE
-				endif 
+		
+		bool PreventStrip = false 
+		NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+" a FOUND")
+			Weapon TempCheckForm = a as weapon			;THIS IS ALL SHIT, FIX THIS! 
+			Objectreference TempCheckObject = a as Objectreference
+			;Enchanted Armor Override 
+			if TempCheckForm && TempCheckForm.GetEnchantment() && Strip_EnchantedArmor_VALUE < 4
+			NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+" Strip_EnchantedArmor_VALUE")
+			StripBehaviour = Strip_EnchantedArmor_VALUE
+			endif 
+
+			if a.HasKeyWord(SexLabNoStrip)
+			PreventStrip = true 
+			endif 
+			if TempCheckObject && PO3_SKSEFunctions.IsQuestItem(TempCheckObject)
+			PreventStrip = true 
+			endif 
+			if StripOverride ;for NPC stripping 
+			PreventStrip = false   
+			endif  
 
 		;Debug.Trace("NAKED DEFEAT configquest: LydiaC")
-			if !a.HasKeyWord(SexLabNoStrip)
+			if !PreventStrip
+			NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+" Allowed to Strip")
 			
 				if Slot == 37 && Nym() 
 				RestoreHeelsEffectOnActor(akactor)
 				endif 
+				
+				if Slot == 33 && (akactor != PlayerRef)
+				String TempName = GetActorName(akactor)
+					if TempName == "Nessa"
+					StripBehaviour = 404
+					 NymTrace("#DEBUG Nessa found and NOT stripped")
+					endif
+				endif 
+				
+				NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+"StripBehaviour == "+StripBehaviour)
 			
 				if StripBehaviour == 0			;unequip
+				NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+"StripBehaviour == 0 Unequipping Item")
 				;Debug.Trace("NAKED DEFEAT configquest: LydiaD")
 				akactor.UnequipItem(a, false, true)								
 				elseif StripBehaviour == 1		;drop
@@ -25541,10 +26217,13 @@ Function Strip(int slot, actor akactor)			;#strip
 					akactor.RemoveItem(a, 1, true, None)
 					endif
 				endif
+			else 
+			NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+" NOT Allowed to Strip")			
+				
 			endif
 		else 
-		;Debug.Trace("NAKED DEFEAT configquest: LydiaFuckedUp")
-		endif
+		NymTrace("FollowerStripUpdate("+folqst.Name_Follower01+" NO A")
+		endif 
 	endif
 EndFunction	
 
@@ -25903,10 +26582,10 @@ EndFunction
 Function RemoveDefeatGags()
 PlayerRef.RemoveItem(DefeatGagsNew[DefeatGagAdded], 1, true, None)
 Gagged = false
+DefeatGagAdded = 0
 EndFunction
 
 Keyword[] Property KeywordsArmorClothing Auto
-
 
 
 Bool Function IsItem(String sKeyword, Form fForm )		;#IsItem()
@@ -25998,7 +26677,7 @@ endif
 		else
 		return false 
 		endif 
-	elseif sKeyword == "Clothes Hands"
+	elseif sKeyword == "Clothes Hands" 
 		if fWornItem.HasKeyword(KeywordsArmorClothing[10])
 		NymTrace("ItemIs Clothes Hands")
 		return true 
@@ -26132,6 +26811,7 @@ Debug.Trace("Naked Defeat configquest: StartSimpleSlaveryHostile()")
 		DebugTrace("Afterlife Location: HELL")
 		
 		SendWashPlayerEvent()
+		
 		if folqst.Actor_Follower01
 		SendModEvent_BiS_WashActor(folqst.Actor_Follower01)
 		endif 
@@ -26615,55 +27295,123 @@ Function RotateObject(ObjectReference akObject, float angle)
 EndFunction
 
 
+Float PlayerHealthLast = 0.0
 
+Function PlayerTrackHealth()
+		Float PlayerHealthCurrent = PlayerRef.GetActorValue("Health")
+		Float DamageReceived = 0.0
+		if PlayerHealthLast == 0 
+		PlayerHealthLast = PlayerRef.GetBaseActorValue("Health") 
+		endif 
+		
+		if PlayerHealthCurrent < PlayerHealthLast
+		DamageReceived = PlayerHealthLast - PlayerHealthCurrent
+		endif 
+		
+		NymTrace(" ------------ Current Health = "+PlayerHealthCurrent as int+" Previous Health = "+PlayerHealthLast as int +" Damage Received = "+DamageReceived as int+"--------------------")
+	
+		PlayerHealthLast = 	PlayerHealthCurrent
+		
+		if Nym() && !PlayerInCombat() && !StartFalling
+			if D100(DamageReceived)
+			
+			ScreenMessage("You had an accident")
+			
+			float PushStrength = DamageReceived*0.1
+				if PushStrength > 10
+				PushStrength = 10
+				endif 
+			NymTrace("PushActorAway "+PushStrength+" code 27324")
+			PlayerRef.PushActorAway(PlayerRef, PushStrength)
+			
+			endif 
+			
+			
+		endif 
+		
+		
+Endfunction		
 
 Function PlayerBuffsMaintenance()  ;#PlayerBuffsMaintenance() #buffs
 	
 	;only for Nymra
 	
-	Float UnarmedDamageWANT = 10
-	Float UnarmedDamageCurrent
+	Float UnarmedDamage_WANT = 10 			;THIS RESETS THE VALUE to the base value WE want
+	Float ShoutRecoveryMult_WANT = 1.0		;THIS RESETS THE VALUE to the base value WE want
+	Float StaminaRate_WANT = 10.0
+	Float HealRate_WANT = 1.0
+	
+	Float UnarmedDamage_CURRENT
+	Float ShoutRecoveryMult_CURRENT
+	Float StaminaRate_CURRENT
+	Float HealRate_CURRENT
+	
 	Bool NewBuffs = true
+	
 	if IsNymrasGame()
-			
-		if !IsDefeatRunning() && PlayerRef.IsInFaction(SexlabAnimatingFaction)	
+
+		;HEALTH TRACKING 
 		
-			if !SexScene
-			SendModEvent("StartNakedSexExpressions")		
-			SexScene = true
-			elseif SexScene
-			SexScene = false
-			endif 
+		PlayerTrackHealth()
+	
+		if !IsDefeatRunning() && PlayerRef.IsInFaction(SexlabAnimatingFaction)	
+		NymMessage("Sex Scene Detected, Starting Expressions")
+			;if !SexScene
+			SendModEvent("StartNakedSexExpressions")		;#susi
+			;SexScene = true
+			;e;lseif SexScene
+			;SxScene = false
+			;endif 
 		endif 
-		UnarmedDamageCurrent = PlayerRef.GetAV("UnarmedDamage")
+		
+		UnarmedDamage_CURRENT = PlayerRef.GetActorValue("UnarmedDamage")
+		ShoutRecoveryMult_CURRENT = PlayerRef.GetActorValue("ShoutRecoveryMult")
+		StaminaRate_CURRENT = PlayerRef.GetActorValue("StaminaRate")
+		HealRate_CURRENT = PlayerRef.GetActorValue("HealRate")				
+		
 	;	NymTrace("UnarmedDamageCurrent: "+UnarmedDamageCurrent)
 		
 		;NEW SYSTEM
 		if NewBuffs
 		
-			if UnarmedDamageCurrent != UnarmedDamageWANT
+			if UnarmedDamage_CURRENT != UnarmedDamage_WANT		;current value differs from the wanted value
 			 
 				if IsPlayerNaked()
-				UnarmedDamageWANT += 5
+				UnarmedDamage_WANT += 5
+				ShoutRecoveryMult_WANT -= 0.3
+				StaminaRate_WANT +=5
+				HealRate_WANT+=0.5
 				endif 
 				
 				if IsPlayerCumsoaked()
-				UnarmedDamageWANT += 5
+				UnarmedDamage_WANT += 5
+				ShoutRecoveryMult_WANT -= 0.3
+				StaminaRate_WANT +=5
+				HealRate_WANT+=0.5
 				endif 
 				
 				if IsPlayerBarefoot()
-				UnarmedDamageWANT += 5
+				UnarmedDamage_WANT += 5
+				ShoutRecoveryMult_WANT -= 0.3
+				StaminaRate_WANT +=5
+				HealRate_WANT+=0.5
 				endif 
 				
-			PlayerRef.SetAV("UnarmedDamage", UnarmedDamageWANT)
+			PlayerRef.SetActorValue("UnarmedDamage", UnarmedDamage_WANT)
+			PlayerRef.SetActorValue("ShoutRecoveryMult", ShoutRecoveryMult_WANT)
+			PlayerRef.SetActorValue("StaminaRate", StaminaRate_WANT)
+			PlayerRef.SetActorValue("HealRate", HealRate_WANT)
 			endif 
 		
 		;OLD SYSTEN 
 		else 
+		;/
 			if IsPlayerNaked() ;&& !PlayerNaked
 				if !PlayerNaked
 				PlayerNaked = true
 				UnarmedDamageWANT+=5
+				
+				
 				endif 
 			elseif PlayerNaked 
 			PlayerNaked = false
@@ -26694,10 +27442,18 @@ Function PlayerBuffsMaintenance()  ;#PlayerBuffsMaintenance() #buffs
 			endif 
 			
 		PlayerRef.ModAV("UnarmedDamage", UnarmedDamageWANT)	
+		/;
 		endif 
 		
-		UnarmedDamageCurrent = PlayerRef.GetAV("UnarmedDamage")
-		;NymTrace("#DAMAGE UnarmedDamageCurrent #DAMAGE: "+UnarmedDamageCurrent)
+		UnarmedDamage_CURRENT = PlayerRef.GetActorValue("UnarmedDamage")
+		ShoutRecoveryMult_CURRENT = PlayerRef.GetActorValue("ShoutRecoveryMult")
+		StaminaRate_CURRENT = PlayerRef.GetActorValue("StaminaRate")
+		HealRate_CURRENT = PlayerRef.GetActorValue("HealRate")		
+	
+		NymTrace("#BUFFS UnarmedDamage_CURRENT: "+UnarmedDamage_CURRENT)
+		NymTrace("#BUFFS ShoutRecoveryMult_CURRENT: "+ShoutRecoveryMult_CURRENT)
+		NymTrace("#BUFFS StaminaRate_CURRENT: "+StaminaRate_CURRENT)
+		NymTrace("#BUFFS HealRate_CURRENT: "+HealRate_CURRENT)
 	endif 	
 
 
@@ -26721,7 +27477,8 @@ Function PlayerSpeedMaintenance()		;#PlayerSpeedMaintenance()
 ;endif
 
 	;--------- SPEED MAINTENANCE -------------------------------------------------	
-	if IsNymrasGame() && !IsDefeatRunning() && !PlayerDownAlready
+	;if IsNymrasGame() && !IsDefeatRunning() && !PlayerDownAlready
+	if IsNymrasGame() ;&& !IsDefeatRunning() && !PlayerDownAlready
 	;Debug.Trace("Naked Defeat configquest: WaitLoopPlayerMaintenance(SPEED MAINTENANCE)")
 		
 		
@@ -26729,13 +27486,18 @@ Function PlayerSpeedMaintenance()		;#PlayerSpeedMaintenance()
 		PlayerSpeedMultCurrent = PlayerRef.GetActorValue("SpeedMult")
 		Float PlayerSpeedMultToSet = 100.0 
 		
+	;	Float PlayerStaminaRateCurrent = 0.0
+	;	PlayerStaminaRateCurrent = PlayerRef.GetActorValue("StaminaRate")
+	;	
+	;	Float PlayerStaminaRateToSet = 100.0 
+	;	PlayerRef.SetActorValue("StaminaRate")
 		;COMBAT SPEED 
 		
 		if PlayerInCombat()
 		
 			PlayerSpeedMultCurrent = PlayerSpeedMultToSet
 				
-			if PlayerBarefoot		
+			if PlayerBarefoot && !IsDefeatRunning()		
 			;do nothing, we already applied the malus 
 				if D100(5) ;barefoot trip chance
 
@@ -26763,7 +27525,7 @@ Function PlayerSpeedMaintenance()		;#PlayerSpeedMaintenance()
 		else
 				
 			;barefoot slows down by 20 
-			if IsPlayerBarefoot() 
+			if IsPlayerBarefoot() && !IsDefeatRunning()	
 			PlayerBarefoot = true
 			PlayerSpeedMultToSet-=20.0
 					
@@ -26810,12 +27572,25 @@ Function ResetEnemies()
 
 EndFunction
 
-Function WaitLoopPlayerMaintenance()		;#monitor 
 
+Function WaitLoopPlayerMaintenance()		;#monitor 
+	NymTrace(" ----------------------------- WaitLoopPlayerMaintenance() -----------------------------")
+	
+	if (ModDDframework && nade_DDint.IsWearingDDs(PlayerRef, "Gag")) || (DefeatGagAdded > 0)	;<<---- DIRE need of Improvement
+	Gagged = true 	
+	else 
+	Gagged = false 
+	endif 
 		
 	if IsNymrasGame()	
 	PlayerSpeedMaintenance()
 	PlayerBuffsMaintenance()
+	GroupStripMaintenance()
+	
+	;	if IsFucking(PlayerRef)
+	;	SendModEvent("StartNakedSexExpressions")
+	;	endif 
+	
 	endif 
 	
 	if PlayerRef.IsInCombat() 
@@ -26825,6 +27600,8 @@ Function WaitLoopPlayerMaintenance()		;#monitor
 	;	endif 
 	
 		if !PlayerIsInCombat
+		NymMessage("Entering Combat") 
+		DebugTrace("Entering Combat")
 		;NymMessage("Entering Combat")	 
 	;	NymMessage("Entering Combat: Enemies: [0] "+Enemy[1]+" [1] "+Enemy[1]+" [2] "+Enemy[2]+" [3] "+Enemy[3]+" [4] "+Enemy[4]+" [5] "+Enemy[5]) 
 		
@@ -26849,11 +27626,18 @@ Function WaitLoopPlayerMaintenance()		;#monitor
 		PlayerIsInCombat = false 
 		;	if !JustLeftCombat
 			NymMessage("Leaving Combat") 
+			DebugTrace("Leaving Combat")
+			
+				if Nym()
+				Utility.Wait(2.0)
+				Game.SaveGame("Leaving Combat")
+				endif 
 			;PlayerBarefoot = false 
 		;	JustLeftCombat = true 
 					
 			if (DefeatStatePlayer == "Free") && !IsDefeatRunning()
-			NymTrace(":::::::::::::::::::::::::::::::::: RESET ENEMIES (leaving Combat) ::::::::::::::::::::::::::::::::::")
+			;NymTrace(":::::::::::::::::::::::::::::::::: RESET ENEMIES (leaving Combat) ::::::::::::::::::::::::::::::::::")
+			DebugTrace(":::::::::::::::::::::::::::::::::: RESET ENEMIES (leaving Combat) ::::::::::::::::::::::::::::::::::")
 			ResetEnemies()
 			endif 
 		endif 
@@ -27015,7 +27799,7 @@ String Function GetRandomLocation_Vampires()
 	sLoc = "RedWater Den"
 	endIf
 	Debug.Trace("Naked Defeat configquest: GetRandomLocation_Vampires("+sLoc+")")
-	sLoc = sLoc
+	return sLoc
 	
 EndFunction
 
@@ -27066,7 +27850,7 @@ String Function GetRandomLocation_Wilderness()
 	endIf
 	
 	Debug.Trace("Naked Defeat configquest: GetRandomLocation_Wilderness("+sLoc+")")
-	sLoc = sLoc
+	return sLoc
 	
 	
 EndFunction
@@ -27116,6 +27900,7 @@ Function LocationEvent(String sEventType)			;##LocationEvent
 	int i 
 	String sTempLoc
 	bool bDoEnslave = false
+	bool bFreeFadeIn = false
 	DefeatTypeGeneral = "empty"
 	
 	;Aftermath FastTravel   ---  teleport and we are naked but free (and surrounded by bandits)
@@ -27129,6 +27914,8 @@ Function LocationEvent(String sEventType)			;##LocationEvent
 		elseif i > 1
 		sTempLoc = GetRandomLocation_Bandits()
 		endif 
+		
+		bFreeFadeIn = true 
 
 	;Afterlife (Hell)
 	elseif sEventType == "Afterlife"			
@@ -27142,7 +27929,7 @@ Function LocationEvent(String sEventType)			;##LocationEvent
 	elseif sEventType == "Rescued"
 	
 		if D100(20)
-		GetRandomLocation_Wilderness()
+		sTempLoc = GetRandomLocation_Wilderness()
 		else
 			if calmqst.GetRegion() == "Region The Reach - Markarth"
 			sTempLoc = "Silverblood Inn"
@@ -27173,14 +27960,16 @@ Function LocationEvent(String sEventType)			;##LocationEvent
 			elseif calmqst.GetRegion() == "Region Winterhold"
 			sTempLoc = "The Frozen Hearth"
 			elseif calmqst.GetRegion() == "Region Unknown"
-			GetRandomLocation_Inn()
+			sTempLoc = GetRandomLocation_Inn()
 			endif 
 		endif 
+		
+		bFreeFadeIn = true 
 		
 	;Aftermath Wake up In Wilderness	
 	elseif sEventType == "Wake up in the Wilderness"	
 
-		GetRandomLocation_Wilderness()
+		sTempLoc = GetRandomLocation_Wilderness()
 
 	;Slavery Public
 	elseif sEventType == "Slavery Public"
@@ -27216,7 +28005,12 @@ Function LocationEvent(String sEventType)			;##LocationEvent
 	
 	DefeatTypeGeneral = "AreHumans"
 	endif 
-
+	
+	if bFreeFadeIn
+	;OOOOOOOOOOOOOoooooooooooooooo............	FADE BLACK OUT 01 ...............................................................................................
+	FadeToBlack(false) 
+	;.............................................................................................................................................................
+	endif 
 EndFunction
 
 
@@ -27224,6 +28018,10 @@ Function ResetPlayer()
 
 	if PlayerRef.IsInFaction(DownedFaction)
 	PlayerRef.RemoveFromFaction(DownedFaction)
+	endif
+	
+	if PlayerRef.IsInFaction(CrawlFaction) ;NEW
+	PlayerRef.RemoveFromFaction(CrawlFaction)
 	endif
 	
 	if PlayerRef.IsInFaction(nade_DefeatFaction)
@@ -27238,6 +28036,9 @@ EndFunction
 
 Function MoveActorToLocation(Actor akActor, String sLocation, bool bEnslave)	;#Location ;#Library
 	;ALWAYS USE Ref Form!!!! NOT #BaseID
+	
+	NymTrace("MoveActorToLocation: sLocation = "+sLocation)
+	
 	Objectreference TempLoc
 	String TempFloor
 	int iRotation
@@ -27432,11 +28233,11 @@ Function MoveActorToLocation(Actor akActor, String sLocation, bool bEnslave)	;#L
 	TempFloor = "empty"
 	iRotation = 0	
 	elseif sLocation == "Clearpine Pond"
-	TempLoc = (Game.GetFormFromFile(0x00016222, "Skyrim.esm") As Objectreference)		;Static
+	TempLoc = (Game.GetFormFromFile(0x00016222, "Skyrim.esm") As Objectreference)		;Static -- will not work
 	TempFloor = "empty"
 	iRotation = 0	
 	elseif sLocation == "The Towerstone"
-	TempLoc = (Game.GetFormFromFile(0x000E0ED5, "Skyrim.esm") As Objectreference)		;Static
+	TempLoc = (Game.GetFormFromFile(0x000E0ED5, "Skyrim.esm") As Objectreference)		;Static -- will not work
 	TempFloor = "empty"
 	iRotation = 0	
 	elseif sLocation == "The Serpent Stone"
@@ -27477,15 +28278,16 @@ Function MoveActorToLocation(Actor akActor, String sLocation, bool bEnslave)	;#L
 	TempFloor = "empty"
 	iRotation = 0	
 	elseif sLocation == "Random Mountain"
-	TempLoc = (Game.GetFormFromFile(0x0008F64F, "Skyrim.esm") As Objectreference)		;XMarkerHeading ;near Helgen
+	TempLoc = (Game.GetFormFromFile(0x0008F64F, "Skyrim.esm") As Objectreference)		;XMarkerHeading ;near Helgen - WORX in CONSOLE
 	TempFloor = "empty"
 	iRotation = 0	
 	elseif sLocation == "Ruins of Bthalft"
-	TempLoc = (Game.GetFormFromFile(0x00090D84, "Skyrim.esm") As Objectreference)		;XMarkerHeading
+	TempLoc = (Game.GetFormFromFile(0x00090D84, "Skyrim.esm") As Objectreference)		;XMarkerHeading - WORX - WORX in CONSOLE
 	TempFloor = "empty"
 	iRotation = 0	
 	elseif sLocation == "The Shadow Stone"
-	TempLoc = (Game.GetFormFromFile(0x000D1F1A, "Skyrim.esm") As Objectreference)		;IdleMarker () Ambush LOL -- COCMarker: 000D1EAC
+	;TempLoc = (Game.GetFormFromFile(0x000D1F1A, "Skyrim.esm") As Objectreference)		;IdleMarker () Ambush LOL -- COCMarker: 000D1EAC   ---- Idle Marker ---> NOT WORKING
+	TempLoc = (Game.GetFormFromFile(0x000D1EAC, "Skyrim.esm") As Objectreference)		;IdleMarker () Ambush LOL -- COCMarker: 000D1EAC   ----> try with COC marker
 	TempFloor = "empty"
 	iRotation = 0	
 	elseif sLocation == "Giant's Grove"
@@ -27497,7 +28299,7 @@ Function MoveActorToLocation(Actor akActor, String sLocation, bool bEnslave)	;#L
 	TempFloor = "empty"
 	iRotation = 0	
 	elseif sLocation == "Mara's Eye Pond"
-	TempLoc = (Game.GetFormFromFile(0x000DC4B8, "Skyrim.esm") As Objectreference)		;
+	TempLoc = (Game.GetFormFromFile(0x000DC4B8, "Skyrim.esm") As Objectreference)		;NOT FOUND! 
 	TempFloor = "empty"
 	iRotation = 0	
 	
@@ -27660,8 +28462,9 @@ Function MoveActorToLocation(Actor akActor, String sLocation, bool bEnslave)	;#L
 	;>>>>>>>>>>>>>>>>>>>>>>>>>> MOVE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 	
 	if !TempLoc
-	Debug.Messagebox("#ERROR Location["+sLocation+"	not found, please report to the forum. Using BackupLocation")
-	TempLoc = (Game.GetFormFromFile(0x0001F88C, "Skyrim.esm") As Objectreference) ;backuplocation is Bannered Mare
+	NymTrace("#ERROR #Location Not Found!") 
+;	Debug.Messagebox("#ERROR Location["+sLocation+"	not found, please report to the forum. Using BackupLocation")
+;	TempLoc = (Game.GetFormFromFile(0x0001F88C, "Skyrim.esm") As Objectreference) ;backuplocation is Bannered Mare
 	endif 
 	
 	bool Follower01found = false
@@ -27713,7 +28516,8 @@ Function MoveActorToLocation(Actor akActor, String sLocation, bool bEnslave)	;#L
 		endif 
 		NymTrace("##AFterlife03")
 		Utility.Wait(0.5)
-		PlayerRef.MoveTo(PlayerRef, 235.0 * Math.Sin(PlayerRef.GetAngleZ()+90.0), 235.0 * Math.Cos(PlayerRef.GetAngleZ()+90.0), PlayerRef.GetHeight() +100.0, abMatchRotation = true) 
+		;OLD: PlayerRef.MoveTo(PlayerRef, 235.0 * Math.Sin(PlayerRef.GetAngleZ()+90.0), 235.0 * Math.Cos(PlayerRef.GetAngleZ()+90.0), PlayerRef.GetHeight() +100.0, abMatchRotation = true) 
+		PlayerRef.MoveTo(PlayerRef, 225.0 * Math.Sin(PlayerRef.GetAngleZ()+90.0), 225.0 * Math.Cos(PlayerRef.GetAngleZ()+90.0), PlayerRef.GetHeight() +100.0, abMatchRotation = true)  ;<<<---- THIS FITS BETTER
 		Utility.Wait(0.5)
 		RotatePC(105) ;initial angle 	
 		Utility.Wait(0.5)		
@@ -27744,7 +28548,7 @@ Function MoveActorToLocation(Actor akActor, String sLocation, bool bEnslave)	;#L
 	
 	;>>>>>>>>>>>>> Enslave >>>>>>>>>>>>>>>;
 	if bEnslave
-		
+	NymTrace("bEnslave")	
 		if DefeatEntranceVia == "Sold as Public Slave"	
 		CivilRapeRunning = true				;#0 -- THIS ORDER HAS TO BE KEPT!!!!!
 		elseif DefeatEntranceVia == "Sold as Slave"
@@ -27777,7 +28581,7 @@ Function MoveActorToLocation(Actor akActor, String sLocation, bool bEnslave)	;#L
 		
 		StartDefeat()
 	elseif DefeatTypeScenario == "Afterlife"
-	
+	NymTrace("DefeatTypeScenario == Afterlife")
 	;	DefeatViaSurrender = true				;#1 ;why again?
 	;	DefeatViaSlavery = true
 		;HarderDefeat = true ;STILL NECESSARY? ;sets escape difficulty to 1/1 all the time I guess... lets try without
@@ -28377,14 +29181,13 @@ int Function RandomInt()
 return  Utility.RandomInt(1, 100)
 EndFunction
 
-
-
 Function SetExpression(int type = 0)	;#expression #SetExpression
-;NymTrace("SetExpression START")
+NymTrace("SetExpression("+type+")")
+
 	if PlayExpressions	;MCM Setting True/False 
-			;NymTrace("SetExpression 1")	
+		NymTrace("SetExpression 1")	
 		if !Gagged && !Orgasm 	;if NOT gagged
-		;NymTrace("SetExpression 2")
+		NymTrace("SetExpression 2")
 			if type == 0 
 			ResetExpressions()	
 			elseif type == 1
@@ -28403,7 +29206,7 @@ Function SetExpression(int type = 0)	;#expression #SetExpression
 				
 		;need dedicated Orgasm expression	
 		elseif Gagged || Orgasm   
-	;	NymTrace("SetExpression 3")
+		NymTrace("SetExpression 3")
 		MfgConsoleFunc.SetModifier(PlayerRef, 6, Utility.RandomInt(80,100))	;BrowUpL
 		MfgConsoleFunc.SetModifier(PlayerRef, 7, Utility.RandomInt(80,100))	;BrowUpR
 
@@ -28414,9 +29217,9 @@ Function SetExpression(int type = 0)	;#expression #SetExpression
 
 		MfgConsoleFunc.SetModifier(PlayerRef, 0, Utility.RandomInt(0,20))	;BlinkL
 
-			if (DefeatGagAdded != 2) && (DefeatGagAdded != 3)
-			MfgConsoleFunc.SetPhoneme(PlayerRef, 0, 100)		;AH
-			endif
+		;	if (DefeatGagAdded != 2) && (DefeatGagAdded != 3)
+		;	MfgConsoleFunc.SetPhoneme(PlayerRef, 0, 100)		;AH
+		;	endif
 		;--- Nymra old ----
 		;MfgConsoleFunc.SetPhoneme(PlayerRef, 1, 100)		;BIG AAAH
 		;MfgConsoleFunc.SetPhoneme(PlayerRef, 11, 100)		;Oh
@@ -28425,7 +29228,7 @@ Function SetExpression(int type = 0)	;#expression #SetExpression
 		;PlayerRef.SetExpressionOverride(9, 100)	;combat shout
 		
 		;---- Nymra from the SL Mod ---- 
-		PlayerRef.SetExpressionOverride(16, 0)  ; Skyrim SE		;?????
+		PlayerRef.SetExpressionOverride(16, 100)  ; Skyrim SE		;?????
 			
 		;/
 		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 1, 100)    ;	;BIG AAAH
@@ -28435,10 +29238,10 @@ Function SetExpression(int type = 0)	;#expression #SetExpression
 		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 6, 100)    ; Eee
 		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 10, 100)    ; Oldrim 
 		/;
-		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 0, 100)    ;
-		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 1, 100)    ;
-		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 5, 100)    
-		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 11, 100)    
+		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 0, 100)    ;AH
+		MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 1, 100)    ;BIG AAAH
+		;MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 5, 100)    ; Eee
+		;MfgConsoleFunc.SetPhonemeModifier(PlayerRef, 0, 11, 100) 	 ; Oh  	
 		
 		
 		; ---------------------------
@@ -28450,7 +29253,7 @@ Function SetExpression(int type = 0)	;#expression #SetExpression
 		
 		;Stage 2: EYE MOVEMENT AND ADDITIONAL RANDOM AHH ------------------------------------
 		if type > 0
-		;NymTrace("SetExpression 4")
+		NymTrace("SetExpression 4")
 			;MOUTH OPENING
 			;if Gagged || Orgasm
 			;MfgConsoleFunc.SetPhoneme(PlayerRef, 1, 100)		;BIG AAAH
@@ -28458,7 +29261,7 @@ Function SetExpression(int type = 0)	;#expression #SetExpression
 			
 			if !Gagged && !Orgasm
 			;additional factors
-			MfgConsoleFunc.SetPhoneme(PlayerRef, 1, (Utility.RandomInt(40,100)))	;BIG AAAH	
+			MfgConsoleFunc.SetPhoneme(PlayerRef, 1, (Utility.RandomInt(60,100)))	;BIG AAAH	
 			endif
 			
 			;EYE MOVEMENT
@@ -29376,10 +30179,71 @@ EndFunction
 
 /;
 
+
+Function ForceSheatheWeapon(bool Disarm)
+
+	if PlayerRef.IsWeaponDrawn()
+	PlayerRef.SheatheWeapon()	
+	NymTrace("ForceSheatheWeapon A")	
+	endif
+	
+	if PlayerRef.IsWeaponDrawn()
+	NymTrace("ForceSheatheWeapon B")	
+		Weapon IronDagger
+
+		if !IronDagger
+		IronDagger = game.GetFormFromFile(0x0001397E , "Skyrim.esm") as weapon
+		endif 
+		IsCheat = true
+	
+		if IronDagger
+		PlayerRef.EquipItem(IronDagger, false, true)
+		PlayerRef.DrawWeapon()
+		else 
+			if Nym()
+			Debug.Messagebox("NO DAGGER")
+			endif 
+		endif 
+		
+		if Nym()
+			while PlayerRef.IsWeaponDrawn()
+			NymTrace("ForceSheatheWeapon(WEAPON STILL DRAWN LOOP)")
+			PlayerRef.SheatheWeapon()
+			Utility.Wait(1.0)
+			endwhile 
+		else
+		
+		PlayerRef.SheatheWeapon()	
+		endif 
+		PlayerRef.RemoveItem(IronDagger, 1, true, None)
+		
+		
+		IsCheat = false
+		if PlayerRef.IsWeaponDrawn()	&& Nym()
+		NymTrace("ForceSheatheWeapon(WEAPON STILL DRAWN 02)")
+		Debug.Messagebox("ForceSheatheWeapon(WEAPON STILL DRAWN 02)")		
+		PlayerRef.SheatheWeapon()		
+		endif
+	endif 
+EndFunction
+
+
+
 Function PlayerSheatheWeapon()
-if PlayerRef.IsWeaponDrawn() 
-PlayerRef.SheatheWeapon()
-endif
+
+if Nym()
+ForceSheatheWeapon(true)
+else 
+
+	if PlayerRef.IsWeaponDrawn() 
+	PlayerRef.SheatheWeapon()
+	endif
+	;Utility.Wait(0.5)
+	if PlayerRef.IsWeaponDrawn() 
+	PlayerRef.SheatheWeapon()
+	endif
+endif 
+	
 EndFunction
 
 Function FadeToBlack(bool FadeOut) ;#fade #fadeout #FadeToBlack

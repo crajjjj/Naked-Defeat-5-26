@@ -162,6 +162,10 @@ if cfgqst.ProximityScanType == "CombatScan" 		;ARE ACTORS NEARBY
 cfgqst.ProximityScanType = "empty" 
 ProximityScanCombat()	
 
+elseif cfgqst.ProximityScanType == "RaperScan" 
+cfgqst.ProximityScanType = "empty" 
+ProximityScanRapers()
+
 elseif cfgqst.ProximityScanType == "DuplicateEnemyScan"
 cfgqst.ProximityScanType = "empty"
 ProximityScanDuplicateEnemies()
@@ -276,6 +280,8 @@ Function ProximityScanFollowerName()
 		if a
 		
 			TempName = cfgqst.GetActorName(a)
+			Debug.Trace("NAKED DEFEAT: ProximityScanFollowerName ACTOR["+i+"] = "+TempName)
+			
 			if sTempName == cfgqst.SavedNames_01
 			a.AddToFaction(cfgqst.PlayerFollowerFaction)
 			bNameFound = true
@@ -429,7 +435,8 @@ Function ProximityScanCombat()
 	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanCombat()")
 
 	Bool IsFollowerFighting = true
-
+	Bool StartCombat0 = false
+	Bool StartCombat1 = false
 	;/PLANS
 	We want to use this in combat ONCE after the first hit to scan for enemies early
 	We also want to use this to check for enemies after defeat and if we can get back up (because nobody is nearby)	
@@ -470,24 +477,49 @@ Function ProximityScanCombat()
 			;IS ENEMY 
 			;if a.IsHostileToActor(cfgqst.PlayerRef)
 			
-			if a && (a == folqst.Actor_Follower01) && (a == folqst.Actor_Follower02) && (a == folqst.Actor_Follower03) && (a == folqst.Actor_Follower04) && (a == folqst.Actor_Follower05)
-				if a.IsInCombat()
-				cfgqst.ProxGuardDetected += 1.0	
-				endif
-			elseif a 
-			Debug.Trace("NAKED DEFEAT: #ProximityScanCombat ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+" IsEnemy")
-				if !(a.GetBaseObject().GetName() == "FEC : Load Screen Detector")						
-					;if a != folqst.Actor_Follower01
-					cfgqst.GetEnemyType(a)
-					
-					;if a.IsInCombat()
-					if cfgqst.PlayerRef.GetDistance(a) <= 1500 ;100 units = 1,42 m --> 14 m ca. 
-					cfgqst.ProxActorDetected += 1.0	
+			if a 
+			
+			
+				if (a == folqst.Actor_Follower01) || (a == folqst.Actor_Follower02) || (a == folqst.Actor_Follower03) || (a == folqst.Actor_Follower04) || (a == folqst.Actor_Follower05)
+					if a.IsInCombat()
+					cfgqst.ProxGuardDetected += 1.0	
 					endif
-					;endif 
-				endif 	
-			endif   
-		
+					
+				else
+				Debug.Trace("NAKED DEFEAT: #ProximityScanCombat ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+" IsEnemy")
+					if !(a.GetBaseObject().GetName() == "FEC : Load Screen Detector")						
+						;if a != folqst.Actor_Follower01
+						cfgqst.GetEnemyType(a)
+						
+						;if a.IsInCombat()
+						if cfgqst.PlayerRef.GetDistance(a) <= 1500 ;100 units = 1,42 m --> 14 m ca. 
+						cfgqst.ProxActorDetected += 1.0	
+						endif
+						
+						if folqst.IsWithUs_Follower(0) && (PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[0]) == 0)
+						a.StartCombat(folqst.NakedFollower[0])
+					;	NymTrace("Enemy start combat with NakedFollower[0]")
+						elseif folqst.IsWithUs_Follower(1) && (PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[1]) == 0)
+						a.StartCombat(folqst.NakedFollower[1])
+					;	NymTrace("Enemy start combat with NakedFollower[1]")
+						elseif folqst.IsWithUs_Follower(2) && (PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[2]) == 0)
+						a.StartCombat(folqst.NakedFollower[2])
+					;	NymTrace("Enemy start combat with NakedFollower[2]")
+						elseif folqst.IsWithUs_Follower(3) && (PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[3]) == 0)
+						a.StartCombat(folqst.NakedFollower[3])
+					;	NymTrace("Enemy start combat with NakedFollower[3]")
+						elseif folqst.IsWithUs_Follower(4) && (PO3_SKSEFunctions.GetActorState(folqst.NakedFollower[4]) == 0)
+						a.StartCombat(folqst.NakedFollower[4])
+					;	NymTrace("Enemy start combat with NakedFollower[4]")
+					;	StartCombat0 = true 
+					;	Debug.Messagebox("Start Combat 0")
+						endif 
+						
+						
+						;endif 
+					endif 	
+				endif   
+			endif 
 				;/	
 			;IS FOLLOWER 01 
 			elseif a == folqst.Actor_Follower01	
@@ -548,6 +580,49 @@ Function ProximityScanCombat()
 	;Debug.Notification("NAKED DEFEAT proximity: Actors: "+cfgqst.ProxActorDetected)
 	;Debug.Notification("NAKED DEFEAT proximity: Guards: "+cfgqst.ProxGuardDetected)
 
+	SetStage(1000)
+
+EndFunction
+
+Function ProximityScanRapers()
+
+	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanRapers()")
+	;WE SCAN I VALID RAPERS ARE IN THE vicinity
+	;when checking for misshaps (Traps/Struggling/Potions etc.)
+	
+	
+	Actor a										
+	cfgqst.ProxActorDetected = 0
+	int i = NPC.Length 							;############ I think this is wrong. Index needs to reduce AggressourCount directly not NPC Lenght ###########
+
+	while i							
+	i -= 1	
+	a = NPC[i].GetReference() as Actor		
+;	Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ACTOR#"+i+": "+cfgqst.GetActorInfo(a))	;check actor alias slots (15)
+	
+		if a
+			
+			if folqst.IsPresentFollower(a) || (a.GetBaseObject().GetName() == "FEC : Load Screen Detector")
+			;sort out followers
+			elseif cfgqst.AllowActor(a, 0, "PotentialRaper")  
+	
+			cfgqst.ProxActorDetected += 1
+	
+			endif	
+			
+		else 
+		Debug.Trace("NAKED DEFEAT: #ProximityScanRapers ACTOR["+i+"] = NONE")
+		endif	
+	endwhile	
+
+	if cfgqst.ProxActorDetected > 0
+	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanRapers(Potential Rapers Nearby)")
+	else 
+	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanRapers(NO Potential Rapers Nearby)")
+	endif 
+	
+	;cfgqst.ProxGuardDetected = 0
+	
 	SetStage(1000)
 
 EndFunction
@@ -648,6 +723,8 @@ Debug.Trace("NAKED DEFEAT: ProximityScan() START")
 	ActorAllowed = true
 	a = NPC[i].GetReference() as Actor	
 	Bool ValidCreature = false 
+	
+	cfgqst.ProxActorDetected = 0
 	
 	int sTempGender = 0
 	Float sTempDistance = 0.0

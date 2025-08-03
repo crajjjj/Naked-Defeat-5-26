@@ -651,6 +651,7 @@ else
 	if IsCriticalDefeat && !IsBleedoutDefeat
 	Debug.trace("NAKED DEFEAT playeraliasquest: PlayerDown(from CriticalDefeat)")
 	cfgqst.DefeatStatePlayer = "Down"
+	cfgqst.PlayerSheatheWeapon()
 	PlayerDown("Combat: Critical Hit")
 	endif
 	
@@ -1408,12 +1409,13 @@ Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 		cfgqst.PlayerRef.AddToFaction(DefeatFaction)
 		
 		if !SPE_Actor.IsActorCalmed(cfgqst.PlayerRef)
+		NymTrace("##Calm Player A")
 		SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
 		endif 
 		
-		if Nym()
-		cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, true)
-		endif 
+	;	if Nym()
+	;	cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, true)
+	;	endif 
 		
 		;------ DeBug ------;
 
@@ -1583,7 +1585,7 @@ EndFunction
 
 Function ResetPlayer()	;this is called whenever CalmQuest is NOT Started
 
-	cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, false)
+	;cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, false)
 
 	PlayerDownAlreadyStarted = false 
 
@@ -1597,6 +1599,7 @@ Function ResetPlayer()	;this is called whenever CalmQuest is NOT Started
 	
 	if SPE_Actor.IsActorCalmed(cfgqst.PlayerRef)
 	SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, false)
+	NymTrace("##CALM OFF Player 1")
 	endif 
 	
 	calmqst.CalmFollowers(false)
@@ -1632,7 +1635,14 @@ Bool Function FollowersCanProtect()		;NEW2025		#Protect #FollowersCanProtect()
 		cfgqst.DefeatStateChapter = "FollowersProtect"
 
 		float Timer = 30
+		
+		if NobodyAround()
+		sTempOutcomeMessage = "Nobody left to fight, you can recover [Recover]."
+		Timer = 0
+		CanProtect = 1
+		else 
 		Timer = cfgqst.DefeatDowntime
+		endif 
 		;check if followers are all in bleedout or not
 		DebugTrace("FollowersCanProtect(Timer START: "+Timer+")")
 		
@@ -1696,26 +1706,28 @@ Bool Function FollowersCanProtect()		;NEW2025		#Protect #FollowersCanProtect()
 			;FIGHT OVER, no Enemies nearby > Get Up 		
 
 				if folqst.PartyDown() 
-				NymTrace("Your followers cannot win the fight [Defeated] Timer:"+Timer)
+				NymTrace("Your followers cannot win the fight [A]  [Defeated] Timer:"+Timer)
 				sTempOutcomeMessage = "Your followers cannot win the fight [Defeated]."
 				;Followers down -> End Timer 
 				Timer = 0
 				CanProtect = 0
-				elseif !cfgqst.FollowersInCombat(10000) 
 				
-					if NobodyAround()
-					NymTrace("Nobody around, you can recover unnoticed [Recover] Timer:"+Timer)
-					sTempOutcomeMessage = "Nobody around, you can recover unnoticed [Recover]."
-					;Followers no longer fighting in the area and nobody around
+				elseif !cfgqst.FollowersInCombat(10000) 	;if followers in 10000 radius are NOT in combat anymore
+				
+					if NobodyAround() ;and if nobody is around
+					NymTrace("The fight is over and you can recover [Recover] Timer:"+Timer)
+					sTempOutcomeMessage = "The battle is over and you can recover [Recover]."
 					Timer = 0
 					CanProtect = 1
-					else 
-					NymTrace("The battle is lost. [Defeated] Timer:"+Timer)
-					sTempOutcomeMessage = "The battle is lost. [Defeated]."
+					elseif folqst.PartyDown()  		;if enmies still around 
+					NymTrace("Your followers cannot win the fight [B] [Defeated] Timer:"+Timer)
+					sTempOutcomeMessage = "Your followers cannot win the fight [Defeated]."
+					;Followers down -> End Timer 
 					Timer = 0
 					CanProtect = 0
 					endif 
-				else 
+				else ;Followers Up and Still fighting ->
+
 				;Timer keeps going
 				endif 
 			endif 
@@ -2085,7 +2097,7 @@ EndFunction
 
 ;------------------------------------------------------------------------------------------------------------------------------
 
-Function FollowersProtect()
+Function FollowersProtect() ;;;; OLD DELETE LOL
 
 	;/
 	You have followers and go down
@@ -2104,7 +2116,13 @@ Function FollowersProtect()
 	cfgqst.DefeatStateChapter = "FollowersProtect"
 
 	float Timer = 30
+	
+	if NobodyAround() ;check early and re-initiate combat early, too! 
+	Timer = 0
+	else 
+	
 	Timer = cfgqst.DefeatDowntime
+	endif 
 	;check if followers are all in bleedout or not
 	
 	while cfgqst.ModEnabled && !folqst.PartyDown() && (Timer > 0)	
@@ -2292,6 +2310,20 @@ Function ForceSheatheWeapon2()
 
 EndFunction 
 
+
+
+
+Bool Function WasInCombat()
+
+if (cfgqst.Enemy[0] != "none") && (cfgqst.Enemy[1] != "none") && (cfgqst.Enemy[2] != "none") && (cfgqst.Enemy[3] != "none") && (cfgqst.Enemy[4] != "none") && (cfgqst.Enemy[5] != "none") 
+return false 
+else
+return true
+endif 
+
+Endfunction
+
+
 ;bi55.hkx ;NICE 
 
 Event OnEnterBleedout()			;#bleedout1 ##BLEED##	;#OnBleedout #OnEnterBleedout()
@@ -2299,6 +2331,9 @@ Event OnEnterBleedout()			;#bleedout1 ##BLEED##	;#OnBleedout #OnEnterBleedout()
 bool NEWSYSTEMFUCKOOFF = true
 
 if NEWSYSTEMFUCKOOFF
+
+cfgqst.DefeatStatePlayer = "Bleedout"
+
 Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 	if cfgqst.PlayerDownAlready
 		
@@ -2317,7 +2352,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 	else
 		; --- BLEEDOUT RECOVERY ---
 		cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 1.0)
-		
+		NymTrace("#PushActorAway 1.0 - 2355")
 		
 		if cfgqst.PlayerRef.IsWeaponDrawn()	
 		NymTrace("OnEnterBleedout(Weapon Drawn 00 TRUE)")	
@@ -2328,6 +2363,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 		endif
 		
 		SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
+		NymTrace("##Calm Player B")
 		
 		cfgqst.PlayerRef.AddToFaction(cfgqst.DownedFaction)
 		if cfgqst.PlayerRef.IsInFaction(cfgqst.DownedFaction)
@@ -2336,9 +2372,9 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 		NymTrace("OnEnterBleedout AddToDownedFaction FAILED")
 		endif 
 		
-		if Nym()
-		cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, true)
-		endif 
+	;	if Nym()
+	;	cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, true)
+	;	endif 
 		
 		cfgqst.PlayerDownAlready = true
 		NymTrace("OnEnterBleedout(Regular Start)")
@@ -2360,7 +2396,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 		endif 
 	;	SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
 
-		if cfgqst.PlayerIsInCombat || cfgqst.PlayerRef.IsInCombat() 
+		if cfgqst.PlayerIsInCombat || cfgqst.PlayerRef.IsInCombat() || WasInCombat() 
 		PlayerDown("Combat: Bleedout")
 		else
 		PlayerDown("Adventure: Deadly Accident")
@@ -2431,6 +2467,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 	else
 	
 		SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
+		NymTrace("CALM Player C")
 		cfgqst.PlayerDownAlready = true
 		NymTrace("OnEnterBleedout(Regular Start)")
 		; --- BLEEDOUT RECOVERY ---; 
@@ -2442,7 +2479,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 		cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 0.1)
 		cfgqst.PlayerRef.MoveTo(cfgqst.PlayerRef)
 		cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 0.1)
-								
+		NymTrace("#PushActorAway 0.1 - 2482")						
 										
 							
 		if cfgqst.PlayerRef.IsWeaponDrawn()	
@@ -2453,9 +2490,12 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 		
 	;	SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
 
-		if cfgqst.PlayerIsInCombat || cfgqst.PlayerRef.IsInCombat() 
+		if cfgqst.PlayerRef.IsInCombat() 
 		PlayerDown("Combat: Bleedout")
 		else
+			if Nym() && cfgqst.PlayerIsInCombat 
+			Debug.Messagebox("Player no longer in combat but bool is still true")
+			endif 
 		PlayerDown("Adventure: Deadly Accident")
 		endif 	
 
@@ -2464,6 +2504,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 			Debug.Messagebox("Actor was NOT calmed A")
 			endif 
 		SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
+		NymTrace("##CALM Player Z")
 		endif
 
 		if Nym()
@@ -2489,6 +2530,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 			Debug.Messagebox("Actor was NOT calmed B")
 			endif 
 		SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
+		NymTrace("##CALM Player Y")
 		endif
 		
 		if !SPE_Actor.IsActorCalmed(cfgqst.PlayerRef)
@@ -2496,6 +2538,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 			Debug.Messagebox("Actor was NOT calmed C")
 			endif 
 		SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
+		NymTrace("##CALM Player X")
 		endif
 		
 		ForceSheatheWeapon()
@@ -2789,6 +2832,8 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 	PlayerIsDown = FALSE
 	endif 
 	
+	cfgqst.PlayerTrackHealth()
+	
 	;/
 	;DODGE SOUND
 	if PublicPunishment_Sounds_TOGGLE	
@@ -3008,7 +3053,7 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 						cfgqst.Immobilize(False)
 						;AMBUSH!! 
 						endif 
-						
+					;/	
 					elseif TrapType == "Drop"
 					;NymTrace("##TrapStart (Drop)")
 						cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 7)
@@ -3019,7 +3064,8 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 						else 
 						NymTrace("##TrapStart (Drop was Accident)")	
 						PlayerDown("Adventure: Deadly Accident")
-						endif 
+						endi
+						/;
 
 					elseif TrapType == "Dart"		;certain potions can help / need to hit hotkey fast!
 					
@@ -3194,13 +3240,13 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 								IsDefeatingEasily = true
 											
 								;MEDIUM  CREATURES: add extra chance and especially for heavy armor	
-								elseif (cfgqst.RaceKey == "SabreCats")  ||(cfgqst.RaceKey == "IceWraiths") ||(cfgqst.RaceKey == "LargeSpiders")
+								elseif (cfgqst.RaceKey == "SabreCats")  ||(cfgqst.RaceKey == "IceWraiths") || (cfgqst.RaceKey == "LargeSpiders")
 								
 								IsDefeatingOnNaked = true
 								IsStripAttackLight = true
 								
 								;HUMANOID BEASTS (Trolls, Werewolves)
-								elseif (cfgqst.RaceKey == "Troll") || (cfgqst.RaceKey == "Werewolves")
+								elseif (cfgqst.RaceKey == "Troll") || (cfgqst.RaceKey == "Werewolves") || (cfgqst.RaceKey == "Bears")
 								IsStripAttackHeavy = true
 								IsDefeatingOnCum = true
 		
@@ -3274,7 +3320,7 @@ Debug.trace("NAKED DEFEAT playeraliasquest: OnCellLoad()")
 	if !cfgqst.PlayerMonitorOn		
 	PlayerMonitor()
 	endif
-	
+
 	cfgqst.OnCellLoadFunction()
 
 EndEvent
@@ -3680,6 +3726,10 @@ Bool IsInCity = false
 Function StartProcessPublicExposure()			;#validation
 Debug.trace("NAKED DEFEAT playeraliasquest: StartProcessPublicExposure()")
 
+
+
+
+
 ;This function determines Public Exposure and how it changes based on circumstances
 
 	;if cfgqst.NymBETA
@@ -3688,8 +3738,9 @@ Debug.trace("NAKED DEFEAT playeraliasquest: StartProcessPublicExposure()")
 	;	IsInCity = true
 	;	endif
 	;endif	
-		
-	cfgqst.PlayerSpeedMaintenance()
+	
+	cfgqst.WaitLoopPlayerMaintenance()	
+	;PlayerSpeedMaintenance()
 	
 	if !LocTypeTemple						
 	LocTypeTemple = (Game.GetFormFromFile(0x0001CD56, "Skyrim.esm") As Keyword)
@@ -3887,7 +3938,10 @@ if Thane: reduced chance to get bounty
 
 
 /; 
-	if cfgqst.IsNymrasGame()
+
+Bool Bounty = false
+		
+if Bounty && cfgqst.IsNymrasGame()
 		int LevelPlayer = cfgqst.PlayerRef.GetLevel()
 		Debug.trace("NAKED DEFEAT playeraliasquest: ApplyRandomBounty() - Player Level: "+LevelPlayer)
 
@@ -4171,7 +4225,7 @@ else
 	elseif cfgqst.PlayerRef.IsInLocation(LocationDragonbridge)
 	CurrentLocation = LocationDragonbridge
 	cfgqst.PublicExposure = 0
-	CurrentLocationName = "Dragonbride"
+	CurrentLocationName = "Dragonbridge"
 	ApplyRandomBounty()
 	IsInCity = true
 	ScreenMessage("Entering "+CurrentLocationName) 
@@ -4726,6 +4780,7 @@ EndFunction
 
 
 Function SheathWeapon()
+NymTrace("SheathWeapon()")
 
 	if cfgqst.PlayerRef.IsWeaponDrawn() 
 	cfgqst.PlayerRef.SheatheWeapon() 
@@ -4787,12 +4842,9 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: PlayerGetsDefeated()")
 			;if IsCriticalDefeat || IsPoisonDefeat
 			if Outcome_PlayerDefeated
 			
-			SheathWeapon()
+			cfgqst.PlayerSheatheWeapon()
 			cfgqst.StripWeapons()
 			cfgqst.Immobilize(true)
-			SheathWeapon()
-
-			
 			CriticalDefeatPose()
 		;/
 			int i = Utility.RandomInt(1,6)
@@ -5020,6 +5072,7 @@ String sFileName
 Function CriticalDefeatPose()		;USE NEW PLAYPOSEONACTOR FUNCTION ;#CriticalDefeatPose()
 	
 	if cfgqst.PlayerRef.IsWeaponDrawn() 
+	NymTrace("SheatheWeapon 013")
 	cfgqst.PlayerRef.SheatheWeapon() 
 	endif
 

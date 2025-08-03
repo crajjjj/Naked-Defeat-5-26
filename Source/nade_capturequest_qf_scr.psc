@@ -199,21 +199,58 @@ Function Fragment_2()				;CAPTURE EVENT	//// decides if Furniture OR DDe game	;#
 
 	RegisterForKey(cfgqst.DefeatKey)
 	Debug.Trace("NAKED DEFEAT capturequest: stage 20")	
+	Debug.Trace("NAKED DEFEAT capturequest: DefeatTypeScenario: "+cfgqst.DefeatTypeScenario)
 
 	if !Nym()
 	Device = Alias_Furniture0.GetReference()
 	endif 
 	;----- DDe Check --------------------------------
 
-	if (cfgqst.DefeatTypeScenario != "DD") && D100(cfgqst.DefeatDDeProb) 	
-	Debug.Trace("NAKED DEFEAT capturequest: DD Random Event")
-	
-	;from this point we handle DD and non-DD the same since we get devices now.
+	if !cfgqst.DefeatViaSlavery 
+
+		if (cfgqst.DefeatTypeScenario == "DD")
+		;already bound in Devices, do nothing
+		FurnitureEvent = false
+		elseif !cfgqst.IsPoseScenario() && (cfgqst.DefeatTypeScenario != "DD") && D100(cfgqst.DefeatDDeProb) 	
+		Debug.Trace("NAKED DEFEAT capturequest: DD Random Event")
 						
-	cfgqst.DefeatTypeScenario = "DD"	
-	FurnitureEvent = false
-	EquipDDevices = true
-	endif
+		cfgqst.DefeatTypeScenario = "DD"	
+		FurnitureEvent = false
+		
+		nade_DDInt.EquipDDtoActor(cfgqst.PlayerRef, "Random")
+			
+			if (calmqst.VictimCount > 0) && !cfgqst.RapeAgain && (!cfgqst.AbortAll);&& BindsEquiped
+			;RAPEAGAIN - we still have binds? 
+				if calmqst.Victims[0]	
+				calmqst.AddDefeatBindsToActor(calmqst.Victims[0], "add")
+				calmqst.StripFollower(0)
+				endif				
+				if calmqst.Victims[1]
+				calmqst.AddDefeatBindsToActor(calmqst.Victims[1], "add")
+				calmqst.StripFollower(1)
+				endif					
+				if calmqst.Victims[2]
+				calmqst.AddDefeatBindsToActor(calmqst.Victims[2], "add")
+				calmqst.StripFollower(2)
+				endif					
+				if calmqst.Victims[3]
+				calmqst.AddDefeatBindsToActor(calmqst.Victims[3], "add")
+				calmqst.StripFollower(3)
+				endif
+			endif
+		
+	
+		endif
+	
+	;FOR SLAVERY we currently do NOT use the DD Scenario (until we wiggle free of them)
+	elseif cfgqst.DefeatViaSlavery && cfgqst.DefeatTypeScenario == "DD"
+	cfgqst.DefeatTypeScenario = "NoScenaro"
+	cfgqst.RemoveAllDDevices(false, "zad_DeviousGag", "zad_DeviousHood", "zad_DeviousPiercingsNipple", "zad_DeviousPiercingsVaginal", "" )	
+	endif 
+
+	if cfgqst.ModDDframework && cfgqst.DefeatTypeScenario != "DD"	
+	cfgqst.RemoveAllDDevices(false, "zad_DeviousGag", "zad_DeviousHood", "zad_DeviousPiercingsNipple", "zad_DeviousPiercingsVaginal", "" )	
+	endif 
 
 	;---- Scenario Check --------------------------------
 	
@@ -343,10 +380,7 @@ Function Fragment_2()				;CAPTURE EVENT	//// decides if Furniture OR DDe game	;#
 		;	cfgqst.Crawl(cfgqst.PlayerRef, false)
 		;	Debug.SendAnimationEvent(cfgqst.PlayerRef,"IdleForceDefaultState")	;this required still?	
 		
-			if EquipDDevices ;if we dont have DDs already we get some here (DD Aftermath)
-			EquipDDevices = false 
-			nade_DDInt.EquipDDtoActor(cfgqst.PlayerRef, "Random")
-			endif 
+			;everything handled in the PRECHECK 
 			
 			calmqst.Vehicle("restore")	
 			

@@ -972,6 +972,22 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 			IsPosing01 = true
 			endif
 			
+			if cfgqst.IsNymrasGame()
+			NymTrace("ForceMaintenance01 - THIS LOOP IS HAPPENING")
+			cfgqst.FollowersStripCompletely()
+			
+				if !cfgqst.IsFucking(a)
+				NymTrace("IsFucking")
+					if cfgqst.InFurniture
+					NymTrace("IsInFurniture")
+					calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
+					else 
+					NymTrace("IsNOTInFurniture")
+					calmqst.PlayPoseOnActor(a, "Random", false)
+					endif 
+				endif
+			endif
+			
 			if cfgqst.IsFucking(a) && !cfgqst.IsNymrasGame() 
 			Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(SEX LOOP)")
 			;during Sex we stop playing our expressions 	
@@ -1024,7 +1040,7 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 				
 					if RunMaintenance01
 					StartDoingNothing_01(true) ;new, try to restart scene (should be broken if this triggers anyway)
-						if cfgqst.InFurniture
+						if cfgqst.IsNymrasGame() || cfgqst.InFurniture
 						calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
 						else 
 					;	calmqst.PlayPoseOnActor(a, "Random", true)
@@ -1032,6 +1048,11 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 					IsPosing01 = true
 					endif 
 				else 	
+						;#posertest
+						if cfgqst.IsNymrasGame() 
+						NymTrace("#ERROR This Is Happening") 
+					;	calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
+						endif 
 				Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(Follower NOT Running?)")	
 				endif
 			;	endif		
@@ -1083,6 +1104,19 @@ Event ForceMaintenance02(string eventName, string strArg, float numArg, Form sen
 				;calmqst.PlayPoseOnActor(a, "Random", false)		
 				IsPosing02 = true
 				endif
+				
+				if cfgqst.IsNymrasGame()
+				NymTrace("ForceMaintenance02 - THIS LOOP IS HAPPENING")
+				cfgqst.FollowersStripCompletely()
+				
+				if !cfgqst.IsFucking(a)
+					if cfgqst.InFurniture
+					calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
+					else 
+					calmqst.PlayPoseOnActor(a, "Random", true)
+					endif 
+				endif
+			endif
 
 				if cfgqst.IsFucking(a) && !cfgqst.IsNymrasGame() 
 				;during Sex we stop playing our expressions ---> Nymras Game ignores this
