@@ -101,7 +101,9 @@ EndEvent
 
 
 Function FollowerStripUpdate()
-NymTrace("FollowerStripUpdate()")
+
+	if Nym()
+	NymTrace("FollowerStripUpdate()")
 
 	int i = NakedFollowerCount
 
@@ -140,7 +142,7 @@ NymTrace("FollowerStripUpdate()")
 				cfgqst.Strip(37, NakedFollower[0] ) 
 				endif
 				
-			
+				
 				;/
 				if Follower01_Helmet31 == 0
 				cfgqst.Strip(31, NakedFollower[0] ) 
@@ -174,7 +176,7 @@ NymTrace("FollowerStripUpdate()")
 				if Follower01_BikiniThigh53 == 0
 				cfgqst.Strip(53, NakedFollower[0] ) 
 				endif 
-				/;
+				/;	
 				
 			endif 	
 			
@@ -214,6 +216,7 @@ NymTrace("FollowerStripUpdate()")
 				endif	
 			endif 
 		
+		endif 
 
 		
 			
