@@ -589,8 +589,6 @@ if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu")
 			
 			Sexlab.ThreadSlots.StopAll()
 
-			
-
 			if cfgqst.RapeAgain
 			Debug.Trace("NAKED DEFEAT captivequest: #ERROR - RapeAgain still TRUE")
 			cfgqst.RapeAgain = false
@@ -602,8 +600,10 @@ if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu")
 			cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 3)
 			endif	
 			
+			if !Nym()
 			cfgqst.Immobilize(false)
-
+			endif 
+			
 			if cfgqst.BoolCaptiveFuckBelt
 			RemovePunishmentItems()
 			endif
@@ -631,7 +631,9 @@ if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu")
 			
 			cfgqst.GracePeriod = 0
 			
+			if !Nym()
 			cfgqst.Immobilize(false)
+			endif 
 	
 			SetStage(1000)
 			return
@@ -1268,7 +1270,7 @@ EndFunction
 
 Function StartPunishmentEffect(string type)	;#shader2 	;#spells		;#StartPunishmentEffect
 
-	;if cfgqst.IsNymrasGame() && D100(50
+	;if cfgqst.Nym()() && D100(50
 	;type = "shock"
 	;endif 
 	
@@ -1518,7 +1520,7 @@ EndFunction
 
 Bool Function Nym()
 
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	return TRUE
 	else
 	return false

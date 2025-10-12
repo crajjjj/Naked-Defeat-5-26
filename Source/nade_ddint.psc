@@ -1172,6 +1172,6 @@ EndFunction
 Function DDTrace(String Text2) Global	;#NymTrace
 	;if IsNymrasGame()
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
-	Debug.trace("NAKED DEFEAT #DDint: "+Text2)
+	;Debug.trace("NAKED DEFEAT #DDint: "+Text2)
 	;endif
 EndFunction

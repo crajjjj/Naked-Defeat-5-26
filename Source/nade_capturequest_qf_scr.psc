@@ -433,9 +433,11 @@ Function Fragment_2()				;CAPTURE EVENT	//// decides if Furniture OR DDe game	;#
 			Utility.Wait(1.0)
 			endwhile
 			
-			If cfgqst.IsNymrasGame()
-			cfgqst.PlayerRef.SetVehicle(cfgqst.PlayerRef)
-			endif 
+			if !cfgqst.VRfix		
+			cfgqst.PlayerRef.SetVehicle(cfgqst.PlayerRef)	;#vehicle ---> pre-Furniture detach ---> else furnitures break!!
+			cfgqst.InFurniture = true
+			Debug.trace("Naked Defeat capturequest: Vehicle DETACHED for Furniture game")
+			endif
 			
 			Device.Activate(cfgqst.PlayerRef, true)	
 			cfgqst.PlayCuffsSoundRope()
@@ -625,6 +627,8 @@ Function Fragment_1()								;############ STAGE 10 ############			##START
 Debug.Trace("NAKED DEFEAT capturequest: stage 10 #START#")
 
 Device = none 
+
+cfgqst.GroupStripMaintenance()
 
 if (cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning) && (!cfgqst.AbortAll)
 
@@ -871,7 +875,7 @@ cfgqst.Immobilize(true)
 ;Device = Alias_Furniture0.GetReference()
 if Device
 Device.Activate(cfgqst.PlayerRef)
-elseif cfgqst.IsNymrasGame()
+elseif Nym()
 Debug.Messagebox("Device = none") 
 endif 
 
@@ -1929,14 +1933,14 @@ Function DebugMessage(String Text2)		;#DebugMessage
 EndFunction
 
 Function NymMessage(String Text2)		;#DebugMessage
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT capturequest: (#msg NYM) "+Text2)
 	endif
 EndFunction
 
 Function NymTrace(String Text2)		;#NymTrace
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT capturequest: (#trace NYM) "+Text2)
 	endif
@@ -1944,7 +1948,7 @@ EndFunction
 
 Bool Function Nym()
 
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	return TRUE
 	else
 	return false

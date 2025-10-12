@@ -31,6 +31,9 @@ Keyword Property ActorTypeNPC Auto
 
 nade_configquest_scr Property cfgqst Auto
 nade_capturequest_qf_scr Property capqst Auto
+nade_calmquest_qf_scr Property calmqst Auto
+
+
 SexLabFramework Property SexLab Auto
 slaFrameworkScr Property sla Auto		;aroused
 
@@ -71,6 +74,8 @@ int Property Follower02_Circlet42 Auto
 int Property Follower02_BikiniBottom52 Auto
 int Property Follower02_BikiniThigh53 Auto
 
+
+
 ;Logic: we save int 0 = Follower cannot have the item. int = 1 follower has and wears the item. int = 2 follower has the item but does not wear it (maybe allows several outfits).
 
 	;MAIN SLOTS:
@@ -102,23 +107,38 @@ EndEvent
 
 Function FollowerStripUpdate()
 
-	if Nym()
+	if Nym() || cfgqst.IsDefeatRunning()
+	
 	NymTrace("FollowerStripUpdate()")
 
 	int i = NakedFollowerCount
 
-	RemoveBindsFromFollowers()
+
+		if !cfgqst.IsDefeatRunning()
+		RemoveBindsFromFollowers()
+		else 
+		RestoreBindsOnFollowers()
+		endif 
+		
+		
+		
 	NymTrace("FollowerStripUpdate(We Are Here)")
 	;	while i > 0	;LOOPING DOES NOT WORK HERE ---> we need to make a tech that looks with numbers isgh)
 			;i -= 1 
+			
 			if NakedFollower[0] 
 		
 			NymTrace("Follower 0 found: "+Name_Follower01)
 			;NymTrace("NakedFollower[0] FOUND") 
 			
 				if Follower01_Body32 == 1
-				NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Body32 == 1")
-				FollowerRedressSlot(NakedFollower[0], 32)
+				
+					if cfgqst.IsDefeatRunning()
+					Follower01_Body32 = 0
+					else 
+					NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Body32 == 1")
+					FollowerRedressSlot(NakedFollower[0], 32)
+					endif 
 				endif
 				if Follower01_Hands33 == 1 
 				NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Hands33 == 1")
@@ -141,8 +161,131 @@ Function FollowerStripUpdate()
 				NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Feet37 == 0")
 				cfgqst.Strip(37, NakedFollower[0] ) 
 				endif
+			
+				if cfgqst.IsDefeatRunning()
+				FollowersStripWeapons()
+				calmqst.AddDefeatBindsToActor(NakedFollower[0], "Restore")
+				endif 	
+			endif 
+
+			if NakedFollower[1] 
+		
+			NymTrace("Follower 1 found: "+Name_Follower02)
+			;NymTrace("NakedFollower[0] FOUND") 
+			
+				if Follower02_Body32 == 1
+					if cfgqst.IsDefeatRunning()
+					Follower02_Body32 = 0
+					else 	
+					NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Body32 == 1")
+					FollowerRedressSlot(NakedFollower[1], 32)
+					endif 
+				endif
+				if Follower02_Hands33 == 1 
+				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Hands33 == 1")
+				FollowerRedressSlot(NakedFollower[1], 33)
+				endif
+				if Follower02_Feet37 == 1
+				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Feet37 == 1")
+				FollowerRedressSlot(NakedFollower[1], 37)
+				endif
+				
+				if Follower02_Body32 == 0
+				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Body32 == 0")
+				cfgqst.Strip(32, NakedFollower[1] ) 
+				endif
+				if Follower02_Hands33 == 0 
+				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Hands33 == 0")
+				cfgqst.Strip(33, NakedFollower[1] ) 
+				endif
+				if Follower02_Feet37 == 0
+				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Feet37 == 0")
+				cfgqst.Strip(37, NakedFollower[1] ) 
+				endif
 				
 				
+				if cfgqst.IsDefeatRunning()		
+				calmqst.AddDefeatBindsToActor(NakedFollower[1], "Restore")
+				endif 	
+			
+			endif 	
+			
+			
+			FollowersStripWeapons()
+			
+			;#TODO NEED PROPERTIES 
+			;----------------------------------------------
+			;/
+			if NakedFollower[2] 
+		
+			NymTrace("Follower 2 found: "+Name_Follower03)
+			;NymTrace("NakedFollower[0] FOUND") 
+			
+				if Follower03_Body32 == 1
+				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Body32 == 1")
+				FollowerRedressSlot(NakedFollower[2], 32)
+				endif
+				if Follower03_Hands33 == 1 
+				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Hands33 == 1")
+				FollowerRedressSlot(NakedFollower[2], 33)
+				endif
+				if Follower03_Feet37 == 1
+				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Feet37 == 1")
+				FollowerRedressSlot(NakedFollower[2], 37)
+				endif
+				
+				if Follower03_Body32 == 0
+				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Body32 == 0")
+				cfgqst.Strip(32, NakedFollower[2] ) 
+				endif
+				if Follower03_Hands33 == 0 
+				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Hands33 == 0")
+				cfgqst.Strip(33, NakedFollower[2] ) 
+				endif
+				if Follower03_Feet37 == 0
+				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Feet37 == 0")
+				cfgqst.Strip(37, NakedFollower[2] ) 
+				endif
+				
+			endif 		
+
+			if NakedFollower[3] 
+		
+			NymTrace("Follower 3 found: "+Name_Follower04)
+			;NymTrace("NakedFollower[0] FOUND") 
+			
+				if Follower04_Body32 == 1
+				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Body32 == 1")
+				FollowerRedressSlot(NakedFollower[3], 32)
+				endif
+				if Follower04_Hands33 == 1 
+				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Hands33 == 1")
+				FollowerRedressSlot(NakedFollower[3], 33)
+				endif
+				if Follower04_Feet37 == 1
+				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Feet37 == 1")
+				FollowerRedressSlot(NakedFollower[3], 37)
+				endif
+				
+				if Follower04_Body32 == 0
+				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Body32 == 0")
+				cfgqst.Strip(32, NakedFollower[3] ) 
+				endif
+				if Follower04_Hands33 == 0 
+				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Hands33 == 0")
+				cfgqst.Strip(33, NakedFollower[3] ) 
+				endif
+				if Follower04_Feet37 == 0
+				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Feet37 == 0")
+				cfgqst.Strip(37, NakedFollower[3] ) 
+				endif
+				
+			endif 				
+	
+	
+	/;
+	
+	;----------------------------------------------
 				;/
 				if Follower01_Helmet31 == 0
 				cfgqst.Strip(31, NakedFollower[0] ) 
@@ -176,9 +319,8 @@ Function FollowerStripUpdate()
 				if Follower01_BikiniThigh53 == 0
 				cfgqst.Strip(53, NakedFollower[0] ) 
 				endif 
-				/;	
-				
-			endif 	
+					
+		
 			
 			if NakedFollower[1] 
 			
@@ -215,48 +357,72 @@ Function FollowerStripUpdate()
 				cfgqst.Strip(53, NakedFollower[1])  
 				endif	
 			endif 
+			
+		/;
 		
 		endif 
-
 		
-			
 EndFunction 
 
+
+Function RestoreBindsOnFollowers()
+NymTrace("RestoreBindsOnFollowers()")
+
+
+EndFunction 
 
 Function RemoveBindsFromFollowers()
 
 	NymTrace("RemoveBindsFromFollowers()")
-
-	Formlist FormlistEFFInventory = cfgqst.RobbedStuff ;TODO
-
 	int iItemCount
-	
 	Form TempForm
-
 	int i = NakedFollowerCount
 	int j = 0
-	while (i > 0) ;loop for followers
-	i -= 1
 
-	FormlistEFFInventory.Revert()	
-	NakedFollower[i].GetAllForms(FormlistEFFInventory)	
-	j = FormlistEFFInventory.GetSize()	
-;	NymTrace("Formlist Length: "+FormlistEFFInventory.GetSize())	
-
-			while j > 0	;loop for items
-				
-				j -= 1
-				
-				TempForm = FormlistEFFInventory.GetAT(j)
-			
-				if TempForm && TempForm.HasKeyword(cfgqst.KWD_nade_Bondage)				
-				iItemCount = NakedFollower[i].GetItemCount(TempForm)
-				NakedFollower[i].RemoveItem(TempForm, iItemCount, true, None)	;metal	
-				endif 
-				
-			endwhile
+	Formlist RemoveBindsFromFollowersFormlist = cfgqst.TempFormlistArray[1] 
 	
-	endwhile
+	if Nym() && cfgqst.DefeatQuestRunning
+	;Debug.Messagebox("FUCK This is happening")
+	endif 
+
+
+		while (i > 0) ;loop for followers
+		i -= 1
+
+		RemoveBindsFromFollowersFormlist.Revert()	
+		NakedFollower[i].GetAllForms(RemoveBindsFromFollowersFormlist)	
+		j = RemoveBindsFromFollowersFormlist.GetSize()	
+	;	NymTrace("Formlist Length: "+FormlistEFFInventory.GetSize())	
+
+				while j > 0	;loop for items
+					
+					j -= 1
+					
+					TempForm = RemoveBindsFromFollowersFormlist.GetAT(j)
+				
+					if TempForm && TempForm.HasKeyword(cfgqst.KWD_nade_Bondage)				
+					iItemCount = NakedFollower[i].GetItemCount(TempForm)
+					NakedFollower[i].RemoveItem(TempForm, iItemCount, true, None)	;metal	
+					endif 
+					;if player is wearing no DDs but the Followers do, remove them. 
+					if !nade_DDInt.IsWearingDDs(cfgqst.PlayerRef, "Lockable") && (nade_DDInt.IsWearingDDs(NakedFollower[i], "Lockable") || (nade_DDInt.IsWearingDDs(NakedFollower[i], "Heavy Bondage")))
+					NymTrace("REMOVING DEVICES")
+					nade_DDInt.RemoveDevicesFromActor(NakedFollower[i], true)
+						
+					else 
+				;	NymTrace("NO DEVICES FOUND")
+					
+					endif 
+					
+	
+				endwhile
+		
+		endwhile
+		
+	RemoveBindsFromFollowersFormlist.Revert()	
+		
+
+	
 
 EndFunction 
 
@@ -266,92 +432,102 @@ Function FollowerRedressSlot(actor akActor, int iSlot)
 	NymTrace("FollowerRedressSlot")
 	
 	;FOLLOWER REDRESS 	
-	Formlist FormlistEFFInventory = cfgqst.RobbedStuff ;TODO
-	FormlistEFFInventory.Revert()
-	;PO3 Functions also worked, I was just stupid and did not have a FORMLIST!!! !
-	
-	
-	;PO3_SKSEFunctions.AddAllItemsToList(PlayerRef, FormlistInventory, true, false, false)
-			
-	;Form[] Function AddItemsOfTypeToArray(ObjectReference akRef, int aiFormType, bool abNoEquipped = true, bool abNoFavorited = false, bool abNoQuestItem = false) global native
-	
-	;PO3_SKSEFunctions.AddItemsOfTypeToArray(TempArmor
-	
-	;int i = 10
+	Formlist FollowerRedressFormlist = cfgqst.TempFormlistArray[0] ;TODO
 	int i = 1
-;	Armor TempArmor
-	Form TempForm
-	Form WornItem
-	actor a = akActor
 	
-	;int Fuckoff
-	;Bool AnimatedEquip = True
-	;loops as long as we do NOT wear armor on Slot OR we search all outfits
+		FollowerRedressFormlist.Revert()
+		;i = FollowerRedressFormlist.GetSize()
+	
+		
+		;PO3 Functions also worked, I was just stupid and did not have a FORMLIST!!! !
 		
 		
-	a.GetAllForms(FormlistEFFInventory)	
-	
-	
-	i = FormlistEFFInventory.GetSize()	
+		;PO3_SKSEFunctions.AddAllItemsToList(PlayerRef, FormlistInventory, true, false, false)
+				
+		;Form[] Function AddItemsOfTypeToArray(ObjectReference akRef, int aiFormType, bool abNoEquipped = true, bool abNoFavorited = false, bool abNoQuestItem = false) global native
+		
+		;PO3_SKSEFunctions.AddItemsOfTypeToArray(TempArmor
+		
+		;int i = 10
+		
+	;	Armor TempArmor
+		Form TempForm
+		Form WornItem
+		actor a = akActor
+		
+		;int Fuckoff
+		;Bool AnimatedEquip = True
+		;loops as long as we do NOT wear armor on Slot OR we search all outfits
+			
+			
+		a.GetAllForms(FollowerRedressFormlist)	
+		
+		
+		i = FollowerRedressFormlist.GetSize()	
 
-	NymTrace("Formlist Length: "+FormlistEFFInventory.GetSize())	
-		
-	if islot == 32	;32 - BODY
-	
-	WornItem = a.GetWornForm(0x00000004)	;32 - BODY
-		
-		if !WornItem
-			while i > 0
-				
-				TempForm = FormlistEFFInventory.GetAT(i)
+		NymTrace("FollowerRedressSlot Formlist Length: "+FollowerRedressFormlist.GetSize())	
 			
-				if cfgqst.IsItem("Armor Cuirass", TempForm) || cfgqst.IsItem("Clothes Body", TempForm)
-				a.EquipItemEx(TempForm, 0, false, false)	
-				endif 
-							
-				i -= 1
-				
-			endwhile
-		endif 	
+		if islot == 32	;32 - BODY
 		
-	elseif islot == 33	;33 - HANDS
-	
-	WornItem = a.GetWornForm(0x00000008)	;33 - HANDS
-		
-		if !WornItem
-			while i > 0
-				
-				TempForm = FormlistEFFInventory.GetAT(i)
+		WornItem = a.GetWornForm(0x00000004)	;32 - BODY
 			
-				if cfgqst.IsItem("Armor Gauntlets", TempForm) || cfgqst.IsItem("Clothes Hands", TempForm)
-				a.EquipItemEx(TempForm, 0, false, false)	
-				endif 
-							
-				i -= 1
+			if !WornItem
+				while i > 0
+					
+					TempForm = FollowerRedressFormlist.GetAT(i)
 				
-			endwhile
-		endif 	
-	
-	elseif islot == 37	;37 - FEET
-	
-	WornItem = a.GetWornForm(0x00000080)	;37 - FEET
-		
-		if !WornItem
-			while i > 0
-				
-				TempForm = FormlistEFFInventory.GetAT(i)
+					if cfgqst.IsItem("Armor Cuirass", TempForm) || cfgqst.IsItem("Clothes Body", TempForm)
+					a.EquipItemEx(TempForm, 0, false, false)	
+					endif 
+								
+					i -= 1
+					
+				endwhile
+			endif 	
 			
-				if cfgqst.IsItem("Armor Boots", TempForm) || cfgqst.IsItem("Clothes Feet", TempForm)
-				a.EquipItemEx(TempForm, 0, false, false)	
-				endif 
-							
-				i -= 1
+		elseif islot == 33	;33 - HANDS
+		
+		WornItem = a.GetWornForm(0x00000008)	;33 - HANDS
+			
+			if !WornItem
+				while i > 0
+					
+					TempForm = FollowerRedressFormlist.GetAT(i)
 				
-			endwhile
+					if cfgqst.IsItem("Armor Gauntlets", TempForm) || cfgqst.IsItem("Clothes Hands", TempForm)
+					a.EquipItemEx(TempForm, 0, false, false)	
+					endif 
+								
+					i -= 1
+					
+				endwhile
+			endif 	
+		
+		elseif islot == 37	;37 - FEET
+		
+		WornItem = a.GetWornForm(0x00000080)	;37 - FEET
+			
+			if !WornItem
+				while i > 0
+					
+					TempForm = FollowerRedressFormlist.GetAT(i)
+				
+					if cfgqst.IsItem("Armor Boots", TempForm) || cfgqst.IsItem("Clothes Feet", TempForm)
+					a.EquipItemEx(TempForm, 0, false, false)	
+					endif 
+								
+					i -= 1
+					
+				endwhile
+			endif 
+
+		
 		endif 
-
-	
-	endif 
+		
+		
+		
+		
+		FollowerRedressFormlist.Revert()
 
 
 EndFunction 
@@ -671,21 +847,30 @@ Bool Function ValidateActorAsFollower(actor akactor)
 EndFunction 
 
 Function FollowersStripWeapons()
-
-	if Actor_Follower01
+	NymTrace("FollowersStripWeapons()")
 	
-		if Actor_Follower01.GetEquippedWeapon()
-		Actor_Follower01.UnequipItem(Actor_Follower01.GetEquippedWeapon(), false, true)
-		endif
-	endif 
+	Bool StripWeapons = false 
 
-	if Actor_Follower02
-		if Actor_Follower02.GetEquippedWeapon(true)
-		Actor_Follower02.UnequipItem(Actor_Follower02.GetEquippedWeapon(true), false, true)
-		endif
+	
+	if cfgqst.IsDefeatRunning() || cfgqst.IsPlayerUnarmed()
+	StripWeapons = true 
 	endif 
+	
+	if StripWeapons
+		if Actor_Follower01
+			if Actor_Follower01.GetEquippedWeapon()
+			Actor_Follower01.UnequipItem(Actor_Follower01.GetEquippedWeapon(), false, true)
+			endif
+		endif 
 
+		if Actor_Follower02
+			if Actor_Follower02.GetEquippedWeapon(true)
+			Actor_Follower02.UnequipItem(Actor_Follower02.GetEquippedWeapon(true), false, true)
+			endif
+		endif 
+	endif 	
 EndFunction
+
 
 Function DebugFactions(actor akactor)
 
@@ -885,35 +1070,118 @@ EndFunction
 
 Bool Function PartyDown()
 
-	Debug.Trace("NAKED DEFEAT followerquest: PartyDown()")
+NymTrace("PartyDown()")
 
-	Actor a									
-	Int i = NPC.Length		
+;INFO: This function checks if all Followers are either DOWN or TOO FAR AWAY
 
-	bool AllDown = false
+	bool NEWVERSION = True 
+	bool FollowerStateTemp
+	bool FollowerStillStanding = false 
+	
+	if NEWVERSION 
 		
+		if Nym() && IsWithUs_Follower(0)
 		
-		while i 	 												
-			i -= 1												
-			a = NPC[i].GetReference() as Actor		
-
-			if a 	
-				if a.IsBleedingOut() 
-				AllDown = true
-				else
-				AllDown = false
-				endif		
-			endif	
+		NymTrace("#DEBUG Follower 0 IsInCombat = "+NakedFollower[0].IsInCombat())
+		NymTrace("#DEBUG Follower 0 IsWeaponDrawn = "+NakedFollower[0].IsWeaponDrawn())
+		NymTrace("#DEBUG Follower 0 GetDistance = "+(NakedFollower[0].GetDistance(cfgqst.PlayerRef)))
+		endif 
+		
+		if NakedFollower[0]
 			
-		endwhile
+			FollowerStateTemp = PO3_SKSEFunctions.GetActorState(NakedFollower[0])	
+			NymTrace("GetActorState[0] = "+FollowerStateTemp)
+			if FollowerStateTemp == 0
+			FollowerStillStanding = true 
+			endif 
+		endif
+				
+		if NakedFollower[1]
+			FollowerStateTemp = PO3_SKSEFunctions.GetActorState(NakedFollower[1])
+			NymTrace("GetActorState[1] = "+FollowerStateTemp)
+			if FollowerStateTemp == 0
+			FollowerStillStanding = true 
+			endif 
+		endif 	
 		
-	if AllDown
-	Debug.trace("NAKED DEFEAT followerquest: Followers all down")
-	return true	
-	else
-	Debug.trace("NAKED DEFEAT followerquest: Followers still on their feet")
-	return false
-	endif
+		if NakedFollower[2]
+			FollowerStateTemp = PO3_SKSEFunctions.GetActorState(NakedFollower[2])
+			NymTrace("GetActorState[2] = "+FollowerStateTemp)
+			if FollowerStateTemp == 0
+			FollowerStillStanding = true 
+			endif 
+		endif 	
+		if NakedFollower[3]
+			FollowerStateTemp = PO3_SKSEFunctions.GetActorState(NakedFollower[3])
+			NymTrace("GetActorState[3] = "+FollowerStateTemp)
+			if FollowerStateTemp == 0
+			FollowerStillStanding = true 
+			endif 
+		endif 
+		if NakedFollower[4]
+			FollowerStateTemp = PO3_SKSEFunctions.GetActorState(NakedFollower[4])
+			NymTrace("GetActorState[4] = "+FollowerStateTemp)
+			if FollowerStateTemp == 0
+			FollowerStillStanding = true 
+			endif 
+		endif 
+		
+		;/
+		GetActorState
+		Alive	0
+		Dying	1
+		Dead	2
+		Unconscious	3
+		Reanimate	4
+		Recycle	5
+		Restrained	6
+		EssentialDown	7
+		Bleedout	8
+			/;
+			
+		if FollowerStillStanding
+		NymTrace("PartyDown(FALSE)")
+		return FALSE
+		else
+		NymTrace("PartyDown(TRUE)")
+		return True 
+		endif 
+	else 
+
+
+
+
+		Debug.Trace("NAKED DEFEAT followerquest: PartyDown()")
+
+		Actor a									
+		Int i = NPC.Length		
+
+		bool AllDown = false
+			
+			
+			while i 	 												
+				i -= 1												
+				a = NPC[i].GetReference() as Actor		
+
+				if a 	
+					if a.IsBleedingOut() 
+					AllDown = true
+					else
+					AllDown = false
+					endif		
+				endif	
+				
+			endwhile
+			
+		if AllDown
+		Debug.trace("NAKED DEFEAT followerquest: Followers all down")
+		return true	
+		else
+		Debug.trace("NAKED DEFEAT followerquest: Followers still on their feet")
+		return false
+		endif
+	endif 
+	
 	
 EndFunction	
 
@@ -1050,7 +1318,7 @@ Debug.trace("NAKED DEFEAT followerquest: (#msg) "+Text3)
 EndFunction
 
 Function NymTrace(String Text2)		;#NymTrace
-	if cfgqst.IsNymrasGame()
+	if Nym()
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT followerquest: (#trace NYM) "+Text2)
 	endif
@@ -1058,7 +1326,7 @@ EndFunction
 
 Bool Function Nym()
 
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	return TRUE
 	else
 	return false

@@ -229,17 +229,30 @@ Function Fragment_3()				;#START				;############ STAGE 10 ;############
 QuestID = Random()
 
 Debug.Trace("NAKED DEFEAT #allegiancequest: stage 10 (START)")
-if cfgqst.ShowDebugMessages	
-Debug.Notification("NAKED DEFEAT allegiancequest: stage 10 (START)")
-endif
+
+	if cfgqst.AllegianceScanType == "DuplicateEnemyScan"	;WIP - we want to duplicate enemies the more the merrier 
+	cfgqst.AllegianceScanType = "empty"
+	AreaScanDuplicateEnemies()
+
+	elseif cfgqst.AllegianceScanType == "MarkDuplicantsScan"	;WIP - we want to duplicate enemies the more the merrier 
+	cfgqst.AllegianceScanType = "empty"
+	AreaScanMarkDuplicants()
+
+	else 
 		
-Allegiance(true)	;---> calming actors 
-StopCombatScan = false
-while AllegianceRunning
-Utility.Wait(0.5)
-endwhile
-RegisterForSingleUpdate(0.1)	
-SetStage(14) 
+		if cfgqst.ShowDebugMessages	
+		Debug.Notification("NAKED DEFEAT allegiancequest: stage 10 (START)")
+		endif
+				
+		Allegiance(true)	;---> calming actors 
+		StopCombatScan = false
+		while AllegianceRunning
+		Utility.Wait(0.5)
+		endwhile
+		RegisterForSingleUpdate(0.1)	
+		SetStage(14) 
+	endif 
+
 EndFunction
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
@@ -287,6 +300,23 @@ Debug.Trace("NAKED DEFEAT allegiancequest: CombatScan()")
 EndFunction
 
 
+;/ MODS TO IMPROVE:
+Follow Me and Swim After Me 
+https://www.nexusmods.com/skyrimspecialedition/mods/7026?tab=posts
+
+Inconvenient Dungeons
+https://www.nexusmods.com/skyrimspecialedition/mods/66784
+
+Dungeons - Revisited
+https://www.nexusmods.com/skyrimspecialedition/mods/51798
+
+Hand Placed Enemies - More populated spawns dungeons and POIs
+https://www.nexusmods.com/skyrimspecialedition/mods/59249
+
+/; 
+
+
+
 
 bool AllegianceRunning = false
 
@@ -310,6 +340,235 @@ endif
 EndFunction
 
 ;------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Bool DuplicationRunning = false
+
+
+Keyword DemonicCreature
+
+Function AreaScanDuplicateEnemies()
+	
+	DuplicationRunning = true
+	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanDuplicateEnemies()")
+
+	Actor a		
+	Actor aTempActor 
+
+	int i = NPC.Length 							;############ I think this is wrong. Index needs to reduce AggressourCount directly not NPC Lenght ###########
+	int j = NPC.Length
+	int EnemyCount = 0
+	bool SpawnExtra = false 
+	
+	bool Enable = true
+	int SpawnCount = 0
+	bool Spawned = false
+	bool DemonicCreatureFound = false
+	bool AllowedSpawnFound = false 
+	
+	bool WeAreInDungeon = false 
+	bool Abort = false
+	
+	RaceKey = "none"
+	
+	if cfgqst.Nym() && cfgqst.TempDefeatShortProb == 100
+	Enable = false 
+	elseif cfgqst.PlayerRef.IsInCombat()
+	Enable = false
+	endif 
+	
+	if Enable
+	
+		if cfgqst.IsPlayerInDungeon() && cfgqst.PlayerRef.IsInInterior() 
+		NymTrace("AreaScanDuplicateEnemies() WeAreInDungeon TRUE")
+		WeAreInDungeon = true 
+		else 
+		NymTrace("AreaScanDuplicateEnemies() WeAreInDungeon FALSE")
+		endif
+		
+		NymTrace("AreaScanDuplicateEnemies() NPC.Length: "+i)
+	
+		while (j > 0) && !Abort
+		j -= 1	
+		a = NPC[j].GetReference() as Actor	
+		
+			if a 
+
+				if a.IsInFaction(cfgqst.NakedGhostFaction)
+				a.disable()
+				a.delete()
+				else
+				
+					if a.IsHostileToActor(cfgqst.PlayerRef)
+					EnemyCount += 1
+					endif 
+				
+					if a.IsInFaction(cfgqst.RobberFaction)
+					Abort = true 
+					endif 
+				endif 
+
+
+			endif 
+		endwhile 
+		
+		
+		NymTrace("AreaScanDuplicateEnemies() EnemyCount: "+EnemyCount)
+		
+		if EnemyCount < 3
+		SpawnExtra = true 
+		endif 
+		
+		if !Abort
+			while i > 0							
+				i -= 1	
+				a = NPC[i].GetReference() as Actor		
+			;	Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ACTOR#"+i+": "+cfgqst.GetActorInfo(a))	;check actor alias slots (15)
+					
+					
+				DemonicCreatureFound = false 
+					
+					if cfgqst.ModDEM
+						if !DemonicCreature 
+						DemonicCreature = (Game.GetFormFromFile(0x0081F780, "DemonicCreatures.esp") As Keyword)
+						endif 
+					endif 
+					
+					if a 
+						if cfgqst.ModDEM && a.HasKeyword(DemonicCreature)
+						DemonicCreatureFound = true
+						NymTrace("AreaScanDuplicateEnemies() DemonicCreatureFound")
+						else
+						RaceKey = cfgqst.GetRaceKey(a)
+						
+							if (RaceKey == "Canines") || (RaceKey == "Wolves") || (RaceKey == "Skeevers") || (RaceKey == "Bears") || (RaceKey == "Sabrecats") || (RaceKey == "Trolls") 
+							AllowedSpawnFound = true
+							endif 
+						
+						endif 
+					endif 
+			
+					if a && (DemonicCreatureFound || WeAreInDungeon || AllowedSpawnFound) ;this only spawns demonic creatures OR when we are in a dungeon in general
+						
+						;String sTempName = a.GetActorBase().GetName() 
+						;if !sTempName
+						String sTempName = cfgqst.GetActorName(a)	
+						int iTempLevel = a.GetLevel()			
+						;endif 
+						
+						if a.IsInFaction(cfgqst.NakedDuplicantFaction) 
+						Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR["+i+"] ["+sTempName+"] [Level:"+iTempLevel+"] = NakedDuplicantFaction - NOT DUPLICATED")
+						endif 
+						if !a.IsHostileToActor(cfgqst.PlayerRef)
+						Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR["+i+"] ["+sTempName+"] [Level:"+iTempLevel+"] = Is NOT Hostile - NOT DUPLICATED")
+						endif 			
+						
+						if a.IsInFaction(cfgqst.NakedGhostFaction)
+						a.disable()
+						a.delete()
+					
+						
+						elseif a == folqst.Actor_Follower01	|| a == folqst.Actor_Follower02	|| (a.GetBaseObject().GetName() == "FEC : Load Screen Detector")
+						;do nothing
+						
+						elseif !a.IsInFaction(cfgqst.NakedDuplicantFaction) && a.IsHostileToActor(cfgqst.PlayerRef) && !a.IsInCombat()
+						Actorbase TempActor = a.GetActorBase() 
+						
+						
+							if TempActor
+							
+							a.AddToFaction(cfgqst.NakedDuplicantFaction)
+							
+							Spawned = true
+							a.PlaceAtMe(TempActor, 1);
+							SpawnCount += 1
+							Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR["+i+"] ["+sTempName+"] [Level:"+iTempLevel+"] = %DUPLICATED")
+						
+								
+									if SpawnExtra || DemonicCreatureFound
+									Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR["+i+"] ["+sTempName+"] [Level:"+iTempLevel+"] = %DUPLICATED EXTRA 1")
+									a.PlaceAtMe(TempActor, 1);
+									SpawnCount += 1
+										if DemonicCreatureFound || D100(50)
+										a.PlaceAtMe(TempActor, 1)
+										SpawnCount += 1
+										Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR["+i+"] ["+sTempName+"] [Level:"+iTempLevel+"] = %DUPLICATED EXTRA 2")
+										endif 
+								;	a.PlaceAtMe(TempActor, 1);
+									endif 
+									
+							;	endif 
+							else 
+							
+							Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR["+i+"] ["+sTempName+"] = NO ACTOR!")
+							
+							endif	
+						endif 	
+					;else 
+				
+				endif	
+			endwhile
+		endif 
+	endif 
+	
+	if Spawned
+	ScreenMessage("Actors Spawned: "+SpawnCount)
+	endif 
+	
+	DuplicationRunning = false
+	
+	SetStage(1000)
+
+EndFunction
+
+Function AreaScanMarkDuplicants()
+
+	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanMarkDuplicants()")
+
+	Actor a										
+
+	if DuplicationRunning
+	Debug.MessageBox("DuplicationRunning #ERROR")
+	endif 
+
+	while DuplicationRunning && cfgqst.ModEnabled
+	Utility.Wait(1.0)
+	endwhile 
+
+	int i = NPC.Length 							;############ I think this is wrong. Index needs to reduce AggressourCount directly not NPC Lenght ###########
+
+	while i							
+	i -= 1	
+	a = NPC[i].GetReference() as Actor	
+	
+	
+	String sTempName = "NoActor"
+;	Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ACTOR#"+i+": "+cfgqst.GetActorInfo(a))	;check actor alias slots (15)
+	
+		if a
+			sTempName = a.GetActorBase().GetName() 
+			
+			if !sTempName
+			sTempName = "NoName"
+			endif 
+			
+			if a == folqst.Actor_Follower01	|| a == folqst.Actor_Follower02	|| (a.GetBaseObject().GetName() == "FEC : Load Screen Detector")
+			;do nothing	
+			else 		
+			a.AddToFaction(cfgqst.NakedDuplicantFaction)
+			Debug.Trace("NAKED DEFEAT: #AreaScanMarkDuplicants ACTOR["+i+"] "+sTempName+" = MARKED")
+			endif	
+		;else 
+		;else 
+		
+		
+		endif	
+	endwhile	
+
+	SetStage(1000)
+
+EndFunction
+
 
 Function Allegiance(Bool value = true)			; #allegiance
 	
@@ -469,7 +728,7 @@ Function Allegiance(Bool value = true)			; #allegiance
 		endwhile
 		
 		;-------- DEFEAT TYPE ----------
-		if cfgqst.DefeatViaSurrender && cfgqst.DefeatTypeScenario != "Afterlife"
+		if cfgqst.DefeatViaSurrender && cfgqst.DefeatTypeScenario != "Afterlife" && cfgqst.IsDefeatRunning()
 		Debug.Trace("NAKED DEFEAT allegiancequest: Starting cfgqst.GetDefeatType()")
 		cfgqst.GetDefeatType()
 		endif
@@ -606,14 +865,14 @@ Function DebugMessage(String Text2)		;#DebugMessage
 EndFunction
 
 Function NymMessage(String Text2)		;#NymMessage
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT allegiancequest: (#msg NYM) "+Text2)
 	endif
 EndFunction
 
 Function NymTrace(String Text2)		;#NymTrace
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT allegiancequest: (#trace NYM) "+Text2)
 	endif

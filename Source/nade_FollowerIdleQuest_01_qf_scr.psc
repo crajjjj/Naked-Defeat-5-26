@@ -414,7 +414,7 @@ Function SetExpression(int type, actor akactor)	;#setexpression
 Actor a = akActor as Actor
 int RandomAAAH = 100
 
-if cfgqst.IsFucking(a) && cfgqst.IsNymrasGame()
+if cfgqst.IsFucking(a) && Nym()
 RandomAAAH = Utility.RandomInt(80,100)
 else 
 RandomAAAH = Utility.RandomInt(0,100)
@@ -951,7 +951,7 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 
 	Bool IsPosing01 = false
 
-	Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(START)")
+	Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01("+folqst.Name_Follower01+" START)")
 
 	Actor a = (Alias_Follower_01.GetReference() as Actor)
 
@@ -972,23 +972,31 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 			IsPosing01 = true
 			endif
 			
-			if cfgqst.IsNymrasGame()
+			;if cfgqst.IsNymrasGame()
 			NymTrace("ForceMaintenance01 - THIS LOOP IS HAPPENING")
-			cfgqst.FollowersStripCompletely()
+			;cfgqst.FollowersStripCompletely()
 			
-				if !cfgqst.IsFucking(a)
-				NymTrace("IsFucking")
-					if cfgqst.InFurniture
-					NymTrace("IsInFurniture")
-					calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
-					else 
-					NymTrace("IsNOTInFurniture")
-					calmqst.PlayPoseOnActor(a, "Random", false)
-					endif 
-				endif
+			if cfgqst.IsFucking(a)
+			NymTrace("IsFucking(TRUE)")
+			
+			else 
+			
+			NymTrace("IsFucking(FALSE)")
+			
+				if cfgqst.InFurniture
+				NymTrace("IsInFurniture(TRUE)")
+				NymTrace("%NOTE PLAYPOSE B")
+				calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
+				else 
+				NymTrace("IsInFurniture(FALSE)")
+				NymTrace("%NOTE PLAYPOSE C")	
+				calmqst.PlayPoseOnActor(a, "Random", false)
+				endif 
 			endif
+			;endif
 			
-			if cfgqst.IsFucking(a) && !cfgqst.IsNymrasGame() 
+			;FUCKING AND IF NOT NYMRAS GAME  --> WTF WHY? cause of expressions I guess
+			if cfgqst.IsFucking(a) && !Nym()
 			Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(SEX LOOP)")
 			;during Sex we stop playing our expressions 	
 				if !calmqst.CheckEndOfDefeat() && !cfgqst.AbortAll && RunMaintenance01; && (cfgqst.DefeatStatePlayer != "Escaping") && (cfgqst.DefeatStatePlayer != "Escaped")
@@ -1001,6 +1009,7 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 				Utility.Wait(1.0)
 				endif
 				
+			;IF NYMRAS GAME OR NOT FUCKING 	
 			else
 			Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(MAIN LOOP)")
 			
@@ -1039,20 +1048,34 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 				;calmqst.RestorePosition(0)
 				
 					if RunMaintenance01
-					StartDoingNothing_01(true) ;new, try to restart scene (should be broken if this triggers anyway)
-						if cfgqst.IsNymrasGame() || cfgqst.InFurniture
+					
+						if cfgqst.Nym() && cfgqst.IsFucking(a)
+						;DO nothing
+						StartDoingNothing_01(true)
+						else 
+						StartDoingNothing_01(true) ;new, try to restart scene (should be broken if this triggers anyway)
+						endif 	
+						;if cfgqst.IsFucking(a)
+						;DO nothing
+						;else 
+						;	if cfgqst.IsNymrasGame() || cfgqst.InFurniture 
+						if cfgqst.InFurniture && !cfgqst.IsFucking(a)
+						NymTrace("%NOTE PLAYPOSE A")
 						calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
+						
 						else 
 					;	calmqst.PlayPoseOnActor(a, "Random", true)
 						endif 
-					IsPosing01 = true
+					
+						;endif 
+					IsPosing01 = true	
 					endif 
 				else 	
 						;#posertest
-						if cfgqst.IsNymrasGame() 
-						NymTrace("#ERROR This Is Happening") 
+						;if cfgqst.IsNymrasGame() 
+						;NymTrace("#ERROR This Is Happening") 
 					;	calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
-						endif 
+						;endif 
 				Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(Follower NOT Running?)")	
 				endif
 			;	endif		
@@ -1063,16 +1086,7 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 	SetExpression(0, a)
 	cfgqst.ResetIdle(a)
 	Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(END)")
-	endif 
-;[04/17/2025 - 03:09:27AM] NAKED DEFEAT followerquest: (#trace NYM) NakedFollower[0] FOUND
-;[04/17/2025 - 03:09:27AM] NAKED DEFEAT followerquest: (#trace NYM) NakedFollowerCount: 1
-;[04/17/2025 - 03:09:27AM] WARNING: Assigning None to a non-object variable named "::temp69"
-;stack:
-;[nade_FollowerIdleQuest_01 (45005A1F)].nade_followeridlequest_01_qf_scr.ForceMaintenance01() - "------------------------------------" Line 995
-;[04/17/2025 - 03:09:27AM] NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(LOOP)
-;[04/17/2025 - 03:09:27AM] NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance01(MAIN LOOP)
-;[04/17/2025 - 03:09:27AM] NAKED DEFEAT: FollowerIdleQuest_01 SetExpression - type: 3
-	
+	endif 	
 	
 EndEvent
 
@@ -1084,7 +1098,7 @@ Event ForceMaintenance02(string eventName, string strArg, float numArg, Form sen
 	NymTrace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance02(none)")
 	elseif folqst.Actor_Follower01
 	
-		Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance02(START)")
+		Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 ForceMaintenance02("+folqst.Name_Follower02+" START)")
 
 		Actor a = (Alias_Follower_02.GetReference() as Actor)
 
@@ -1105,9 +1119,9 @@ Event ForceMaintenance02(string eventName, string strArg, float numArg, Form sen
 				IsPosing02 = true
 				endif
 				
-				if cfgqst.IsNymrasGame()
+				;if cfgqst.IsNymrasGame()
 				NymTrace("ForceMaintenance02 - THIS LOOP IS HAPPENING")
-				cfgqst.FollowersStripCompletely()
+				;cfgqst.FollowersStripCompletely()
 				
 				if !cfgqst.IsFucking(a)
 					if cfgqst.InFurniture
@@ -1116,9 +1130,9 @@ Event ForceMaintenance02(string eventName, string strArg, float numArg, Form sen
 					calmqst.PlayPoseOnActor(a, "Random", true)
 					endif 
 				endif
-			endif
+		;	endif
 
-				if cfgqst.IsFucking(a) && !cfgqst.IsNymrasGame() 
+				if cfgqst.IsFucking(a) && !Nym()
 				;during Sex we stop playing our expressions ---> Nymras Game ignores this
 				Utility.Wait(3.0)
 				else
@@ -1156,11 +1170,15 @@ Event ForceMaintenance02(string eventName, string strArg, float numArg, Form sen
 						if RunMaintenance02;
 						StartDoingNothing_02(true) ;new, try to restart scene (should be broken if this triggers anyway)
 						;calmqst.PlayPoseOnActor(a, "Random", false)	;set a new Pose
-							if cfgqst.InFurniture
+							if cfgqst.InFurniture && !cfgqst.IsFucking(a)
+							NymTrace("%NOTE PLAYPOSE A")
 							calmqst.PlayPoseOnActor(a, "FollowerDevices", true)
+							;IsPosing01 = true
 							else 
 						;	calmqst.PlayPoseOnActor(a, "Random", true)
 							endif 
+			
+
 						;PlayPoseOnActor(calmqst.Victims[1], "FollowerDevices", false)
 						endif 
 					IsPosing02 = true
@@ -1358,17 +1376,26 @@ Debug.trace("NAKED DEFEAT followeridelquest: (#msg) "+Text3)
 EndFunction
 
 Function NymMessage(String Text2)		;#NymMessage
-	if cfgqst.IsNymrasGame()
+	if Nym()
 	Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT followeridelquest: (#msg NYM) "+Text2)
 	endif
 EndFunction
 
 Function NymTrace(String Text2)		;#NymTrace
-	if cfgqst.IsNymrasGame()
+	if Nym()
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT followeridelquest: (#trace NYM) "+Text2)
 	endif
+EndFunction
+
+Bool Function Nym()
+
+	if cfgqst.Nym()
+	return TRUE
+	else
+	return false
+	endif 
 EndFunction
 
 ;BASE FUNCTIONS END ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

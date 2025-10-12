@@ -598,14 +598,14 @@ EndEvent
 
 
 Function NymMessage(String Text2)		;#NymMessage
-	if cfgqst.IsNymrasGame()
+	if Nym()
 	Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT whipquest: (#msg NYM) "+Text2)
 	endif
 EndFunction
 
 Function NymTrace(String Text2)		;#NymTrace
-	if cfgqst.IsNymrasGame()
+	if Nym()
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT whipquest: (#trace NYM) "+Text2)
 	endif
@@ -613,7 +613,7 @@ EndFunction
 
 Bool Function Nym()
 
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	return TRUE
 	else
 	return false

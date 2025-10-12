@@ -33,6 +33,8 @@ Or maybe add an option to debug the script(toggle in Config?)
 
 Actor Attacker = None			;PUSHAWAY TEST
 
+nade_playeralias_scr Property playscr Auto
+
 Quest Property CalmQuest Auto		
 Quest Property qst2 Auto		;crimequest (civilian)
 Quest Property qst3 Auto		;rapequest (civilian)
@@ -94,6 +96,10 @@ Spell Property SpellLootCooldown Auto
 
 Faction Property SexLabAnimatingFaction Auto
 Faction Property DefeatFaction Auto	
+
+
+Bool Property PlayerWasInCombat Auto
+
 
 Int[] Property SlotMasks Auto
 Bool ScanOn = false
@@ -272,6 +278,15 @@ else
 	HitLegs = true
 	endif
 		
+	if HitHead	
+	NymTrace("HIT: HitHead")
+	elseif HitBody
+	NymTrace("HIT: HitBody")
+	elseif HitArms	
+	NymTrace("HIT: HitArms")
+	elseif HitLegs	
+	NymTrace("HIT: HitLegs")
+	endif 
 	;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 ;>>> GET TYPE and STRIP CHANCE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -422,7 +437,7 @@ else
 				cfgqst.PlayerRef.RemoveItem(a, 1)
 				SendModEvent("Moan")
 				
-				if cfgqst.IsNymrasGame() 
+				if Nym() 
 				cfgqst.FollowerStripCombat()
 				endif 
 
@@ -499,7 +514,7 @@ else
 			Debug.trace("NAKED DEFEAT playeraliasquest: #HIT ItemStrip DefeatChance: "+addCritChance)	
 			if D100(addCritChance)		;#CriticalDefeat  Chance
 			
-				if cfgqst.IsNymrasGame()
+				if Nym()
 				TempScreenMessage = "A hard blow strips you and forces you down!! (addCritChance: "+addCritChance+")"
 				else
 				TempScreenMessage = "A hard blow strips you and forces you down!"
@@ -571,7 +586,7 @@ else
 			if D100(addCritChance)	
 			IsCriticalDefeat = true	
 			
-				if cfgqst.IsNymrasGame()
+				if Nym()
 				TempScreenMessage = "A hard blow on naked skin forces you down! (addCritChance: "+addCritChance+")"
 				else
 				TempScreenMessage = "A hard blow on naked skin forces you down!"
@@ -905,7 +920,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference) 			;	##eq
 		if akBaseObject && (OURakBaseObject != "")
 		Debug.trace("NAKED DEFEAT playeraliasquest: OnObjectEquipped(Object: akBaseObject FOUND")
 			
-			if cfgqst.IsNymrasGame()
+			if Nym()
 			currentobject = OURakBaseObject
 
 				if currentobject != lastobject
@@ -916,7 +931,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference) 			;	##eq
 
 			endif
 
-			if cfgqst.IsNymrasGame() ;TENTACLE TEST
+			if Nym() ;TENTACLE TEST
 				if !KWD_DeviousGag
 				KWD_DeviousGag = (Game.GetFormFromFile(0x03007EB8, "Devious Devices - Assets.esm")) As Keyword			;zad_DeviousGag
 				endif
@@ -1034,7 +1049,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference) 			;	##eq
 
 					int PotionTest = 0
 					
-					if PotionTest && cfgqst.IsNymrasGame()
+					if PotionTest && Nym()
 							SendModEvent("Moan")
 							ScreenMessage("Your potion was cursed and kinky magic force you to be naked")
 							InfoMessage("Naked Curse is active for the duration of the potions effect.")
@@ -1127,7 +1142,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference) 			;	##eq
 					elseif IsWorkbenchNearby()
 					Debug.trace("NAKED DEFEAT playeraliasquest: OnObjectEquipped - Workbench: LocTypeStore(TRUE)")	
 					IsStore = true
-						if cfgqst.IsNymrasGame()
+						if Nym()
 						ScreenMessage("WorkBench Found")
 						endif
 					endif
@@ -1137,7 +1152,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference) 			;	##eq
 					IsHome = true
 					endif
 					
-					If cfgqst.IsNymrasGame() && cfgqst.PlayerRef.IsSneaking()
+					If Nym() && cfgqst.PlayerRef.IsSneaking()
 					Debug.trace("NAKED DEFEAT playeraliasquest: OnObjectEquipped - IsSneaking(TRUE)")
 					IsHome = true	;for checkup of outfits. maybe add to debug wheelmenu?
 					endif
@@ -1396,6 +1411,19 @@ Bool PlayerDownAlreadyStarted = false
 
 Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 	
+	Bool FollowersAllowedToProtect = true 
+	
+	if folqst.PartyDown()
+	NymTrace("PARTY ALREADY DOWN")
+	FollowersAllowedToProtect = false 
+	else 
+	NymTrace("PARTY STILL UP")
+	endif 
+	 
+	if playscr.PlayerWasInCombat
+	playscr.PlayerWasInCombat = false
+	endif 
+	
 	Debug.Trace("NAKED DEFEAT playeraliasquest: PlayerDown("+DownedFrom+") ##DOWN##")
 
 	if PlayerDownAlreadyStarted
@@ -1429,6 +1457,7 @@ Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 		
 		cfgqst.PlayerSheatheWeapon()
 		cfgqst.Immobilize(true)
+		NymTrace("Immobilize TRUE PlayerDown - 1432")
 		cfgqst.PlayerDownAlready = TRUE		;01 - always first! 
 		cfgqst.DefeatStatePlayer = "Down"
 	;	RecoverFromRagdoll()
@@ -1465,11 +1494,24 @@ Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 
 		; ------ Downed on Adventure ------ ;
 		elseif DownedFrom == ("Adventure: Deadly Accident")	
+			
+			FollowersAllowedToProtect = false 
+			
+			if cfgqst.RapersNearby()
+			NymTrace("PlayerDown() Combat: Outcome_PlayerDefeated")
+			Outcome_PlayerDefeated = true
+			elseif cfgqst.FallingDamageTreshold > 0
 			NymTrace("PlayerDown() Adventure: Outcome_PlayerDies")
 			Outcome_PlayerDies = true
+			else 
+			NymTrace("PlayerDown() Adventure: Outcome_PlayerRecovers")
+			Outcome_PlayerRecovers = true
+			endif 
 					
 		elseif DownedFrom == ("Adventure: Accident")		;I think I only need this for bleedout -- technically this is a bit overcomplicated but well... lets go with this for now
 				
+			FollowersAllowedToProtect = false 	
+
 			if D100(cfgqst.DefeatRescueProb)
 			NymTrace("PlayerDown() Adventure: Outcome_PlayerRescued")
 			Outcome_PlayerRescued = true
@@ -1500,9 +1542,10 @@ Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 		
 		if Outcome_PlayerDefeated
 		NymTrace("Outcome_PlayerDefeated ->> Protection Start")		
+		
 			if folqst.IsFollowerPresent() 
 				
-				if FollowersCanProtect()	;FollowersCanProtect does everything
+				if FollowersAllowedToProtect && FollowersCanProtect()	;FollowersCanProtect does everything
 				NymTrace("PlayerDown() Combat: Followers protect you!")
 				Outcome_PlayerRecovers = true
 				Outcome_PlayerDefeated = false				
@@ -1516,11 +1559,15 @@ Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 			Outcome_PlayerDefeated = false	
 			
 			ScreenMessage(sTempOutcomeMessage) ;only plays when protection attempt is made
+			
 			else
 			NymTrace("PlayerDown() Combat: NO PROTECTION -> Defeated!")
 			endif 
-
+			
+		
 		endif 	
+		
+		sTempOutcomeMessage = "EmptyMessage"
 		
 		cfgqst.PlayerSheatheWeapon()
 		calmqst.CalmFollowers(true)
@@ -1545,6 +1592,7 @@ Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 		; --- Outcome: Death --- ;
 		elseif Outcome_PlayerDies
 		;Death Pose before fadeout 
+		NymTrace("PlayerDown(Outcome_PlayerDies)")
 		cfgqst.FadeToBlack(true)
 		cfgqst.StartRobberyAtLocation()
 		Utility.Wait(3.0)
@@ -1610,8 +1658,8 @@ EndFunction
 Function RecoverFromRagdoll()
 
 	while cfgqst.ModEnabled && cfgqst.Ragdolling		
-		Utility.Wait(3.0)
-		NymTrace("Ragdolling")
+		Utility.Wait(1.0)
+		NymTrace("Ragdolling 1619")
 		;cfgqst.KeyFixBleedout()
 	endwhile
 
@@ -1621,6 +1669,8 @@ Bool AllFollowersDown = false
 Bool CombatOver = false 
 
 String sTempOutcomeMessage
+
+Bool FollowersAlreadyDown = false 
  
 Bool Function FollowersCanProtect()		;NEW2025		#Protect #FollowersCanProtect()
 
@@ -1632,6 +1682,7 @@ Bool Function FollowersCanProtect()		;NEW2025		#Protect #FollowersCanProtect()
 	ScreenMessage("Your Followers will try to protect you")
 	int CanProtect = 404
 	bool MessagePlayedOnce = false
+	int FirstTwoCylesWait = 2 
 		cfgqst.DefeatStateChapter = "FollowersProtect"
 
 		float Timer = 30
@@ -1672,67 +1723,98 @@ Bool Function FollowersCanProtect()		;NEW2025		#Protect #FollowersCanProtect()
 			ScreenMessage("Your Followers are still fighting desperatly")
 			endif 
 
-			;we can recover after X Seconds 
-			if cfgqst.DefeatGetUp
-			;TIMER: 0 > Get Up under all circumstances
-			;FOLLOWERS DOWN EARLY and Enemies nearby > STOP - Defeated
-			;FOLLOWERS DOWN EARLY and no Enemies nearby > Wait for Timer 0 or Enemies 
-				if NobodyAround() 
-				NymTrace("Nobody around, you can recover unnoticed [Recover] Timer:"+Timer)
-				sTempOutcomeMessage = "Nobody around, you can recover unnoticed [Recover]."
-				Timer = 0
-				CanProtect = 1
-				elseif folqst.PartyDown()
-				NymTrace("Your Followers are defeated before you can recover [Defeated] Timer:"+Timer)
-				sTempOutcomeMessage = "Your Followers are defeated before you can recover [Defeated]."
-				Timer = 0
-				CanProtect = 0
-				elseif !cfgqst.FollowersInCombat(5000)
-				Timer = 0
-				CanProtect = 1
-				NymTrace("The fight is over and you can recover [Recover] Timer:"+Timer)
-				sTempOutcomeMessage = "The fight is over and you can recover [Recover]."
-				else 
-				;Timer keeps going		
-				endif 
-
-			;we get defeated after X Seconds
+			if FirstTwoCylesWait > 0
+			FirstTwoCylesWait -= 1
+			;we wait for 2 full cycles (4 seconds) before first checking the combat status)
 			else 
-			;TIMER: 0, Fight ongoing, Enemies nearby > Defeated
-			;TIMER: 0, Fight ongoing, No Enemies nearby > GetsUp
-			
-			;FOLLOWERS DOWN EARLY and Enemies nearby > STOP - Defeated
-			;FOLLOWERS DOWN EARLY and no Enemies nearby > STOP - GetsUp  
-			;FIGHT OVER, no Enemies nearby > Get Up 		
-
-				if folqst.PartyDown() 
-				NymTrace("Your followers cannot win the fight [A]  [Defeated] Timer:"+Timer)
-				sTempOutcomeMessage = "Your followers cannot win the fight [Defeated]."
-				;Followers down -> End Timer 
-				Timer = 0
-				CanProtect = 0
-				
-				elseif !cfgqst.FollowersInCombat(10000) 	;if followers in 10000 radius are NOT in combat anymore
-				
-					if NobodyAround() ;and if nobody is around
-					NymTrace("The fight is over and you can recover [Recover] Timer:"+Timer)
-					sTempOutcomeMessage = "The battle is over and you can recover [Recover]."
+			;we can recover after X Seconds 
+				if cfgqst.DefeatGetUp
+				;TIMER: 0 > Get Up under all circumstances
+				;FOLLOWERS DOWN EARLY and Enemies nearby > STOP - Defeated
+				;FOLLOWERS DOWN EARLY and no Enemies nearby > Wait for Timer 0 or Enemies 
+					if NobodyAround() 
+					NymTrace("Nobody around, you can recover unnoticed [Recover] Timer:"+Timer)
+					sTempOutcomeMessage = "Nobody around, you can recover unnoticed [Recover]."
 					Timer = 0
 					CanProtect = 1
-					elseif folqst.PartyDown()  		;if enmies still around 
-					NymTrace("Your followers cannot win the fight [B] [Defeated] Timer:"+Timer)
-					sTempOutcomeMessage = "Your followers cannot win the fight [Defeated]."
-					;Followers down -> End Timer 
+					elseif folqst.PartyDown()
+					NymTrace("Your Followers are defeated before you can recover [Defeated] Timer:"+Timer)
+					sTempOutcomeMessage = "Your Followers are defeated before you can recover [Defeated]."
 					Timer = 0
 					CanProtect = 0
+					elseif !cfgqst.FollowersInCombat(5000)
+					Timer = 0
+					CanProtect = 1
+					NymTrace("The fight is over and you can recover [Recover] Timer:"+Timer)
+					sTempOutcomeMessage = "The fight is over and you can recover [Recover]."
+					else 
+					;Timer keeps going		
 					endif 
-				else ;Followers Up and Still fighting ->
 
-				;Timer keeps going
+				;we get defeated after X Seconds
+				else 
+				;TIMER: 0, Fight ongoing, Enemies nearby > Defeated
+				;TIMER: 0, Fight ongoing, No Enemies nearby > GetsUp
+				
+				;FOLLOWERS DOWN EARLY and Enemies nearby > STOP - Defeated
+				;FOLLOWERS DOWN EARLY and no Enemies nearby > STOP - GetsUp  
+				;FIGHT OVER, no Enemies nearby > Get Up 		
+
+					if folqst.PartyDown() 
+					
+						if NobodyAround()
+						NymTrace("Nobody is left standing and you can get up [D] [Recover] [Recover] Timer:"+Timer)
+						sTempOutcomeMessage = "Nobody is left standing and you can get up [Recover]."
+						Timer = 0
+						CanProtect = 1	
+						else
+						NymTrace("Your followers cannot win the fight [A]  [Defeated] Timer:"+Timer)
+						sTempOutcomeMessage = "Your followers cannot win the fight [Defeated]."
+						;Followers down -> End Timer 
+						Timer = 0
+						CanProtect = 0
+						
+						endif 
+					
+					elseif !cfgqst.FollowersInCombat(10000) 	;if followers in 10000 radius are NOT in combat anymore
+					
+						;/
+						if NobodyAround() ;and if nobody is around
+						NymTrace("The fight is over and you can recover [Recover] Timer:"+Timer)
+						sTempOutcomeMessage = "The battle is over and you can recover [Recover]."
+						Timer = 0
+						CanProtect = 1
+						elseif folqst.PartyDown()  		;if enmies still around AND Party Down
+						NymTrace("Your followers cannot win the fight [B] [Defeated] Timer:"+Timer)
+						sTempOutcomeMessage = "Your followers cannot win the fight [Defeated]."
+						;Followers down -> End Timer 
+						Timer = 0
+						CanProtect = 0
+						endif 
+						/;
+						if folqst.PartyDown()  		;if enmies still around AND Party Down
+						NymTrace("Your followers cannot win the fight [B] [Defeated] Timer:"+Timer)
+						sTempOutcomeMessage = "Your followers cannot win the fight [Defeated]."
+						;Followers down -> End Timer 
+						Timer = 0
+						CanProtect = 0
+						elseif NobodyAround() 
+						NymTrace("The fight is over and you can recover [C] [Recover] Timer:"+Timer)
+						sTempOutcomeMessage = "The battle is over and you can recover [Recover]."
+						Timer = 0
+						CanProtect = 1				
+						endif 					
+						
+						
+					else ;Followers Up and Still fighting ->
+
+					;Timer keeps going
+					endif 
 				endif 
 			endif 
 
 		DebugTrace("FollowersCanProtect(Timer: "+Timer+")")
+		
 		endwhile
 		
 		DebugTrace("FollowersCanProtect(Timer FINAL: "+Timer+")")
@@ -2094,10 +2176,8 @@ cfgqst.DefeatStatePlayer = "Free"
 
 
 EndFunction
-
-;------------------------------------------------------------------------------------------------------------------------------
-
-Function FollowersProtect() ;;;; OLD DELETE LOL
+	
+;----------	--------------------------------------------------------------------------------------------------------------------
 
 	;/
 	You have followers and go down
@@ -2110,14 +2190,19 @@ Function FollowersProtect() ;;;; OLD DELETE LOL
 	Y: they lose before 30 secs time ---> defeated
 	Z: they fight still after 30 secs time ---> you get up
 	/;
+
+;/	
+Function FollowersProtect() ;;;; OLD DELETE LOL	
 	
-	Debug.Trace("NAKED DEFEAT playeraliasquest: AA")	
+
+	
+	Debug.Trace("NAKED DEFEAT playeraliasquest: AA")
 
 	cfgqst.DefeatStateChapter = "FollowersProtect"
 
 	float Timer = 30
 	
-	if NobodyAround() ;check early and re-initiate combat early, too! 
+	if NobodyAround()	 ;check early and re-initiate combat early, too! 
 	Timer = 0
 	else 
 	
@@ -2198,6 +2283,8 @@ Function FollowersProtect() ;;;; OLD DELETE LOL
 	cfgqst.DefeatStateChapter = "None"
 
 EndFunction
+	
+/;
 
 Bool Function NobodyAround()
 
@@ -2207,6 +2294,7 @@ Bool Function NobodyAround()
 	
 	if cfgqst.ProxActorDetected == 66
 	Debug.Messagebox("Proximity Quest Combat Scan did not work")
+	
 	return false
 	elseif cfgqst.ProxActorDetected > 0
 	DebugTrace("NobodyAround(FALSE)")
@@ -2265,7 +2353,7 @@ Weapon IronDagger
 ;>>>>>>>>>>>>>>>>>>>>>>>>>> BLEEDOUT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
-Function ForceSheatheWeapon()
+Function ForceSheatheWeapon() ;OLD DELETE 
 	NymTrace("ForceSheatheWeapon()")
 	if cfgqst.PlayerRef.IsWeaponDrawn()		
 	cfgqst.PlayerRef.SheatheWeapon()		
@@ -2290,7 +2378,7 @@ Function ForceSheatheWeapon()
 
 EndFunction 
 
-Function ForceSheatheWeapon2()
+Function ForceSheatheWeapon2() ;OLD DELETE 
 	NymTrace("ForceSheatheWeapon2()")
 
 	if !IronDagger
@@ -2315,10 +2403,33 @@ EndFunction
 
 Bool Function WasInCombat()
 
-if (cfgqst.Enemy[0] != "none") && (cfgqst.Enemy[1] != "none") && (cfgqst.Enemy[2] != "none") && (cfgqst.Enemy[3] != "none") && (cfgqst.Enemy[4] != "none") && (cfgqst.Enemy[5] != "none") 
-return false 
-else
-return true
+if Nym()
+	Debug.trace("NAKED DEFEAT WasInCombat(): Enemy[0]: "+cfgqst.Enemy[0])
+	Debug.trace("NAKED DEFEAT WasInCombat(): Enemy[1]: "+cfgqst.Enemy[1])
+	Debug.trace("NAKED DEFEAT WasInCombat(): Enemy[2]: "+cfgqst.Enemy[2])
+	Debug.trace("NAKED DEFEAT WasInCombat(): Enemy[3]: "+cfgqst.Enemy[3])
+	Debug.trace("NAKED DEFEAT WasInCombat(): Enemy[4]: "+cfgqst.Enemy[4])
+	Debug.trace("NAKED DEFEAT WasInCombat(): Enemy[5]: "+cfgqst.Enemy[5])
+	
+	if (cfgqst.Enemy[0] == "none") && (cfgqst.Enemy[1] == "none") && (cfgqst.Enemy[2] == "none") && (cfgqst.Enemy[3] == "none") && (cfgqst.Enemy[4] == "none") && (cfgqst.Enemy[5] == "none") 
+	NymTrace("WasInCombat(FALSE)")
+	return false 
+	else
+	NymTrace("WasInCombat(TRUE)")
+	return true
+	endif 
+	
+else 
+ 
+
+	if (cfgqst.Enemy[0] != "none") && (cfgqst.Enemy[1] != "none") && (cfgqst.Enemy[2] != "none") && (cfgqst.Enemy[3] != "none") && (cfgqst.Enemy[4] != "none") && (cfgqst.Enemy[5] != "none") 
+	NymTrace("WasInCombat(FALSE)")
+	return false 
+	else
+	NymTrace("WasInCombat(TRUE)")
+	return true
+	endif 
+
 endif 
 
 Endfunction
@@ -2334,14 +2445,16 @@ if NEWSYSTEMFUCKOOFF
 
 cfgqst.DefeatStatePlayer = "Bleedout"
 
-Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
+Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout## Version:"+cfgqst.NakedDefeat_ModVersion)
+
+
 	if cfgqst.PlayerDownAlready
 		
 		if cfgqst.PlayerRef.IsWeaponDrawn()		
 		cfgqst.PlayerRef.SheatheWeapon()		
 		endif
 	
-		NymTrace("OnEnterBleedout(cfgqst.PlayerDownAlready)")
+		DebugTrace("OnEnterBleedout(cfgqst.PlayerDownAlready)")
 		cfgqst.PlayerRef.RestoreActorValue("Health", 200)		
 		cfgqst.PlayerRef.SetNoBleedoutRecovery(true)
 		
@@ -2350,53 +2463,70 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 		endif
 
 	else
+		
+		if cfgqst.PlayerIsInCombat || cfgqst.PlayerRef.IsInCombat()
+		PlayerWasInCombat = true 
+		endif 
+	
 		; --- BLEEDOUT RECOVERY ---
+		
+	;	if Nym() ;MOVE EARLIER #TEST 
+		cfgqst.PlayerDownAlready = true
+		DebugTrace("OnEnterBleedout(Regular Start)")
+		cfgqst.PlayerTrackHealth()
+	;	endif 
+		
 		cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 1.0)
-		NymTrace("#PushActorAway 1.0 - 2355")
+		DebugTrace("#PushActorAway 1.0 - 2355")
 		
 		if cfgqst.PlayerRef.IsWeaponDrawn()	
-		NymTrace("OnEnterBleedout(Weapon Drawn 00 TRUE)")	
+		DebugTrace("OnEnterBleedout(Weapon Drawn 00 TRUE)")	
 		endif
 		cfgqst.PlayerRef.SheatheWeapon()		
 		if cfgqst.PlayerRef.IsWeaponDrawn()	
-		NymTrace("OnEnterBleedout(Weapon Drawn 01 TRUE #ERROR)")	
+		DebugTrace("OnEnterBleedout(Weapon Drawn 01 TRUE #ERROR)")	
 		endif
 		
 		SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
-		NymTrace("##Calm Player B")
+	;	DebugTrace("##Calm Player B")
 		
 		cfgqst.PlayerRef.AddToFaction(cfgqst.DownedFaction)
 		if cfgqst.PlayerRef.IsInFaction(cfgqst.DownedFaction)
-		NymTrace("OnEnterBleedout AddToDownedFaction TRUE")
+		DebugTrace("OnEnterBleedout AddToDownedFaction TRUE")
 		else 
-		NymTrace("OnEnterBleedout AddToDownedFaction FAILED")
+		DebugTrace("OnEnterBleedout AddToDownedFaction FAILED")
 		endif 
 		
 	;	if Nym()
 	;	cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, true)
 	;	endif 
 		
-		cfgqst.PlayerDownAlready = true
-		NymTrace("OnEnterBleedout(Regular Start)")
-
+	;	if !Nym() ;MOVE EARLIER #TEST 
+	;	cfgqst.PlayerDownAlready = true
+	;	DebugTrace("OnEnterBleedout(Regular Start)")
+	;	endif 
 		cfgqst.PlayerRef.RestoreActorValue("Health", 100)		
 		cfgqst.PlayerRef.SetNoBleedoutRecovery(true)			
 		SendModEvent("Moan")			
 							
 		if cfgqst.PlayerRef.IsWeaponDrawn()	
-		NymTrace("OnEnterBleedout(Weapon Drawn A TRUE #ERROR))")		
+		DebugTrace("OnEnterBleedout(Weapon Drawn A TRUE #ERROR))")		
 		cfgqst.PlayerRef.SheatheWeapon()		
 		endif
 		
 		if !cfgqst.PlayerRef.IsInFaction(cfgqst.DownedFaction)
-		NymTrace("OnEnterBleedout IsInFaction DownedFaction - FALSE #ERROR")
+		DebugTrace("OnEnterBleedout IsInFaction DownedFaction - FALSE #ERROR")
 		cfgqst.PlayerRef.AddToFaction(cfgqst.DownedFaction)
 		else 
-		NymTrace("OnEnterBleedout IsInFaction DownedFaction - TRUE -- All Good")
+		DebugTrace("OnEnterBleedout IsInFaction DownedFaction - TRUE -- All Good")
 		endif 
 	;	SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
 
-		if cfgqst.PlayerIsInCombat || cfgqst.PlayerRef.IsInCombat() || WasInCombat() 
+	;	if Nym()
+	;	WasInCombat() 
+	;	endif 
+
+		if cfgqst.PlayerIsInCombat || cfgqst.PlayerRef.IsInCombat() || WasInCombat() || PlayerWasInCombat
 		PlayerDown("Combat: Bleedout")
 		else
 		PlayerDown("Adventure: Deadly Accident")
@@ -2448,7 +2578,7 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 
 ;FUCKED VERSION: 
 else 
-Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
+;Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 
 	if cfgqst.PlayerDownAlready
 		
@@ -2541,8 +2671,8 @@ Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout##")
 		NymTrace("##CALM Player X")
 		endif
 		
-		ForceSheatheWeapon()
-		ForceSheatheWeapon2()
+		;ForceSheatheWeapon()
+		;ForceSheatheWeapon2()
 		CriticalDefeatPose()
 		
 	endif
@@ -2644,6 +2774,18 @@ Keyword MagicTrapGas		;0009F28E
 int PierceClothingChance = 0
 int	PierceLightChance = 0
 int	PierceHeavyChance = 0
+
+Function TestFunction()
+
+Debug.MessageBox("This Worked")
+
+Endfunction
+
+Function TestFunctionInternal()
+
+Debug.MessageBox("This Worked INTERNAL")
+
+Endfunction
 
 Function GetWeapon(Form akSource)
 
@@ -2897,7 +3039,7 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 
 		;-------- TEST HITTER DETECTION -----------------------------------------------------------------------------------------------------
 		
-		if !IsAttackDodged && cfgqst.IsNymrasGame() && !cfgqst.CivilRapeRunning && !cfgqst.DefeatQuestRunning ;&& !cfgqst.PartyInCombat() 
+		if !IsAttackDodged && Nym() && !cfgqst.CivilRapeRunning && !cfgqst.DefeatQuestRunning ;&& !cfgqst.PartyInCombat() 
 		
 			string akAggressor_NAME = "empty"
 			string akSource_NAME = "empty"
@@ -3036,13 +3178,18 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 
 
 
-				if Nym() && TrapStart
+				if (cfgqst.FallingDamageTreshold > 0) && TrapStart
 				;PlayerIsDown = true  ;OLD VERSION - delete
 				NymTrace("##TrapStart")
 				TrapStart = false 
 					if TrapType == "Bear Trap"
 						if cfgqst.PartyInCombat()
-						cfgqst.KeySurrender("Forced Surrender")			
+						cfgqst.KeySurrender("Forced Surrender")		
+					
+
+						elseif cfgqst.RapersNearby()
+						PlayerDown("Combat: Deadly Accident")
+					
 						else 
 						cfgqst.Immobilize(True)
 						cfgqst.PlayerSheatheWeapon()
@@ -3091,17 +3238,18 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 						cfgqst.CreateModEvent("NakedDefeatTransition", "Afterlife")
 						endif 
 /;
-					elseif TrapType == "FlamesDISABLED"		;certain potions can help / need to hit hotkey fast!
+					elseif TrapType == "Flames"		;certain potions can help / need to hit hotkey fast!
 						if cfgqst.PartyInCombat()
-						NymMessage("Hit by Flames during Combat")
+					;	NymMessage("COMBAT: Hit by Flames")
 					;	cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 4)
 					;	PlayerRef.DamageAV("Health", 100000)
 						else 
-						cfgqst.FadeToBlack(true)
-						Utility.Wait(2.0)
-						cfgqst.DefeatEntranceVia = "TrapHit"
+						NymMessage("ADVENTURE: Hit by Flames")
+						;cfgqst.FadeToBlack(true)
+						;Utility.Wait(2.0)
+						;cfgqst.DefeatEntranceVia = "TrapHit"
 						
-						cfgqst.CreateModEvent("NakedDefeatTransition", "Afterlife")
+						;cfgqst.CreateModEvent("NakedDefeatTransition", "Afterlife")
 						endif 	
 						
 					endif 
@@ -3182,6 +3330,8 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 					
 					if !cfgqst.IsDefeatRunning() && cfgqst.PlayerRef.IsInCombat()
 					Actor Hitter = akAggressor as Actor
+					
+					PlayerWasInCombat = true 
 					
 					cfgqst.GetEnemyType(Hitter)
 					
@@ -3317,12 +3467,24 @@ Debug.trace("NAKED DEFEAT playeraliasquest: OnCellLoad()")
 
 	cfgqst.CheckEssentiality()
 
-	if !cfgqst.PlayerMonitorOn		
-	PlayerMonitor()
-	endif
+	if Nym()
+	;DO nothing
+	else 
+	;	if !cfgqst.PlayerMonitorOn			;DISABLE MONITOR 2025
+	;	PlayerMonitor()
+	;	endif
+	endif 
 
 	cfgqst.OnCellLoadFunction()
-
+	
+	
+	
+	if Nym()
+	cfgqst.PlayerHairMaintenance()
+;	cfgqst.ProximityQuestStart("DuplicateEnemyScan")
+;	cfgqst.ProximityQuestStart("MarkDuplicantsScan")
+	endif 
+	
 EndEvent
 
 ;new version
@@ -3332,10 +3494,28 @@ Debug.trace("NAKED DEFEAT playeraliasquest: OnPlayerLoadGame()")
 
 cfgqst.OnPlayerLoadGameExternal()
 
-	if !cfgqst.PlayerMonitorOn		
-	PlayerMonitor()
-	endif
+	;if !Nym()
 	
+	;	cfgqst.ProxActorDetected = 66
+	;	cfgqst.ProximityQuestStart("CombatScan")
+		
+	;	if cfgqst.ProxActorDetected == 66
+	;	ProximityQuest.SetStage(1000)
+	;	Debug.Trace("NAKED DEFEAT ##ERROR: ProximityQuest Debugged.")
+	;	Debug.Messagebox("Proximity Quest Combat Scan did not work")
+	;	endif 
+	
+	
+	if Nym()
+		
+
+
+	;DO nothing
+	else 
+	;	if !cfgqst.PlayerMonitorOn			;DISABLE MONITOR 2025
+	;	PlayerMonitor()
+	;	endif
+	endif 	
 	
 	RegisterForMenu("ContainerMenu")
 		
@@ -3357,261 +3537,286 @@ Event OnMenuOpen(String MenuName)
 EndEvent
 
 
-
-
-
-
-Function PlayerMonitor()			;#scan	;#monitor		MOVE MONITOR to DEFEATQUEST??? 
-
-Debug.trace("NAKED DEFEAT playeraliasquest: PlayerMonitor() 27-12-2023")
-Debug.notification("NAKED DEFEAT: Player Monitor started")
-
-if cfgqst.ShowDebugMessages
-Debug.notification("NAKED DEFEAT: Player Monitor started")
-endif
-
-if cfgqst.PlayerMonitorOn
-Debug.trace("NAKED DEFEAT: #ERROR (non critical) - Player Monitor started twice")
-;do Nothing/skip
-else
-
-	;>>>>>>>>>>>>>> MAIN LOOP STARTS <<<<<<<<<<<<<<<<<<
-	while cfgqst.ModEnabled && DefeatQuest.IsRunning()
-
+Function PlayerPunishmentMonitor_Loop();#scan	;#monitor
+	
+	if !cfgqst.PlayerMonitorOn
+	ScreenMessage("NAKED DEFEAT Player Punishment Monitor Started ("+cfgqst.NakedDefeat_ModVersion+")")
 	cfgqst.PlayerMonitorOn = true
-	
-		;>>>>> DURING RAPE: Maintenance LOOP >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		;applies expressions
-		;plays sound
-		if cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning 
+	endif 
 
-		cfgqst.SetExpression(0) ;RESET
+	RegisterForSingleUpdate(1.0)	;1 second ticks 
 
-			while cfgqst.ModEnabled && DefeatQuest.IsRunning() && (cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning) ;|| (cfgqst.NymBETA && cfgqst.POPSuspendStatus)
-						
-				;WAITING Maintenance (outside SexScene)
-				if !cfgqst.SexScene; (cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning) && 	
-					
-					if CalmQuest.IsRunning()
-					SendModEvent("RestorePose")
-					endif
-					
-				cfgqst.SetExpression(Utility.RandomInt(1,6))	;DEFEAT EXPRESSIONS
-					
-					;looping with fuckbelt sounds & gag sounds
-					if cfgqst.BoolCaptiveFuckBelt || cfgqst.Gagged || cfgqst.SexSceneBukkake
-						;only plays with fuckingbelt
-						if cfgqst.BoolCaptiveFuckBelt
-						cfgqst.PlaySoundFuckBelt()
-						endif
-						SendModEvent("Moan")
-						Utility.Wait(3.0)
-						if cfgqst.BoolCaptiveFuckBelt
-						cfgqst.PlaySoundFuckBelt()
-						endif	
-						;only 75% chance of second moan to increase variety
-						if D100(75)
-						SendModEvent("Moan")
-						endif
-						Utility.Wait(3.0)
-					
-					;looping fallback
-					else	
-					Utility.Wait(5.0)
-					endif
-				endif
-						
-				;>>>>>> WAIT <<<<<<<<< HAS SCENARIO SEX LOOP 		
-				while cfgqst.ModEnabled && cfgqst.SexScene		
-				Utility.Wait(3.0)
-				endwhile
+EndFunction 
 
-			endwhile	
-			
-			cfgqst.SetExpression(0)
+Function PlayerMonitor()				;	MOVE MONITOR to DEFEATQUEST???  ---> DONE 
+
+if Nym() 
+;DO NOTHING 
+else 
+
+	Debug.trace("NAKED DEFEAT playeraliasquest: PlayerMonitor() 27-12-2023")
+	Debug.notification("NAKED DEFEAT: Player Monitor started")
+
+	if cfgqst.ShowDebugMessages
+	Debug.notification("NAKED DEFEAT: Player Monitor started")
+	endif
+
+	if cfgqst.PlayerMonitorOn
+	Debug.trace("NAKED DEFEAT: #ERROR (non critical) - Player Monitor started twice")
+	;do Nothing/skip
+	else
+
+		;>>>>>>>>>>>>>> MAIN LOOP STARTS <<<<<<<<<<<<<<<<<<
+		while cfgqst.ModEnabled && DefeatQuest.IsRunning()
+
+		cfgqst.PlayerMonitorOn = true
 		
-		;>>>>> NOT IN SCENARIO LOOP >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		;this Loops starts when we are not In Naked Defeat Scenario
-		else
-			
-			;NAKED DROWNING LOOP >>>>>>>>>>>>>>>	;#drowning >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			;#GUIDE: we check first if Player is Swimming
-			if cfgqst.NakedDrowning && cfgqst.PlayerRef.IsSwimming()
+			;>>>>> DURING RAPE: Maintenance LOOP >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+			;applies expressions
+			;plays sound
+			if cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning 
 				
-				float Health
-				;Health = cfgqst.PlayerRef.GetAV("Health")
-				Health = cfgqst.PlayerRef.GetBaseActorValue("Health")
-				float Damage
-				Damage = Health*0.2
+				if Nym()
+				;DO nothing
+				Utility.Wait(3.0)
+				else 
+					
+					cfgqst.SetExpression(0) ;RESET
 
-				while cfgqst.ModEnabled && cfgqst.PlayerRef.IsSwimming()	
-					if IsArmorTooHeavy()
-						Debug.Notification("<font color='#ff0000'>You cannot swim in your gear and strip it fast!</font>")
-						Debug.trace("NAKED DEFEAT calmquest: (#msg) You cannot swim in your gear and strip it fast!")
-						
-						if cfgqst.NymBeta	
-						cfgqst.StripWeapons()
-						cfgqst.Strip(30, cfgqst.PlayerRef)
-						cfgqst.Strip(31, cfgqst.PlayerRef)
-						cfgqst.Strip(32, cfgqst.PlayerRef)
-						cfgqst.Strip(33, cfgqst.PlayerRef)
-						cfgqst.Strip(37, cfgqst.PlayerRef)
-						cfgqst.Strip(39, cfgqst.PlayerRef)
-						else	;original (damage when swimming)				
-						cfgqst.PlayerRef.DamageAV("Health", Damage)
-						int i = Utility.RandomInt(1,3)
-							if i == 1
-							Debug.Notification("<font color='#ff0000'>You cannot swim in your heavy armor!</font>")
-							Debug.trace("NAKED DEFEAT calmquest: (#msg) You cannot swim in your heavy armor!")
-							elseif i == 2
-							Debug.Notification("<font color='#ff0000'>Get out of the water fast!</font>")
-							Debug.trace("NAKED DEFEAT calmquest: (#msg) Get out of the water fast!")		
-							elseif i == 3
-							Debug.Notification("<font color='#ff0000'>You will drown, get out!</font>")
-							Debug.trace("NAKED DEFEAT calmquest: (#msg) You will drown, get out!")
+				
+					while cfgqst.ModEnabled && DefeatQuest.IsRunning() && (cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning) ;|| (cfgqst.NymBETA && cfgqst.POPSuspendStatus)
+								
+						;WAITING Maintenance (outside SexScene)
+						if !cfgqst.SexScene; (cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning) && 	
+							
+							if CalmQuest.IsRunning()
+							SendModEvent("RestorePose")
+							endif
+							
+						cfgqst.SetExpression(Utility.RandomInt(1,6))	;DEFEAT EXPRESSIONS
+							
+							;looping with fuckbelt sounds & gag sounds
+							if cfgqst.BoolCaptiveFuckBelt || cfgqst.Gagged || cfgqst.SexSceneBukkake
+								;only plays with fuckingbelt
+								if cfgqst.BoolCaptiveFuckBelt
+								cfgqst.PlaySoundFuckBelt()
+								endif
+								SendModEvent("Moan")
+								Utility.Wait(3.0)
+								if cfgqst.BoolCaptiveFuckBelt
+								cfgqst.PlaySoundFuckBelt()
+								endif	
+								;only 75% chance of second moan to increase variety
+								if D100(75)
+								SendModEvent("Moan")
+								endif
+								Utility.Wait(3.0)
+							
+							;looping fallback
+							else	
+							Utility.Wait(5.0)
 							endif
 						endif
-					endif
-					Utility.Wait(1.5)
-				endwhile
-			;----------------------------------------------------------------------------------------------------------------------------		
-			
-			;PUBLIC PUNISHMENT LOOP >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			;Public Punishment is ENABLED and WE are Allowed to be Downed and Fucked
-			
-			elseif cfgqst.Indecency && DefeatQuest.IsRunning() && CheckLocation()
-	
-				Utility.Wait(cfgqst.LoopTime)	
-	
-				;if !Busy()	;we do not check for BUSY here but in PlayerValidForRape
-				if !cfgqst.IsSuspended()
-				
-					StartProcessPublicExposure() 
-				
-					;PUBLIC PUNISHMENT CHECK
-					if PlayerValidForRape() 
-						While cfgqst.ModEnabled && !Game.IsLookingControlsEnabled()	;loop while in dialog. test maybe?
-						Utility.Wait(2.0)
-						;Debug.trace("NAKED DEFEAT: playeralias SCAN waiting for dialogueend(controlsdisabled)")
-							if cfgqst.ShowDebugMessages
-							Debug.notification("NAKED DEFEAT: playeralias SCAN waiting for dialogueend(controlsdisabled)")
-							endif
-						EndWhile
-							
-						;PUBLIC PUNISH START SEQUENCE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	;baustelle
-						if cfgqst.IsGuardsPresent()
-						cfgqst.PlayProximitySound()
-						else 
-						;we need a proximity sound for civilians!
-						endif			
-						
-						IndecencyMessage()	
+								
+						;>>>>>> WAIT <<<<<<<<< HAS SCENARIO SEX LOOP 		
+						while cfgqst.ModEnabled && cfgqst.SexScene		
+						Utility.Wait(3.0)
+						endwhile
+
+					endwhile	
 					
-						;>>>>>>>>>>>>>>>>>> Surrender Pose >>>>>>>>>>>>>>>>>>
-					;	Game.DisablePlayerControls(1, 1, 0, 0, 1, 1, 1, 1, 1)
-					;	Game.SetPlayerAIDriven(true)
-						cfgqst.Immobilize(true)
-						
-						Utility.Wait(1.0)
-						SendModEvent("Moan")	
-						
-						if cfgqst.IsGuardsPresent()
-						cfgqst.DisableGuardsPresent()
-						int i = Utility.RandomInt(1,3)
-							if i == 1
-							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_01)	
-							elseif i == 2
-							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_02)
-							elseif i == 3
-							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_03)
+				cfgqst.SetExpression(0)	
+				endif 
+				
+				
+			
+			;>>>>> NOT IN SCENARIO LOOP >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+			;this Loops starts when we are not In Naked Defeat Scenario
+			else
+				
+				;NAKED DROWNING LOOP >>>>>>>>>>>>>>>	;#drowning >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+				;#GUIDE: we check first if Player is Swimming
+				if cfgqst.NakedDrowning && cfgqst.PlayerRef.IsSwimming()
+					
+					float Health
+					;Health = cfgqst.PlayerRef.GetAV("Health")
+					Health = cfgqst.PlayerRef.GetBaseActorValue("Health")
+					float Damage
+					Damage = Health*0.2
+
+					while cfgqst.ModEnabled && cfgqst.PlayerRef.IsSwimming()	
+						if IsArmorTooHeavy()
+							Debug.Notification("<font color='#ff0000'>You cannot swim in your gear and strip it fast!</font>")
+							Debug.trace("NAKED DEFEAT calmquest: (#msg) You cannot swim in your gear and strip it fast!")
+							
+							if cfgqst.NymBeta	
+							cfgqst.StripWeapons()
+							cfgqst.Strip(30, cfgqst.PlayerRef)
+							cfgqst.Strip(31, cfgqst.PlayerRef)
+							cfgqst.Strip(32, cfgqst.PlayerRef)
+							cfgqst.Strip(33, cfgqst.PlayerRef)
+							cfgqst.Strip(37, cfgqst.PlayerRef)
+							cfgqst.Strip(39, cfgqst.PlayerRef)
+							else	;original (damage when swimming)				
+							cfgqst.PlayerRef.DamageAV("Health", Damage)
+							int i = Utility.RandomInt(1,3)
+								if i == 1
+								Debug.Notification("<font color='#ff0000'>You cannot swim in your heavy armor!</font>")
+								Debug.trace("NAKED DEFEAT calmquest: (#msg) You cannot swim in your heavy armor!")
+								elseif i == 2
+								Debug.Notification("<font color='#ff0000'>Get out of the water fast!</font>")
+								Debug.trace("NAKED DEFEAT calmquest: (#msg) Get out of the water fast!")		
+								elseif i == 3
+								Debug.Notification("<font color='#ff0000'>You will drown, get out!</font>")
+								Debug.trace("NAKED DEFEAT calmquest: (#msg) You will drown, get out!")
+								endif
+							endif
+						endif
+						Utility.Wait(1.5)
+					endwhile
+				;----------------------------------------------------------------------------------------------------------------------------		
+				
+				;PUBLIC PUNISHMENT LOOP >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+				;Public Punishment is ENABLED and WE are Allowed to be Downed and Fucked
+				
+				elseif cfgqst.Indecency && DefeatQuest.IsRunning() && CheckLocation()
+		
+					Utility.Wait(cfgqst.LoopTime)	
+		
+					;if !Busy()	;we do not check for BUSY here but in PlayerValidForRape
+					if !cfgqst.IsSuspended()
+					
+						StartProcessPublicExposure() 
+					
+						;PUBLIC PUNISHMENT CHECK
+						if PlayerValidForRape() 
+							While cfgqst.ModEnabled && !Game.IsLookingControlsEnabled()	;loop while in dialog. test maybe?
+							Utility.Wait(2.0)
+							;Debug.trace("NAKED DEFEAT: playeralias SCAN waiting for dialogueend(controlsdisabled)")
+								if cfgqst.ShowDebugMessages
+								Debug.notification("NAKED DEFEAT: playeralias SCAN waiting for dialogueend(controlsdisabled)")
+								endif
+							EndWhile
+								
+							;PUBLIC PUNISH START SEQUENCE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	;baustelle
+							if cfgqst.IsGuardsPresent()
+							cfgqst.PlayProximitySound()
+							else 
+							;we need a proximity sound for civilians!
 							endif			
 							
-						else
-							int i = Utility.RandomInt(1,3)
-							if i == 1
-							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[0])	
-							elseif i == 2
-							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[1])
-							elseif i == 3
-							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[2])
-							endif	
-						endif
-
-						;----------------------------------------------------	
-							
-						;>>>>>>>>>>>>>>>>>> Follower Poses >>>>>>>>>>>>>>>>>>
-						if cfgqst.FollowerCount > 0
-							Debug.trace("NAKED DEFEAT playeraliasquest: StartFollowerIdleQuest_01()")
-							folidle01.StartFollowerIdleQuest_01("none")		
-							;IndecentWaiting(1.0)
-							if cfgqst.FollowerCount > 0
-							folidle01.StartDoingNothing_01(true)
-							endif
-							if cfgqst.FollowerCount > 1
-							folidle01.StartDoingNothing_02(true)
-							endif
-							if cfgqst.FollowerCount > 2
-							folidle01.StartDoingNothing_03(true)
-							endif
-							if cfgqst.FollowerCount > 3
-							folidle01.StartDoingNothing_04(true)
-							endif
-						endif
-						;----------------------------------------------------
-			
-					cfgqst.PublicExposure = 0
-					cfgqst.CivilRapeRunning = true
-					;cfgqst.DefeatTypeHumans = true
-					cfgqst.DefeatTypeGeneral = "AreHumans"
-					
-					if cfgqst.HealthBoost
-					cfgqst.PlayerRef.ModActorValue("health", 100000.0)
-					endif
-					cfgqst.SendModEvents(true)
-					
-					CalmQuest.Start()		;via PublicPunishement
-					
-					;---------------------------------------------------------------------------------------------
-					endif	;not valid for rape
+							IndecencyMessage()	
 						
-				;PLAYER IS BUSY (EXTRA LOOP TIME) -----------------------------------------------		
-				else 
-				Debug.trace("NAKED DEFEAT playeraliasquest: PlayerMonitor(IndecentWaiting 1)")
+							;>>>>>>>>>>>>>>>>>> Surrender Pose >>>>>>>>>>>>>>>>>>
+						;	Game.DisablePlayerControls(1, 1, 0, 0, 1, 1, 1, 1, 1)
+						;	Game.SetPlayerAIDriven(true)
+							cfgqst.Immobilize(true)
+							
+							Utility.Wait(1.0)
+							SendModEvent("Moan")	
+							
+							if cfgqst.IsGuardsPresent()
+							cfgqst.DisableGuardsPresent()
+							int i = Utility.RandomInt(1,3)
+								if i == 1
+								cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_01)	
+								elseif i == 2
+								cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_02)
+								elseif i == 3
+								cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_03)
+								endif			
+								
+							else
+								int i = Utility.RandomInt(1,3)
+								if i == 1
+								cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[0])	
+								elseif i == 2
+								cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[1])
+								elseif i == 3
+								cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[2])
+								endif	
+							endif
 
-					int WaitTime = 10
-					while WaitTime > 0 && DefeatQuest.IsRunning() && cfgqst.ModEnabled && !cfgqst.DefeatQuestRunning && !cfgqst.CivilRapeRunning ; && (ftimeCurrent < (ftimeStart + WaitTime))
-					Utility.Wait(2.0)
-					WaitTime -= 2
-					endwhile
-				 
-				endif
-			
-			;IDLE LOOP when Location Check fails) -----------------------------------------------------------------------
-			;else	;Location false (in Wilderness OR DHLPsuspend, additional loop)
-			;Debug.trace("NAKED DEFEAT playeraliasquest: PlayerMonitor(IndecentWaiting 2)")
-
-			;	int WaitTime = 10
-			;	while WaitTime > 0 && DefeatQuest.IsRunning() && cfgqst.ModEnabled && !cfgqst.DefeatQuestRunning && !cfgqst.CivilRapeRunning ; && (ftimeCurrent < (ftimeStart + WaitTime))
-			;	Utility.Wait(2.0)
-			;	WaitTime -= 2
-			;	endwhile		
-			;endif
+							;----------------------------------------------------	
+								
+							;>>>>>>>>>>>>>>>>>> Follower Poses >>>>>>>>>>>>>>>>>>
+							if cfgqst.FollowerCount > 0
+								Debug.trace("NAKED DEFEAT playeraliasquest: StartFollowerIdleQuest_01()")
+								folidle01.StartFollowerIdleQuest_01("none")		
+								;IndecentWaiting(1.0)
+								if cfgqst.FollowerCount > 0
+								folidle01.StartDoingNothing_01(true)
+								endif
+								if cfgqst.FollowerCount > 1
+								folidle01.StartDoingNothing_02(true)
+								endif
+								if cfgqst.FollowerCount > 2
+								folidle01.StartDoingNothing_03(true)
+								endif
+								if cfgqst.FollowerCount > 3
+								folidle01.StartDoingNothing_04(true)
+								endif
+							endif
+							;----------------------------------------------------
+				
+						cfgqst.PublicExposure = 0
+						cfgqst.CivilRapeRunning = true
+						;cfgqst.DefeatTypeHumans = true
+						cfgqst.DefeatTypeGeneral = "AreHumans"
+						
+						if cfgqst.HealthBoost
+						cfgqst.PlayerRef.ModActorValue("health", 100000.0)
+						endif
+						cfgqst.SendModEvents(true)
+						
+						CalmQuest.Start()		;via PublicPunishement
+						
+						;---------------------------------------------------------------------------------------------
+						endif	;not valid for rape
+							
+					;PLAYER IS BUSY (EXTRA LOOP TIME) -----------------------------------------------		
+					else 
 					
-			;>>>>>>>>>>> WAIT LOOP <<<<<<<<<<<<<< when, not swimming, no valid location for rape, etc.		
-			else 	
 
-			Utility.Wait(3.0)
-			cfgqst.WaitLoopPlayerMaintenance()
-			endif
-			
-		endif	
-			
-	endwhile	
-endif
+						if Nym()
+						Debug.trace("NAKED DEFEAT playeraliasquest: PlayerMonitor(IndecentWaiting NYM)")
+						Utility.Wait(3.0)
+						else 
+						Debug.trace("NAKED DEFEAT playeraliasquest: PlayerMonitor(IndecentWaiting OLD)")
+							int WaitTime = 10
+							while WaitTime > 0 && DefeatQuest.IsRunning() && cfgqst.ModEnabled && !cfgqst.DefeatQuestRunning && !cfgqst.CivilRapeRunning ; && (ftimeCurrent < (ftimeStart + WaitTime))
+							Utility.Wait(3.0)
+							WaitTime -= 2
+							endwhile	
+						endif 	
+					endif
+				
+				;IDLE LOOP when Location Check fails) -----------------------------------------------------------------------
+				;else	;Location false (in Wilderness OR DHLPsuspend, additional loop)
+				;Debug.trace("NAKED DEFEAT playeraliasquest: PlayerMonitor(IndecentWaiting 2)")
 
-Debug.notification("NAKED DEFEAT: Player Monitor disabled")
-cfgqst.PlayerMonitorOn = false
+				;	int WaitTime = 10
+				;	while WaitTime > 0 && DefeatQuest.IsRunning() && cfgqst.ModEnabled && !cfgqst.DefeatQuestRunning && !cfgqst.CivilRapeRunning ; && (ftimeCurrent < (ftimeStart + WaitTime))
+				;	Utility.Wait(2.0)
+				;	WaitTime -= 2
+				;	endwhile		
+				;endif
+						
+				;>>>>>>>>>>> WAIT LOOP <<<<<<<<<<<<<< when, not swimming, no valid location for rape, etc.		
+				else 	
 
+				Utility.Wait(3.0)
+				cfgqst.WaitLoopPlayerMaintenance()
+				endif
+				
+			endif	
+				
+		endwhile	
+	endif
+
+	Debug.notification("NAKED DEFEAT: Player Monitor disabled")
+	cfgqst.PlayerMonitorOn = false
+endif 
 EndFunction
 
 ;----------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3726,10 +3931,6 @@ Bool IsInCity = false
 Function StartProcessPublicExposure()			;#validation
 Debug.trace("NAKED DEFEAT playeraliasquest: StartProcessPublicExposure()")
 
-
-
-
-
 ;This function determines Public Exposure and how it changes based on circumstances
 
 	;if cfgqst.NymBETA
@@ -3739,7 +3940,7 @@ Debug.trace("NAKED DEFEAT playeraliasquest: StartProcessPublicExposure()")
 	;	endif
 	;endif	
 	
-	cfgqst.WaitLoopPlayerMaintenance()	
+	;cfgqst.WaitLoopPlayerMaintenance()	
 	;PlayerSpeedMaintenance()
 	
 	if !LocTypeTemple						
@@ -3764,7 +3965,7 @@ Debug.trace("NAKED DEFEAT playeraliasquest: StartProcessPublicExposure()")
 	;we need to make a proximity scan (combat scan) and check for player Location vs. Which NPC are hostile and IF they have the current TownLocFaction... sigh
 	;in this case we auto surrender. 	
 
-		if cfgqst.IsNymrasGame()
+		if Nym()
 			
 			;we set the Proximity Scan to "CityFightScan" 
 			cfgqst.ProximityScanType = "CityFightScan"
@@ -3774,7 +3975,7 @@ Debug.trace("NAKED DEFEAT playeraliasquest: StartProcessPublicExposure()")
 			ProximityQuest.Start()		;proximityquest start for scan
 			else
 				while cfgqst.ModEnabled && (ProximityQuest.GetStage() > 0) && (ProximityQuest.GetStage() < 1000)
-				Utility.Wait(2.0)
+				Utility.Wait(1.0)
 				endwhile
 			ProximityQuest.Start()
 			endif
@@ -3792,6 +3993,7 @@ Debug.trace("NAKED DEFEAT playeraliasquest: StartProcessPublicExposure()")
 		CurrentLocationTempName = "Home"
 		ScreenMessage("Entering save "+CurrentLocationTempName)
 		endif 
+		NymTrace("#NOTE we are in a Home")
 		cfgqst.PublicExposure = 0
 		
 	
@@ -3802,14 +4004,17 @@ Debug.trace("NAKED DEFEAT playeraliasquest: StartProcessPublicExposure()")
 		CurrentLocationTempName = "Temple"
 		ScreenMessage("Entering save "+CurrentLocationTempName)
 		endif 
+		NymTrace("#NOTE we are in a Temple")
 		cfgqst.PublicExposure = 0
 		
 	;elseif CurrentLocationHasKeyword(cfgqst.PlayerRef, LocTypeTemple) 	;WIP
 	;cfgqst.PublicExposure = 0
 	else
 		if CurrentLocationTempName == "Home"
+		
 		ScreenMessage("Left save "+CurrentLocationTempName)
 		elseif CurrentLocationTempName == "Temple"
+		
 		ScreenMessage("Left save "+CurrentLocationTempName)
 		endif 
 		CurrentLocationTempName = "empty"
@@ -3825,6 +4030,16 @@ String CurrentLocationTempName = "empty"
 ;Bool MinorCrime = false
 	
 bool IsPlayerUneasy = false
+
+Bool Function IsPlayerUneasy()
+
+if IsPlayerUneasy
+return true
+else 
+return FALSE
+endif 
+
+EndFunction
 
 ;>>>>>>>>>>>>>>>PUBLIC PUNISHMENT ----- VALIDATION final Poll <<<<<<<<<<<<<<<<<<<<<<<<<	
 	
@@ -3941,7 +4156,7 @@ if Thane: reduced chance to get bounty
 
 Bool Bounty = false
 		
-if Bounty && cfgqst.IsNymrasGame()
+if Bounty && Nym()
 		int LevelPlayer = cfgqst.PlayerRef.GetLevel()
 		Debug.trace("NAKED DEFEAT playeraliasquest: ApplyRandomBounty() - Player Level: "+LevelPlayer)
 
@@ -4013,7 +4228,7 @@ AuctionRoom = (Game.GetFormFromFile(0x030619F8, "SimpleSlavery.esp") As Location
 	if cfgqst.PlayerRef.IsInLocation(AuctionRoom)	
 	EnteringForAuction = true 	
 	
-		if cfgqst.IsNymrasGame()
+		if Nym()
 		NymTrace("#SS In Auction Room")	
 		
 			if !SSQuest
@@ -4055,6 +4270,39 @@ EndFunction
 
 
 Bool IsInValidLocation
+
+Bool Function IsInDungeon()
+
+Bool InInterior = false
+
+if cfgqst.PlayerRef.IsInInterior()
+InInterior = true 
+endif 
+
+if CurrentLocationHasKeyword(cfgqst.PlayerRef, LocTypeClearable) && InInterior
+NymTrace("IsInDungeon(TRUE - LocTypeClearable)")
+
+	;if !InInterior
+	;Debug.Messagebox("#ERROR We Are In NOT in Interior A")
+	;NymTrace("IsInDungeon(TRUE - LocTypeClearable INTERIOR ERROR A)")
+	;endif 
+
+return true
+elseif CurrentLocationHasKeyword(cfgqst.PlayerRef, LocTypeDungeon) && InInterior
+NymTrace("IsInDungeon(TRUE - LocTypeDungeon)")
+
+	;if !InInterior
+	;Debug.Messagebox("#ERROR We Are NOT in  Interior B")
+	;NymTrace("IsInDungeon(TRUE - LocTypeClearable INTERIOR ERROR B)")
+	;endif 
+
+return true
+else 
+return false 
+endif 
+
+EndFunction 
+
 
 Bool Function CheckLocation()			;#location
 
@@ -4327,53 +4575,178 @@ Bool GetDefeatTypeRunning = false
 ;Bool StartGetDefeatType = false
 Bool StartCombatStrip = false
 
-Event OnUpdate()		;#update	;#type	;MOVE MONITOR to DEFEATQUEST??? 
+int iUpdateTimer = 0
 
-;started from OnHit
-;------> for surrender key add a "crosshair" condition (and then check racekey of crosshair target)
-;/
-if RunPlayerMonitor && ModEnabled 
-NymTrace("OnUpdate(RunPlayerMonitor)")
-RunPlayerMonitor = false 
+Event OnUpdate()		;#update	;#type	
+	
+	
 
-	;GENERAL CHECKS (always)
-	if cfgqst.DeviousPiercingEffects && nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Nipples") && D100(5)
+	if StartCombatStrip ;;;---> change to ModEvent 
+	Debug.Trace("NAKED DEFEAT playeraliasquest: OnUpdate (StartCombatStrip)")
 		
-	endif 
+		StartCombatStrip = false
+		CombatStrip()
 
-	;COMBAT CHECKS 
-	if cfgqst.PlayerRef.IsInCombat() 
-		
-		;DD AUTO SURRENDER 
-		if Nym() && nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage") && D100(5)
-		cfgqst.KeySurrender("CombatSurrender")		
+	; NO LONGER IN USE DELETE 
+	;elseif StartGetDefeatType 
+	;Debug.Trace("NAKED DEFEAT playeraliasquest: OnUpdate (GetDefeatType)")
+	;StartGetDefeatType = false
+
+	;elseif cfgqst.IsCooldownRunning()
+	;Debug.Trace("NAKED DEFEAT playeraliasquest: OnUpdate (CooldownRunning)")
+	;Utility.Wait(30)
+	;cfgqst.DisableCooldownRunning()
+	;else 
+	;Debug.Trace("NAKED DEFEAT playeraliasquest: ERROR (Empty OnUpdateCall)")
+	endif
+
+
+ 	iUpdateTimer += 1
+
+	NymTrace("OnUpdate(iUpdateTimer: "+iUpdateTimer+") cfgqst.LoopTime:"+cfgqst.LoopTime)
+
+	if iUpdateTimer > cfgqst.LoopTime
+		if Nym()
+		Debug.MessageBox("#ERROR UPDATETIMER > LOOPTIME") 
 		endif 
+	iUpdateTimer = cfgqst.LoopTime as int
 	endif 
 	
+	if iUpdateTimer == cfgqst.LoopTime		;X seconds passed - (X = MCM Setting)
 	
-RegisterForSingleUpdate(4.0)
-/;
-
-if StartCombatStrip ;;;---> change to ModEvent 
-Debug.Trace("NAKED DEFEAT playeraliasquest: OnUpdate (StartCombatStrip)")
+		if Nym()
+		NymTrace("playeralias - OnUpdate() iUpdateTimer: "+iUpdateTimer)
+		endif 
+		
+	iUpdateTimer = 0
 	
-	StartCombatStrip = false
-	CombatStrip()
+	;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> BAUSTELLE start
+	
+	cfgqst.PlayerMonitorOn = true
+		
+			;>>>>> DURING RAPE: Maintenance LOOP --- now in DefeatQuest >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+			if cfgqst.IsDefeatRunning()
+			;DO NOTHING AT THE MOMENT
+				
+				
+			;PUBLIC PUNISHMENT LOOP >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+			elseif cfgqst.Indecency && CheckLocation() && !cfgqst.PartyInCombat()
+	
+				;if !Busy()	;we do not check for BUSY here but in PlayerValidForRape
+				if !cfgqst.IsSuspended()
+				
+					StartProcessPublicExposure() 
+				
+					;PUBLIC PUNISHMENT CHECK
+					if PlayerValidForRape() 
 
-; NO LONGER IN USE DELETE 
-;elseif StartGetDefeatType 
-;Debug.Trace("NAKED DEFEAT playeraliasquest: OnUpdate (GetDefeatType)")
-;StartGetDefeatType = false
+						;PUBLIC PUNISH START SEQUENCE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	;baustelle
+						if cfgqst.IsGuardsPresent()
+						cfgqst.PlayProximitySound()
+						else 
+						;we need a proximity sound for civilians!
+						endif			
 
-;elseif cfgqst.IsCooldownRunning()
-;Debug.Trace("NAKED DEFEAT playeraliasquest: OnUpdate (CooldownRunning)")
-;Utility.Wait(30)
-;cfgqst.DisableCooldownRunning()
-else 
-Debug.Trace("NAKED DEFEAT playeraliasquest: ERROR (Empty OnUpdateCall)")
-endif
+						IndecencyMessage()	
+						
+						
+						Bool MessageOnce = true
+						
+						While cfgqst.ModEnabled && UI.IsMenuOpen("Dialogue Menu") ; !Game.IsLookingControlsEnabled()	;loop while in dialog. test maybe?
+						NymTrace("PLAYER IS IN DIALOGUE")
+						
+						if MessageOnce && Nym()
+						Debug.Messagebox("PlayerisInDialoge")
+						MessageOnce = false 
+						endif 
+						
+						Utility.Wait(2.0)
+						;Debug.trace("NAKED DEFEAT: playeralias SCAN waiting for dialogueend(controlsdisabled)")
+						;	if cfgqst.ShowDebugMessages
+						;	Debug.notification("NAKED DEFEAT: playeralias SCAN waiting for dialogueend(controlsdisabled)")
+						;	endif
+						EndWhile
+					
+						;>>>>>>>>>>>>>>>>>> Surrender Pose >>>>>>>>>>>>>>>>>>
+	
+						cfgqst.Immobilize(true)
+						
+						Utility.Wait(1.0)
+						SendModEvent("Moan")	
+						
+						if cfgqst.IsGuardsPresent()
+						cfgqst.DisableGuardsPresent()
+						int i = Utility.RandomInt(1,3)
+							if i == 1
+							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_01)	
+							elseif i == 2
+							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_02)
+							elseif i == 3
+							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesHumanSurrender_03)
+							endif			
+							
+						else
+							int i = Utility.RandomInt(1,3)
+							if i == 1
+							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[0])	
+							elseif i == 2
+							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[1])
+							elseif i == 3
+							cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesAnimalDefeat[2])
+							endif	
+						endif
+
+						;----------------------------------------------------	
+							
+						;>>>>>>>>>>>>>>>>>> Follower Poses >>>>>>>>>>>>>>>>>>
+						if cfgqst.FollowerCount > 0
+							Debug.trace("NAKED DEFEAT playeraliasquest: StartFollowerIdleQuest_01()")
+							folidle01.StartFollowerIdleQuest_01("none")		
+							;IndecentWaiting(1.0)
+							if cfgqst.FollowerCount > 0
+							folidle01.StartDoingNothing_01(true)
+							endif
+							if cfgqst.FollowerCount > 1
+							folidle01.StartDoingNothing_02(true)
+							endif
+							if cfgqst.FollowerCount > 2
+							folidle01.StartDoingNothing_03(true)
+							endif
+							if cfgqst.FollowerCount > 3
+							folidle01.StartDoingNothing_04(true)
+							endif
+						endif
+						;----------------------------------------------------
+			
+					cfgqst.PublicExposure = 0
+					cfgqst.CivilRapeRunning = true
+					;cfgqst.DefeatTypeHumans = true
+					cfgqst.DefeatTypeGeneral = "AreHumans"
+					
+					if cfgqst.HealthBoost
+					cfgqst.PlayerRef.ModActorValue("health", 100000.0)
+					endif
+					cfgqst.SendModEvents(true)
+					
+					CalmQuest.Start()		;via PublicPunishement
+					
+					;---------------------------------------------------------------------------------------------
+					endif	;not valid for rape
+				endif 		
+			endif 
+
+			
+
+	;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< BAUSTELLE END 
+	
+	endif 
+	
+	PlayerPunishmentMonitor_Loop()
 
 EndEvent
+
+
+
 
 ;MOVED TO CONFIGQUEST
 ;/
@@ -5163,14 +5536,14 @@ Function DebugMessage(String Text2)		;#DebugMessage
 EndFunction
 
 Function NymMessage(String Text2)		;#DebugMessage
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT playeraliasquest: (#msg NYM) "+Text2)
 	endif
 EndFunction
 
 Function NymTrace(String Text2)		;#NymTrace
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT playeraliasquest: (#trace NYM) "+Text2)
 	endif
@@ -5178,7 +5551,7 @@ EndFunction
 
 Bool Function Nym()
 
-	if cfgqst.IsNymrasGame()
+	if cfgqst.Nym()
 	return TRUE
 	else
 	return false
