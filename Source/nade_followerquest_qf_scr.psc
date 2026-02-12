@@ -107,259 +107,260 @@ EndEvent
 
 Function FollowerStripUpdate()
 
-	if Nym() || cfgqst.IsDefeatRunning()
-	
-	NymTrace("FollowerStripUpdate()")
+	if NakedFollowerCount > 0
 
-	int i = NakedFollowerCount
+		if Nym() || cfgqst.IsDefeatRunning()
+		
 
+		int i = NakedFollowerCount
 
-		if !cfgqst.IsDefeatRunning()
-		RemoveBindsFromFollowers()
-		else 
-		RestoreBindsOnFollowers()
-		endif 
-		
-		
-		
-	NymTrace("FollowerStripUpdate(We Are Here)")
-	;	while i > 0	;LOOPING DOES NOT WORK HERE ---> we need to make a tech that looks with numbers isgh)
-			;i -= 1 
-			
-			if NakedFollower[0] 
-		
-			NymTrace("Follower 0 found: "+Name_Follower01)
-			;NymTrace("NakedFollower[0] FOUND") 
-			
-				if Follower01_Body32 == 1
-				
-					if cfgqst.IsDefeatRunning()
-					Follower01_Body32 = 0
-					else 
-					NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Body32 == 1")
-					FollowerRedressSlot(NakedFollower[0], 32)
-					endif 
-				endif
-				if Follower01_Hands33 == 1 
-				NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Hands33 == 1")
-				FollowerRedressSlot(NakedFollower[0], 33)
-				endif
-				if Follower01_Feet37 == 1
-				NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Feet37 == 1")
-				FollowerRedressSlot(NakedFollower[0], 37)
-				endif
-				
-				if Follower01_Body32 == 0
-				NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Body32 == 0")
-				cfgqst.Strip(32, NakedFollower[0] ) 
-				endif
-				if Follower01_Hands33 == 0 
-				NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Hands33 == 0")
-				cfgqst.Strip(33, NakedFollower[0] ) 
-				endif
-				if Follower01_Feet37 == 0
-				NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Feet37 == 0")
-				cfgqst.Strip(37, NakedFollower[0] ) 
-				endif
-			
-				if cfgqst.IsDefeatRunning()
-				FollowersStripWeapons()
-				calmqst.AddDefeatBindsToActor(NakedFollower[0], "Restore")
-				endif 	
+		NymTrace("FollowerStripUpdate(Followercount:"+NakedFollowerCount+")")
+			if !cfgqst.IsDefeatRunning()
+			RemoveBindsFromFollowers()
+			else 
+			RestoreBindsOnFollowers()
 			endif 
-
-			if NakedFollower[1] 
-		
-			NymTrace("Follower 1 found: "+Name_Follower02)
-			;NymTrace("NakedFollower[0] FOUND") 
-			
-				if Follower02_Body32 == 1
-					if cfgqst.IsDefeatRunning()
-					Follower02_Body32 = 0
-					else 	
-					NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Body32 == 1")
-					FollowerRedressSlot(NakedFollower[1], 32)
-					endif 
-				endif
-				if Follower02_Hands33 == 1 
-				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Hands33 == 1")
-				FollowerRedressSlot(NakedFollower[1], 33)
-				endif
-				if Follower02_Feet37 == 1
-				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Feet37 == 1")
-				FollowerRedressSlot(NakedFollower[1], 37)
-				endif
-				
-				if Follower02_Body32 == 0
-				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Body32 == 0")
-				cfgqst.Strip(32, NakedFollower[1] ) 
-				endif
-				if Follower02_Hands33 == 0 
-				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Hands33 == 0")
-				cfgqst.Strip(33, NakedFollower[1] ) 
-				endif
-				if Follower02_Feet37 == 0
-				NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Feet37 == 0")
-				cfgqst.Strip(37, NakedFollower[1] ) 
-				endif
-				
-				
-				if cfgqst.IsDefeatRunning()		
-				calmqst.AddDefeatBindsToActor(NakedFollower[1], "Restore")
-				endif 	
-			
-			endif 	
 			
 			
-			FollowersStripWeapons()
 			
-			;#TODO NEED PROPERTIES 
-			;----------------------------------------------
-			;/
-			if NakedFollower[2] 
-		
-			NymTrace("Follower 2 found: "+Name_Follower03)
-			;NymTrace("NakedFollower[0] FOUND") 
+		;NymTrace("FollowerStripUpdate(We Are Here)")
+		;	while i > 0	;LOOPING DOES NOT WORK HERE ---> we need to make a tech that looks with numbers isgh)
+				;i -= 1 
+				
+				if NakedFollower[0] 
 			
-				if Follower03_Body32 == 1
-				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Body32 == 1")
-				FollowerRedressSlot(NakedFollower[2], 32)
-				endif
-				if Follower03_Hands33 == 1 
-				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Hands33 == 1")
-				FollowerRedressSlot(NakedFollower[2], 33)
-				endif
-				if Follower03_Feet37 == 1
-				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Feet37 == 1")
-				FollowerRedressSlot(NakedFollower[2], 37)
-				endif
+				NymTrace("Follower 0 found: "+Name_Follower01)
+				;NymTrace("NakedFollower[0] FOUND") 
 				
-				if Follower03_Body32 == 0
-				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Body32 == 0")
-				cfgqst.Strip(32, NakedFollower[2] ) 
-				endif
-				if Follower03_Hands33 == 0 
-				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Hands33 == 0")
-				cfgqst.Strip(33, NakedFollower[2] ) 
-				endif
-				if Follower03_Feet37 == 0
-				NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Feet37 == 0")
-				cfgqst.Strip(37, NakedFollower[2] ) 
-				endif
-				
-			endif 		
-
-			if NakedFollower[3] 
-		
-			NymTrace("Follower 3 found: "+Name_Follower04)
-			;NymTrace("NakedFollower[0] FOUND") 
-			
-				if Follower04_Body32 == 1
-				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Body32 == 1")
-				FollowerRedressSlot(NakedFollower[3], 32)
-				endif
-				if Follower04_Hands33 == 1 
-				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Hands33 == 1")
-				FollowerRedressSlot(NakedFollower[3], 33)
-				endif
-				if Follower04_Feet37 == 1
-				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Feet37 == 1")
-				FollowerRedressSlot(NakedFollower[3], 37)
-				endif
-				
-				if Follower04_Body32 == 0
-				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Body32 == 0")
-				cfgqst.Strip(32, NakedFollower[3] ) 
-				endif
-				if Follower04_Hands33 == 0 
-				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Hands33 == 0")
-				cfgqst.Strip(33, NakedFollower[3] ) 
-				endif
-				if Follower04_Feet37 == 0
-				NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Feet37 == 0")
-				cfgqst.Strip(37, NakedFollower[3] ) 
-				endif
-				
-			endif 				
-	
-	
-	/;
-	
-	;----------------------------------------------
-				;/
-				if Follower01_Helmet31 == 0
-				cfgqst.Strip(31, NakedFollower[0] ) 
-				endif
-				Follower01_Body32
-				if Follower01_Body32 == 0
-				NymTrace("FollowerStripUpdate(Follower01_Body32 == 0)")
-				cfgqst.Strip(32, NakedFollower[0] ) 
-				else 
-				FollowerRedressSlot(NakedFollower[0], 32)
-				endif
-
-				if Follower01_Hands33 == 0 
-				cfgqst.Strip(33, NakedFollower[0] ) 
-				else 
-				FollowerRedressSlot(NakedFollower[0], 33)
-				endif
-	
-				if Follower01_Feet37 == 0
-				cfgqst.Strip(37, NakedFollower[0] ) 
-				else 
-				FollowerRedressSlot(NakedFollower[0], 37)
-				endif
-									
-				if Follower01_Circlet42 == 0	
-				cfgqst.Strip(42, NakedFollower[0] ) 
-				endif
-				if Follower01_BikiniBottom52 == 0
-				cfgqst.Strip(52, NakedFollower[0] ) 
-				endif
-				if Follower01_BikiniThigh53 == 0
-				cfgqst.Strip(53, NakedFollower[0] ) 
-				endif 
+					if Follower01_Body32 == 1
 					
-		
-			
-			if NakedFollower[1] 
-			
-			NymTrace("Follower 1 found: "+Name_Follower02)
-				if Follower02_Helmet31 == 0
-				cfgqst.Strip(31, NakedFollower[1])  
-				endif
+						if cfgqst.IsDefeatRunning()
+						Follower01_Body32 = 0
+						else 
+						NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Body32 == 1")
+						FollowerRedressSlot(NakedFollower[0], 32)
+						endif 
+					endif
+					if Follower01_Hands33 == 1 
+					NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Hands33 == 1")
+					FollowerRedressSlot(NakedFollower[0], 33)
+					endif
+					if Follower01_Feet37 == 1
+					NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Feet37 == 1")
+					FollowerRedressSlot(NakedFollower[0], 37)
+					endif
+					
+					if Follower01_Body32 == 0
+					NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Body32 == 0")
+					cfgqst.Strip(32, NakedFollower[0] ) 
+					endif
+					if Follower01_Hands33 == 0 
+					NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Hands33 == 0")
+					cfgqst.Strip(33, NakedFollower[0] ) 
+					endif
+					if Follower01_Feet37 == 0
+					NymTrace("FollowerStripUpdate("+Name_Follower01+"Follower01_Feet37 == 0")
+					cfgqst.Strip(37, NakedFollower[0] ) 
+					endif
 				
-				if Follower02_Body32 == 0
-				cfgqst.Strip(32, NakedFollower[1] ) 
-				else 
-				FollowerRedressSlot(NakedFollower[1], 32)
-				endif
+					if cfgqst.IsDefeatRunning()
+					FollowersStripWeapons()
+					calmqst.AddDefeatBindsToActor(NakedFollower[0], "Restore")
+					endif 	
+				endif 
 
-				if Follower02_Hands33 == 0 
-				cfgqst.Strip(33, NakedFollower[1] ) 
-				else 
-				FollowerRedressSlot(NakedFollower[1], 33)
-				endif
-	
-				if Follower02_Feet37 == 0
-				cfgqst.Strip(37, NakedFollower[1] ) 
-				else 
-				FollowerRedressSlot(NakedFollower[1], 37)
-				endif
-
-				if Follower02_Circlet42 == 0
-				cfgqst.Strip(42, NakedFollower[1])  
-				endif
-				if Follower02_BikiniBottom52 == 0
-				cfgqst.Strip(52, NakedFollower[1])  
-				endif
-				if Follower02_BikiniThigh53 == 0
-				cfgqst.Strip(53, NakedFollower[1])  
-				endif	
-			endif 
+				if NakedFollower[1] 
 			
+				NymTrace("Follower 1 found: "+Name_Follower02)
+				;NymTrace("NakedFollower[0] FOUND") 
+				
+					if Follower02_Body32 == 1
+						if cfgqst.IsDefeatRunning()
+						Follower02_Body32 = 0
+						else 	
+						NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Body32 == 1")
+						FollowerRedressSlot(NakedFollower[1], 32)
+						endif 
+					endif
+					if Follower02_Hands33 == 1 
+					NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Hands33 == 1")
+					FollowerRedressSlot(NakedFollower[1], 33)
+					endif
+					if Follower02_Feet37 == 1
+					NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Feet37 == 1")
+					FollowerRedressSlot(NakedFollower[1], 37)
+					endif
+					
+					if Follower02_Body32 == 0
+					NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Body32 == 0")
+					cfgqst.Strip(32, NakedFollower[1] ) 
+					endif
+					if Follower02_Hands33 == 0 
+					NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Hands33 == 0")
+					cfgqst.Strip(33, NakedFollower[1] ) 
+					endif
+					if Follower02_Feet37 == 0
+					NymTrace("FollowerStripUpdate("+Name_Follower02+"Follower02_Feet37 == 0")
+					cfgqst.Strip(37, NakedFollower[1] ) 
+					endif
+					
+					
+					if cfgqst.IsDefeatRunning()		
+					calmqst.AddDefeatBindsToActor(NakedFollower[1], "Restore")
+					endif 	
+				
+				endif 	
+		
+				FollowersStripWeapons()
+				
+				;#TODO NEED PROPERTIES 
+				;----------------------------------------------
+				;/
+				if NakedFollower[2] 
+			
+				NymTrace("Follower 2 found: "+Name_Follower03)
+				;NymTrace("NakedFollower[0] FOUND") 
+				
+					if Follower03_Body32 == 1
+					NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Body32 == 1")
+					FollowerRedressSlot(NakedFollower[2], 32)
+					endif
+					if Follower03_Hands33 == 1 
+					NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Hands33 == 1")
+					FollowerRedressSlot(NakedFollower[2], 33)
+					endif
+					if Follower03_Feet37 == 1
+					NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Feet37 == 1")
+					FollowerRedressSlot(NakedFollower[2], 37)
+					endif
+					
+					if Follower03_Body32 == 0
+					NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Body32 == 0")
+					cfgqst.Strip(32, NakedFollower[2] ) 
+					endif
+					if Follower03_Hands33 == 0 
+					NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Hands33 == 0")
+					cfgqst.Strip(33, NakedFollower[2] ) 
+					endif
+					if Follower03_Feet37 == 0
+					NymTrace("FollowerStripUpdate("+Name_Follower03+"Follower03_Feet37 == 0")
+					cfgqst.Strip(37, NakedFollower[2] ) 
+					endif
+					
+				endif 		
+
+				if NakedFollower[3] 
+			
+				NymTrace("Follower 3 found: "+Name_Follower04)
+				;NymTrace("NakedFollower[0] FOUND") 
+				
+					if Follower04_Body32 == 1
+					NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Body32 == 1")
+					FollowerRedressSlot(NakedFollower[3], 32)
+					endif
+					if Follower04_Hands33 == 1 
+					NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Hands33 == 1")
+					FollowerRedressSlot(NakedFollower[3], 33)
+					endif
+					if Follower04_Feet37 == 1
+					NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Feet37 == 1")
+					FollowerRedressSlot(NakedFollower[3], 37)
+					endif
+					
+					if Follower04_Body32 == 0
+					NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Body32 == 0")
+					cfgqst.Strip(32, NakedFollower[3] ) 
+					endif
+					if Follower04_Hands33 == 0 
+					NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Hands33 == 0")
+					cfgqst.Strip(33, NakedFollower[3] ) 
+					endif
+					if Follower04_Feet37 == 0
+					NymTrace("FollowerStripUpdate("+Name_Follower04+"Follower04_Feet37 == 0")
+					cfgqst.Strip(37, NakedFollower[3] ) 
+					endif
+					
+				endif 				
+		
+		
 		/;
 		
+		;----------------------------------------------
+					;/
+					if Follower01_Helmet31 == 0
+					cfgqst.Strip(31, NakedFollower[0] ) 
+					endif
+					Follower01_Body32
+					if Follower01_Body32 == 0
+					NymTrace("FollowerStripUpdate(Follower01_Body32 == 0)")
+					cfgqst.Strip(32, NakedFollower[0] ) 
+					else 
+					FollowerRedressSlot(NakedFollower[0], 32)
+					endif
+
+					if Follower01_Hands33 == 0 
+					cfgqst.Strip(33, NakedFollower[0] ) 
+					else 
+					FollowerRedressSlot(NakedFollower[0], 33)
+					endif
+		
+					if Follower01_Feet37 == 0
+					cfgqst.Strip(37, NakedFollower[0] ) 
+					else 
+					FollowerRedressSlot(NakedFollower[0], 37)
+					endif
+										
+					if Follower01_Circlet42 == 0	
+					cfgqst.Strip(42, NakedFollower[0] ) 
+					endif
+					if Follower01_BikiniBottom52 == 0
+					cfgqst.Strip(52, NakedFollower[0] ) 
+					endif
+					if Follower01_BikiniThigh53 == 0
+					cfgqst.Strip(53, NakedFollower[0] ) 
+					endif 
+						
+			
+				
+				if NakedFollower[1] 
+				
+				NymTrace("Follower 1 found: "+Name_Follower02)
+					if Follower02_Helmet31 == 0
+					cfgqst.Strip(31, NakedFollower[1])  
+					endif
+					
+					if Follower02_Body32 == 0
+					cfgqst.Strip(32, NakedFollower[1] ) 
+					else 
+					FollowerRedressSlot(NakedFollower[1], 32)
+					endif
+
+					if Follower02_Hands33 == 0 
+					cfgqst.Strip(33, NakedFollower[1] ) 
+					else 
+					FollowerRedressSlot(NakedFollower[1], 33)
+					endif
+		
+					if Follower02_Feet37 == 0
+					cfgqst.Strip(37, NakedFollower[1] ) 
+					else 
+					FollowerRedressSlot(NakedFollower[1], 37)
+					endif
+
+					if Follower02_Circlet42 == 0
+					cfgqst.Strip(42, NakedFollower[1])  
+					endif
+					if Follower02_BikiniBottom52 == 0
+					cfgqst.Strip(52, NakedFollower[1])  
+					endif
+					if Follower02_BikiniThigh53 == 0
+					cfgqst.Strip(53, NakedFollower[1])  
+					endif	
+				endif 
+				
+			/;
+			
+			endif 
 		endif 
 		
 EndFunction 
@@ -378,6 +379,7 @@ Function RemoveBindsFromFollowers()
 	Form TempForm
 	int i = NakedFollowerCount
 	int j = 0
+	bool PlayerWearingDDs = false
 
 	Formlist RemoveBindsFromFollowersFormlist = cfgqst.TempFormlistArray[1] 
 	
@@ -385,37 +387,48 @@ Function RemoveBindsFromFollowers()
 	;Debug.Messagebox("FUCK This is happening")
 	endif 
 
+	if nade_DDInt.IsWearingDDs(cfgqst.PlayerRef, "Lockable")
+	PlayerWearingDDs = true
+	endif 
 
 		while (i > 0) ;loop for followers
 		i -= 1
-
-		RemoveBindsFromFollowersFormlist.Revert()	
-		NakedFollower[i].GetAllForms(RemoveBindsFromFollowersFormlist)	
-		j = RemoveBindsFromFollowersFormlist.GetSize()	
-	;	NymTrace("Formlist Length: "+FormlistEFFInventory.GetSize())	
-
-				while j > 0	;loop for items
-					
-					j -= 1
-					
-					TempForm = RemoveBindsFromFollowersFormlist.GetAT(j)
+		
+			if IsWithUs_Follower(i) 
+				if !PlayerWearingDDs && (nade_DDInt.IsWearingDDs(NakedFollower[i], "Lockable") || (nade_DDInt.IsWearingDDs(NakedFollower[i], "Heavy Bondage")))
+				NymTrace("REMOVING DEVICES NakedFollower["+i+"]")
+				nade_DDInt.RemoveDevicesFromActor(NakedFollower[i], true)
+				else 
+				NymTrace("NO DEVICES NakedFollower["+i+"]")
 				
-					if TempForm && TempForm.HasKeyword(cfgqst.KWD_nade_Bondage)				
-					iItemCount = NakedFollower[i].GetItemCount(TempForm)
-					NakedFollower[i].RemoveItem(TempForm, iItemCount, true, None)	;metal	
-					endif 
-					;if player is wearing no DDs but the Followers do, remove them. 
-					if !nade_DDInt.IsWearingDDs(cfgqst.PlayerRef, "Lockable") && (nade_DDInt.IsWearingDDs(NakedFollower[i], "Lockable") || (nade_DDInt.IsWearingDDs(NakedFollower[i], "Heavy Bondage")))
-					NymTrace("REMOVING DEVICES")
-					nade_DDInt.RemoveDevicesFromActor(NakedFollower[i], true)
+				endif 		
+		
+				
+				if !PlayerWearingDDs
+				RemoveBindsFromFollowersFormlist.Revert()	
+				NakedFollower[i].GetAllForms(RemoveBindsFromFollowersFormlist)	
+				j = RemoveBindsFromFollowersFormlist.GetSize()	
+			;	NymTrace("Formlist Length: "+FormlistEFFInventory.GetSize())	
+
+					while j > 0	;loop for items
 						
-					else 
-				;	NymTrace("NO DEVICES FOUND")
+						j -= 1
+						
+						TempForm = RemoveBindsFromFollowersFormlist.GetAT(j)
+						
+						if Nym() && TempForm.HasKeyword(cfgqst.KWD_Zaz_InventoryDevice)
+						NymTrace("TempForm.HasKeyword(cfgqst.KWD_Zaz_InventoryDevice)")
+						endif 
 					
-					endif 
-					
-	
-				endwhile
+						if TempForm && (TempForm.HasKeyword(cfgqst.KWD_nade_Bondage) || TempForm.HasKeyword(cfgqst.KWD_Zaz_InventoryDevice)) 					
+						iItemCount = NakedFollower[i].GetItemCount(TempForm)
+						NakedFollower[i].RemoveItem(TempForm, iItemCount, true, None)	;metal	
+						endif 
+						;if player is wearing no DDs but the Followers do, remove them. 
+
+					endwhile
+				endif 
+			endif 
 		
 		endwhile
 		
@@ -476,7 +489,7 @@ Function FollowerRedressSlot(actor akActor, int iSlot)
 					
 					TempForm = FollowerRedressFormlist.GetAT(i)
 				
-					if cfgqst.IsItem("Armor Cuirass", TempForm) || cfgqst.IsItem("Clothes Body", TempForm)
+					if TempForm && (cfgqst.IsItem("Armor Cuirass", TempForm) || cfgqst.IsItem("Clothes Body", TempForm))
 					a.EquipItemEx(TempForm, 0, false, false)	
 					endif 
 								
@@ -494,7 +507,7 @@ Function FollowerRedressSlot(actor akActor, int iSlot)
 					
 					TempForm = FollowerRedressFormlist.GetAT(i)
 				
-					if cfgqst.IsItem("Armor Gauntlets", TempForm) || cfgqst.IsItem("Clothes Hands", TempForm)
+					if TempForm && (cfgqst.IsItem("Armor Gauntlets", TempForm) || cfgqst.IsItem("Clothes Hands", TempForm))
 					a.EquipItemEx(TempForm, 0, false, false)	
 					endif 
 								
@@ -512,7 +525,7 @@ Function FollowerRedressSlot(actor akActor, int iSlot)
 					
 					TempForm = FollowerRedressFormlist.GetAT(i)
 				
-					if cfgqst.IsItem("Armor Boots", TempForm) || cfgqst.IsItem("Clothes Feet", TempForm)
+					if TempForm && (cfgqst.IsItem("Armor Boots", TempForm) || cfgqst.IsItem("Clothes Feet", TempForm))
 					a.EquipItemEx(TempForm, 0, false, false)	
 					endif 
 								
@@ -523,16 +536,14 @@ Function FollowerRedressSlot(actor akActor, int iSlot)
 
 		
 		endif 
-		
-		
-		
+
 		
 		FollowerRedressFormlist.Revert()
 
 
 EndFunction 
 
-Bool Function IsPresentFollower(actor akActor) ; OLD DELETE !!!!!!!!!!!!!!!! ><<--- no, what is the replacement for this????
+Bool Function IsPresentFollower(actor akActor) ;still usefull to check an actor if its a follower. Just make the code shiny new
 
 	if Actor_Follower01 && (Actor_Follower01.GetDistance(cfgqst.PlayerRef) < 10000) && (akActor == Actor_Follower01)
 	return true
@@ -564,6 +575,19 @@ Bool Function IsFollowerPresent()
 EndFunction
 
 
+
+Function SetFollowersCalmed(bool DoCalm)		
+			
+	int i = NakedFollowerCount
+	while (i > 0) 
+	i -= 1
+		if IsWithUs_Follower(i)
+		NymTrace("Follower Calmed: "+i)
+		SPE_actor.SetActorCalmed(NakedFollower[i], DoCalm)
+		endif 
+	endwhile	
+
+EndFunction 			
 
 	
 Bool Function IsWithUs_Follower(int i)	
@@ -713,6 +737,78 @@ Bool Function Follower05_Present()
 EndFunction 
 
 
+Function ResetFollowers()
+	NymTrace("ResetFollowers()")
+	if Nym()
+	NymTrace("Name_Follower01: " + Name_Follower01)
+	NymTrace("Name_Follower02: " + Name_Follower02)
+	NymTrace("Name_Follower03: " + Name_Follower03)
+	NymTrace("Name_Follower04: " + Name_Follower04)
+	NymTrace("Name_Follower05: " + Name_Follower05)
+
+	endif 
+		
+	Name_Follower01 = "empty"
+	Name_Follower02 = "empty"
+	Name_Follower03 = "empty"
+	Name_Follower04 = "empty"
+	Name_Follower05 = "empty"
+	
+	if NakedFollower[0]		
+	NymTrace("NakedFollower[0] deleted")
+	NakedFollower[0] = none		
+	endif 	
+	
+	if NakedFollower[1]
+	NymTrace("NakedFollower[1] deleted")   
+	NakedFollower[1] = none
+	endif
+
+	if NakedFollower[2]
+	NymTrace("NakedFollower[2] deleted")
+    NakedFollower[2] = none
+	endif
+
+	if NakedFollower[3]
+	NymTrace("NakedFollower[3] deleted")
+    NakedFollower[3] = none
+	endif
+
+	if NakedFollower[4]
+	NymTrace("NakedFollower[4] deleted")
+    NakedFollower[4] = none
+	endif
+	
+	if Actor_Follower01		
+	NymTrace("Actor_Follower01 deleted")
+	Actor_Follower01 = none		
+	endif 	
+	
+	if Actor_Follower01
+    NymTrace("Actor_Follower02 deleted")
+    Actor_Follower01 = none
+endif
+
+if Actor_Follower01
+    NymTrace("Actor_Follower03 deleted")
+    Actor_Follower01 = none
+endif
+
+if Actor_Follower01
+    NymTrace("Actor_Follower04 deleted")
+    Actor_Follower01 = none
+endif
+
+if Actor_Follower01
+    NymTrace("Actor_Follower05 deleted")
+    Actor_Follower01 = none
+endif
+	
+NakedFollowerCount = 0	
+
+EndFunction 
+
+
 Function Fragment_17()	;						;############ STAGE 11 ############							
 ;EMPTY
 EndFunction
@@ -728,15 +824,17 @@ EndFunction
 
 
 Function Fragment_1()						;	#END			;############ STAGE 1000 ############	#1000					
-		
-	
-	Name_Follower01 = "empty"
-	Name_Follower02 = "empty"
-	Name_Follower03 = "empty"
-	Name_Follower04 = "empty"
-	Name_Follower05 = "empty"
 	
 	ShowDebugTrace("NAKED DEFEAT: followerquest stage 1000 (END)")	
+	
+	ResetFollowers()
+	;Name_Follower01 = "empty"
+	;Name_Follower02 = "empty"
+	;Name_Follower03 = "empty"
+	;Name_Follower04 = "empty"
+	;Name_Follower05 = "empty"
+	
+	
 	ShowDebugNotification("NAKED DEFEAT: followerquest stage 1000 (END)")
 	Stop()
 	
@@ -771,7 +869,7 @@ Function Fragment_3()				;			;############ STAGE 10 ;############
 ShowDebugTrace("NAKED DEFEAT followerquest: stage 10 (START)")	
 ShowDebugNotification("NAKED DEFEAT: followerquest stage 10 (START)")		
 
-;SetStage(600) ;send to waiting stage
+SetStage(600) ;send to waiting stage
 	
 EndFunction
 
@@ -857,17 +955,24 @@ Function FollowersStripWeapons()
 	endif 
 	
 	if StripWeapons
-		if Actor_Follower01
-			if Actor_Follower01.GetEquippedWeapon()
-			Actor_Follower01.UnequipItem(Actor_Follower01.GetEquippedWeapon(), false, true)
-			endif
-		endif 
-
-		if Actor_Follower02
-			if Actor_Follower02.GetEquippedWeapon(true)
-			Actor_Follower02.UnequipItem(Actor_Follower02.GetEquippedWeapon(true), false, true)
-			endif
-		endif 
+		
+		int i = 5	;process 5 Followers
+		
+		while (i > 0) && cfgqst.Modenabled
+			
+			i -= 1
+			
+			if NakedFollower[i]
+				if NakedFollower[i].GetEquippedWeapon()
+				NakedFollower[i].UnequipItem(NakedFollower[i].GetEquippedWeapon(), false, true)
+				endif
+			endif 
+		endwhile 
+		;if NakedFollower[1]
+		;;	if NakedFollower[1].GetEquippedWeapon(true)
+		;	NakedFollower[1].UnequipItem(NakedFollower[1].GetEquippedWeapon(true), false, true)
+		;	endif
+		;endif 
 	endif 	
 EndFunction
 
@@ -1278,15 +1383,17 @@ EndFunction
 
 Function EndFollowerQuest()
 
+	ResetFollowers()
+	NymTrace("EndFollowerQuest()")
 	SetStage(1000)
 	
 EndFunction
 
 
 Function StartFollowerQuest()
-	
+	NymTrace("StartFollowerQuest()")
 	Start()
-	SetStage(600)
+	;SetStage(600)
 	
 EndFunction
 

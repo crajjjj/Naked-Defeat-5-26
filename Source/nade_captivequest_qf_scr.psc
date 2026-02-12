@@ -16,6 +16,11 @@ Quest Property CalmQuest Auto
 
 SexLabFramework Property SexLab Auto
 nade_configquest_scr Property cfgqst Auto
+nade_slavery_qf_scr Property slaveqst Auto	
+
+
+nade_defeatquest_qf_scr Property defqst Auto
+
 ;nade_sexquest_qf_scr Property sexqst Auto
 nade_capturequest_qf_scr Property capqst Auto
 Message Property nade_CaptMsg Auto
@@ -29,6 +34,7 @@ ReferenceAlias Property Alias_Furniture0 Auto
 
 nade_WhipQuest_00 Property whipq00 Auto
 nade_calmquest_qf_scr Property calmqst Auto
+nade_storage_qf_scr Property storqst Auto
 
 Spell Property FrostSpell Auto			;NYMRA FROST EFFECT
 Spell Property ShockSpell Auto			;NYMRA SHOCK EFFECT
@@ -49,7 +55,7 @@ int Property EscapeKey Auto					;ESCAPE KEY		;WHY???? EXPLORE
 ;int DebugKeyOID_K							;DEBUG KEY
 ;int Property DebugKey Auto					;DEBUG KEY
 ;int DefeatKeyOID_K							;ESCAPE KEY
-;int Property DefeatKey Auto					;ESCAPE KEY
+;int Property DefeatKey Auto				;ESCAPE KEY
 ;Float StaminaChange = 1.0
 ;Bool iRandom					;randomOMG
 
@@ -70,7 +76,13 @@ return false
 endif
 EndFunction
 
+Bool IsFurniturePunishmentRunning
 
+Bool Function FurniturePunishmentRunning()
+
+return IsFurniturePunishmentRunning
+
+EndFunction
 
 ;/
 if !PlayerInCombat() 		;Combatcheck
@@ -123,7 +135,10 @@ int EscapeDifficulty = 0
 
 Function Fragment_0()					;############ STAGE 10 ############				;#start
 
-cfgqst.DefeatStatePlayer = "EscapeGame"
+cfgqst.DefeatStatePlayer = "Idle in Furniture" 
+cfgqst.DefeatStateChapter = "EscapeGame"
+
+
 
 Debug.Trace("NAKED DEFEAT: captivequest stage 10")
 Debug.Trace("NAKED DEFEAT: captivequest stage 10: cfgqst.Allow_EscapeDifficulty: "+cfgqst.Allow_EscapeDifficulty)
@@ -144,20 +159,24 @@ Debug.Trace("NAKED DEFEAT: captivequest stage 10: cfgqst.Allow_EscapeDifficulty:
 		
 		bool NewSystem = true
 		
-		if cfgqst.NymBeta ;NO THERE, OBSTRUCTS WHIPPING! 
-		SendModEvent("StartVoyeurs")
-		Utility.Wait(2.0)
-		endif
+	;	if cfgqst.NymBeta ;NO THERE, OBSTRUCTS WHIPPING! 
+	;	SendModEvent("StartVoyeurs")
+	;	Utility.Wait(2.0)
+	;	endif
+	
+		cfgqst.GracePeriod = 4
 		
 		if NewSystem
 				
 			int i
 				
-			if cfgqst.DefeatViaSlavery	
+			if cfgqst.DefeatViaSlavery	;MCM Difficulty Override
 			i = cfgqst.WiggleOptionsSS	
 			else 
-			i = cfgqst.WiggleOptions
+			i = cfgqst.WiggleOptions	;MCM Difficulty Override
 			endif 
+	
+			DebugTrace("Final Escape Difficulty: "+i)
 			
 			if i == 0	;HARD 
 			EscapeDifficulty = 1
@@ -204,7 +223,12 @@ Debug.Trace("NAKED DEFEAT: captivequest stage 10: cfgqst.Allow_EscapeDifficulty:
 				loosenDiff = Utility.RandomInt(1,5) 		
 				endif 
 			endif 
-				
+			
+			if storqst.IsLocalSlave()
+				EscapeDifficulty += slaveqst.CompletedDayTasks
+				loosenDiff += slaveqst.CompletedDayTasks
+			endif 
+			
 			if cfgqst.RapeAgain ;I think its no longer true.... 
 			cfgqst.RapeAgain = false
 			EscapeDifficulty += Utility.RandomInt(0,5)
@@ -231,6 +255,8 @@ Debug.Trace("NAKED DEFEAT: captivequest stage 10: cfgqst.Allow_EscapeDifficulty:
 ;RANDOM EASIEST - tends to be 10/10 
 		
 		else ;OLD SYSTEM
+		
+		;/
 			;#GUIDE: Harder Defeat and Slavery scenario make defeat VERY hard (basic difficulty is hardcoded to 1% - for now)
 			if (cfgqst.Allow_EscapeDifficulty == "Hardest") || cfgqst.HarderDefeat
 			EscapeDifficulty = 1
@@ -297,6 +323,8 @@ Debug.Trace("NAKED DEFEAT: captivequest stage 10: cfgqst.Allow_EscapeDifficulty:
 			InfoMessage("Escape Chance (MCM): "+EscapeDifficulty+"% -> gets "+loosenDiff+"% easier per attempt")
 			endif
 			;MESSAGING needs too change / readded
+			
+			/;
 		endif 
 
 	;RegisterForSingleUpdate(1)		;for fuckbeltsound
@@ -319,8 +347,11 @@ bool RescuedAgain = false
 Function Fragment_4()				;############ STAGE 1000 ############	##END## ##1000##
 ;SHUTDOWN
 Debug.Trace("NAKED DEFEAT: captivequest stage 1000 (END)")
-
+if Nym()
+;cfgqst.DefeatStatePlayer = "none"
+else
 cfgqst.DefeatStatePlayer = "none"
+endif 
 cfgqst.DefeatStateChapter = "Escape Game End"
 
 capqst.EndCaptureQuest()
@@ -328,7 +359,7 @@ capqst.EndCaptureQuest()
 	;RAPE AGAIN END
 	if cfgqst.RapeAgain			
 		Debug.Trace("NAKED DEFEAT: captivequest stage 1000 (RapeAgain)")
-		RemovePunishmentItems()
+		capqst.RemovePunishmentItems()
 		cfgqst.RemoveChains()
 		UnregisterForAllKeys()
 
@@ -340,7 +371,7 @@ capqst.EndCaptureQuest()
 	elseif SoldAgain
 	cfgqst.DefeatStateBindings = "Unbound"
 	Debug.Trace("NAKED DEFEAT: captivequest stage 1000 (SoldAgain)")
-	RemovePunishmentItems()
+	capqst.RemovePunishmentItems()
 	cfgqst.RemoveChains()
 	UnregisterForAllKeys()
 	;cfgqst.SpawnRapers("clear", false)
@@ -348,7 +379,7 @@ capqst.EndCaptureQuest()
 	Stop() ;END of Captivequest
 	
 	elseif cfgqst.IsPoseScenario()
-	RemovePunishmentItems()
+	capqst.RemovePunishmentItems()
 		
 	UnregisterForAllKeys()
 		
@@ -364,7 +395,7 @@ capqst.EndCaptureQuest()
 	elseif RescuedAgain
 	cfgqst.DefeatStateBindings = "Unbound"
 	Debug.Trace("NAKED DEFEAT: captivequest stage 1000 (RescuedAgain)")
-	RemovePunishmentItems()
+	capqst.RemovePunishmentItems()
 	cfgqst.RemoveChains()
 	UnregisterForAllKeys()
 	;cfgqst.SpawnRapers("clear", false)
@@ -374,7 +405,7 @@ capqst.EndCaptureQuest()
 	;REGULAR END 	
 	else
 	cfgqst.DefeatStateBindings = "Unbound"
-		RemovePunishmentItems()	
+		capqst.RemovePunishmentItems()	
 		UnregisterForAllKeys()		
 		if CalmQuest.GetStage() < 1000
 		CalmQuest.SetStage(1000)	
@@ -409,7 +440,7 @@ EndFunction
 											;NYMRA TO DO - change hotkey via MCM? set diffculty in MCM - get visuals for Shocks working again!
 
 bool bLocked = false						;wichtig gehört dazu lol!											
-
+bool Restoring = false
 ;bool cfgqst.BoolCaptiveFuckBelt = false
 
 
@@ -424,8 +455,15 @@ int loosenDiff = 1
 Bool PunishmentTypeInfo = false 
 Bool PunishmentHarshInfo = false 
 Bool PunishmentPeeInfo = false 
+	
+;/
+Function RemovePunishmentItems()	;OLD DELETE 
 
+		RemovePunishmentItems()
+		cfgqst.RemoveAllDDevices(false, "empty01", "empty02", "empty03", "empty04", "empty05")
 
+EndFunction 
+/;
 
 
   
@@ -435,123 +473,98 @@ Event OnKeyDown (Int KeyCode)				;CAN I ADD A "ON HIT" bool to break the PC free
 
 if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu") 
 
-	if KeyCode == cfgqst.DefeatKey
-		  Debug.Trace("NAKED DEFEAT: captivequest Keypress DefeatKey (Debug)")
-		  
-			RemovePunishmentItems()
-						
-			;SHIFT + K: ACCEPT SLAVERY >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			if Input.IsKeyPressed(42)
-			
-			;THIS IS NOW ACTION WHEEL. NEED TO MOVE THIS THERE??? 
-			
-			;/
-			SendModEvent("Moan")
-			Debug.Notification("<font color='#ff0000'>You will never escape and accept beeing a slave</font>")
-			Debug.Trace("NAKED DEFEAT notification: You will never escape and accept beeing a slave")
-			 
-			Success = true 
-			Free = true 
-			cfgqst.Immobilize(false)
-			loose = 0		
-				
-				if cfgqst.RapeAgain
-				Debug.Trace("NAKED DEFEAT captivequest: #ERROR - RapeAgain still TRUE (2)")
-				cfgqst.RapeAgain = false
-				endif
-				
-				if cfgqst.ToggleDeleteDevice		;deletes last furniture when free
-				cfgqst.LastAddedDevice.DisableNoWait()
-				cfgqst.LastAddedDevice.Delete()
-				cfgqst.LastAddedDevice = None
-				endif
-				
-			if cfgqst.IsPoseScenario(); && (cfgqst.DefeatTypeScenario != "DDeEvent")	;DDe --> no posing!
-			cfgqst.DefeatStateBindings = "Unbound"
-			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)	;play pose to remove AnimObjects
-			Utility.Wait(2.0)
-			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Stop", false)	
-			endif	
-
-			cfgqst.Immobilize(false)	
-			SendModEvent("EndofDefeat_Slavery")		
-			SetStage(1000)		
-			/;
+	if KeyCode == cfgqst.DefeatKey	;K 
 		
-			;ALT+K: SET FREE (CHEAT) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 	
-			elseif Input.IsKeyPressed(56) 	
-			
-			;REMOVE THIS BECAUSE WE HAVE THE DEBUG WHEEL NOW 
-			
-			;/
-			SendModEvent("Moan")	
-			Debug.Notification("<font color='#ff0000'>Whoever tied you was a fool...so easy to escape!</font>")				;MESSAGE
-			Debug.Trace("NAKED DEFEAT notification: Whoever tied you was a fool...so easy to escape!")
-			Success = true 
-			Free = true 
-			loose = 0
+	Debug.Trace("NAKED DEFEAT: captivequest Keypress DefeatKey (Debug) - UPDATED")
+	Debug.Trace("NAKED DEFEAT: captivequest Keypress DefeatKey (Debug) - IsPose Scenario:"+cfgqst.IsPoseScenario())
 
-			harsh = 0		
-												
-			;	bLocked = false	
-
-				if cfgqst.RapeAgain
-				Debug.Trace("NAKED DEFEAT captivequest: #ERROR - RapeAgain still TRUE")
-				cfgqst.RapeAgain = false
-				endif
-				
-				if (cfgqst.DefeatTypeScenario == "DDeEvent") || (cfgqst.DefeatTypeScenario == "DD")
-				cfgqst.PlayerRef.SendModEvent("iDDeEquipWorn", "Mylist", -66)
-				Utility.Wait(5.0)
-				endif
-				
-				if cfgqst.Ragdoll			
-				cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 3)
-				endif	
-				
-				cfgqst.Immobilize(false)
-				
-				if cfgqst.BoolCaptiveFuckBelt
-				RemovePunishmentItems()
-				endif
-
-				if cfgqst.IsPoseScenario() && (cfgqst.DefeatTypeScenario != "DDeEvent")	;DDe --> no posing!
-				cfgqst.DefeatStateBindings = "Unbound"
-				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)	;play pose to remove AnimObjects
-				Utility.Wait(2.0)
-				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Stop", false)	
-				endif
-					
-				if cfgqst.Ragdoll			
-		;		Debug.Notification("NAKED DEFEAT: PushAway from Device")					;XXX
-				cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 3)
-				endif	
-			
-				if cfgqst.ToggleDeleteDevice		;deletes last furniture when free
-				cfgqst.LastAddedDevice.DisableNoWait()
-				cfgqst.LastAddedDevice.Delete()
-				cfgqst.LastAddedDevice = None
-				endif	
-				
-			cfgqst.GracePeriod = 0	
-				
-			cfgqst.Immobilize(false)		
-			SetStage(1000)	
-			
-			/;
-			endif
-			
 	;>>>>> ESCAPE KEY PRESSED [SPACE] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>				
 	elseif KeyCode == cfgqst.EscapeKey						
-	   if EscapeKey || bLocked								
+		
+		;#WIGGLE 
+		if LoosenNow
+		
+			int TempLoose
+			if D100(1)
+			TempLoose = 100
+			elseif  D100(5)
+			TempLoose = loose + loosenDiff + loosenDiff + loosenDiff
+			elseif D100(50)
+			TempLoose = loose + loosenDiff + loosenDiff + loosenDiff
+			else 
+			TempLoose = loose + loosenDiff
+			endif 
+			loose = TempLoose
+			GoodMessage("You manage to loosen the binds by "+TempLoose)
+	
+		elseif TightenNow
+		
+			int TempTighten
+			if D100(1)
+			TempTighten = 404
+			elseif  D100(5)
+			TempTighten = loosenDiff + loosenDiff + loosenDiff
+			elseif D100(50)
+			TempTighten = loose + loosenDiff + loosenDiff + loosenDiff
+			else 
+			TempTighten = loose + loosenDiff
+			endif 
+			
+			if TempTighten == 404
+			BadMessage("You just made the binds very tight (1%)")
+			loose = 1
+			else 
+			BadMessage("You just made the binds tighter by "+TempTighten)
+			loose -= TempTighten
+				if loose < 0
+				loose = 1
+				endif 
+			endif 	
+		endif 		
+
+		;double Tap -> Return
+		if EscapeKey || Restoring
+		return 
+		
+		;>>>>>>>>>>>>>>>> RESTORE POSE/VEHICLE (ALWAYS WORKS!) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
+	;	elseif cfgqst.IsPoseScenario()
+		;do nothing!		
+	;	Restoring = true
+	;	InfoMessage("Attempt to restore Fix Player Position")
+	;	calmqst.Vehicle("restore")
+	;	calmqst.RestoreVictimFurnitures()
+	;	Utility.Wait(1.0)
+	;	Restoring = false
+	;	return
+		elseif !cfgqst.IsPoseScenario() && (cfgqst.PlayerRef.GetSitState() == 0) && !Success && !Free
+		Debug.Trace("NAKED DEFEAT: captivequest Keypress DefeatKey (Debug) - Attempt to restore Furniture Animation")
+		Restoring = true
+		InfoMessage("Attempt to restore Furniture Animation")
+		capqst.RestoreFurniture()
+		calmqst.RestoreVictimFurnitures()
+		Utility.Wait(1.0)
+		Restoring = false
+		return
+		endif 
+		
+		;double Tap // already running -> Return
+		if EscapeKey || bLocked								
 			return											
-	   endif	  
+		endif	  
+	   
+	   if Wiggling && Nym()
+	   Debug.Messagebox("Wigglig STUCK!")
+	   endif 
 	   
 		bLocked = true
+		;IsFurniturePunishmentRunning = true
+		cfgqst.DefeatStatePlayer = "Punished in Furniture" 
+		cfgqst.DefeatStateChapter = "EscapeGame"
 		Actor player = cfgqst.PlayerRef		
 				
 		;>>>>>>>>>>>>>>>> RESTORE POSE/VEHICLE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
-			
+		
+		;DOUBLE TROUBLE =		
 		if cfgqst.IsPoseScenario() 
 		calmqst.Vehicle("restore")
 		else
@@ -580,268 +593,232 @@ if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu")
 		calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Struggle", false)	
 		endif
 		
-		;FREE >>>>>>>>>>>>>>>> "You are free!!!" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
-		if  Free 
-
-			cfgqst.DefeatStatePlayer = "Escaping"
 		
-			ScreenMessage("You are free!!!")
-			
-			Sexlab.ThreadSlots.StopAll()
+		
+		
+			;FREE >>>>>>>>>>>>>>>> "You are free!!!" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
+			if  Free 
 
-			if cfgqst.RapeAgain
-			Debug.Trace("NAKED DEFEAT captivequest: #ERROR - RapeAgain still TRUE")
-			cfgqst.RapeAgain = false
-			endif
-			SendModEvent("Moan")	
+				cfgqst.DefeatStatePlayer = "Escaping"
 			
-			
-			if cfgqst.Ragdoll			
-			cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 3)
-			endif	
-			
-			if !Nym()
-			cfgqst.Immobilize(false)
-			endif 
-			
-			if cfgqst.BoolCaptiveFuckBelt
-			RemovePunishmentItems()
-			endif
-			loose = 0
-			harsh = 0		
-													
-			bLocked = false		
-			
-			cfgqst.PlaySoundOnActor(cfgqst.PlayerRef, "Furniture Exit", 1.0)
-			
-			if cfgqst.IsPoseScenario() && (cfgqst.DefeatTypeScenario != "DDeEvent")	;DDe --> no posing!
-			cfgqst.DefeatStateBindings = "Unbound"
-			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)	;play pose to remove AnimObjects
-				if (!cfgqst.AbortAll)
-				Utility.Wait(2.0)
+				ScreenMessage("You are free!!!")
+				
+				Sexlab.ThreadSlots.StopAll()
+
+				if cfgqst.RapeAgain
+				Debug.Trace("NAKED DEFEAT captivequest: #ERROR - RapeAgain still TRUE")
+				cfgqst.RapeAgain = false
+				endif
+				SendModEvent("Moan")	
+				
+				
+			;	if cfgqst.Ragdoll			
+			;	cfgqst.PlayerRef.PushActorAway(cfgqst.PlayerRef, 3)
+			;	endif	
+				
+				if !Nym()
+				cfgqst.Immobilize(false)
 				endif 
-			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Stop", false)	
-			endif
-			
-			if cfgqst.ToggleDeleteDevice		;deletes last furniture when free
-			cfgqst.LastAddedDevice.DisableNoWait()
-			cfgqst.LastAddedDevice.Delete()
-			cfgqst.LastAddedDevice = None
-			endif
-			
-			cfgqst.GracePeriod = 0
-			
-			if !Nym()
-			cfgqst.Immobilize(false)
-			endif 
-	
-			SetStage(1000)
-			return
-		endif
-
-		Utility.Wait(2.0)
-		SendModEvent("Moan")
 				
-		;>>>>>>>>>>>>>>>> "Your bindings finally feel loose." >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>		
-		If Success || Utility.RandomInt(1,100) <= (EscapeDifficulty + loose + random)
-		
-			cfgqst.PlayerRef.RemoveItem(Squirt[0], 1, true, None)
-		
-			;----- START WAIT POSE -------------------------------------------------
-			if cfgqst.IsPoseScenario() && (cfgqst.DefeatTypeScenario != "DDeEvent")	;DDe --> no posing!
-			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)
-			endif
-			
-		ScreenMessage("Your bindings finally feel loose.")
-			Success = true 	;no longer necessary???
-			Free = true 
-			SendModEvent("Moan")
-			Utility.Wait(1.0)
-			SendModEvent("Moan")
-			Utility.Wait(1.0)
-			SendModEvent("Moan")
-			Utility.Wait(1.0)
-			SendModEvent("Moan")
-			ScreenMessage("You can easily remove them now... wiggle one last time.")
-	  
-		;NOT required at the moment. we use DebugPunishment for Scenarios.
-		;	if cfgqst.DebugPunishmentType > 0
-		;	ScreenMessage("NAKED DEFEAT DEBUG: you can only break free with ActionKey.")
-		;		ScreenMessage("NAKED DEFEAT DEBUG: set PunishmentType slider in MCM > System to 0 to disable.")
-		;		Free = false	
-		;		Success = false
-		;	endif
-			
-		;>>>>>>>>>>>>>>>> PUNISHMENT START >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		else   
-			
-		;/	 			
-			if PunishEffectType == "Shock"			;#shader3
-			ScreenMessage("The binding spell shocks you while you struggle!")
-			elseif PunishEffectType == "Frost"
-			ScreenMessage("The binding spell freezes you while you struggle!")
-			elseif PunishEffectType == "Fire"
-			ScreenMessage("The binding spell burns you while you struggle!")
-			elseif PunishEffectType == "Random"
-			ScreenMessage("The binding spell overloads your sensation you while you struggle!")	
-			elseif PunishEffectType == "HotnCold"
-			ScreenMessage("The binding spell punishes you with hot and cold chills while you struggle!")					
-			elseif PunishEffectType == "Pain"
-			ScreenMessage("The binding spell tortures you while you struggle!")	
-			endif
-/;
-			
-			Utility.Wait(1.0)   
-		   Int i = 2
-			loose += loosenDiff
-			harsh += 5
-		;	Debug.Trace("NAKED DEFEAT: loose = "+loose)
-			cfgqst.PlayerRef.AddItem(Squirt[0], 1, true)
-			cfgqst.PlayerRef.EquipItem(Squirt[0], false, true)
-			while i
-				i -= 1
-
-				;player.DamageActorValue("Stamina", damage)
-
-			;	SendModEvent("Moan")
-
-				Int j = 3
-
-				while j
-					j -= 1		
-					SendModEvent("Moan")
-					Utility.Wait(1.0)
-					SendModEvent("Moan")
-					Utility.Wait(1.0)
-					StartPunishmentEffect(PunishEffectType)
-					;cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
-					;cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"		
-					SendModEvent("Moan")			
-					;MfgConsoleFunc.SetPhonemeModifier(cfgqst.PlayerRef, 0, 1, 100)		;open mouth
-
-	;				cfgqst.FrostSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT needs implementation
-	;				SendModEvent("Moan")
-				endwhile
-			endwhile
-			
-			;PUNISHMENTS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #punishment type
-			;#GUIDE: we determin the type of punishment here
-			if D100(Utility.RandomInt(20,50) + harsh)		
-			
-			int sevpunish = 0
-			
-				if cfgqst.IsPoseScenario()
-				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Struggle", false)
-				Endif 
-			
-				if cfgqst.GracePeriod > 0
-				cfgqst.GracePeriod -= 1
+				if cfgqst.BoolCaptiveFuckBelt
+				capqst.RemovePunishmentItems()
 				endif
-				if cfgqst.GracePeriod < 0
+				loose = 0
+				harsh = 0		
+														
+				bLocked = false		
+				
+				cfgqst.PlaySoundOnActor(cfgqst.PlayerRef, "Furniture Exit", 1.0)
+				
+				if cfgqst.IsPoseScenario() && (cfgqst.DefeatTypeScenario != "DDeEvent")	;DDe --> no posing!
+				cfgqst.DefeatStateBindings = "Unbound"
+				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)	;play pose to remove AnimObjects
+					if (!cfgqst.AbortAll)
+					Utility.Wait(2.0)
+					endif 
+				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Stop", false)	
+				endif
+				
+				if cfgqst.ToggleDeleteDevice		;deletes last furniture when free
+				cfgqst.LastAddedDevice.DisableNoWait()
+				cfgqst.LastAddedDevice.Delete()
+				cfgqst.LastAddedDevice = None
+				endif
+				
 				cfgqst.GracePeriod = 0
-				endif
-			
-				;NEED a BREAK
-				if D100(20)
-				PlayPunishment("break")
-				cfgqst.GracePeriod = 2
-				;WHIP
-				elseif (cfgqst.GracePeriod == 0) && D100(cfgqst.PunishWhipChance) && capqst.IsWhippingAllowed()
-				PlayPunishment("whip")
-				cfgqst.GracePeriod = 4
-				;BUKKAKE
-				elseif (cfgqst.GracePeriod == 0) && D100(cfgqst.PunishBukkakeChance) && capqst.IsBukkakeAllowed() && !cfgqst.SkipSex ;if we skip Sex this should not happen! || cfgqst.ShowDebugMessages ;&& capqst.IsFurnitureOnVehicle()
-				PlayPunishment("bukkake")
-				cfgqst.GracePeriod = 4
-				;SEX
-				elseif (cfgqst.GracePeriod == 0) && D100(cfgqst.PunishSexChance) && !cfgqst.SkipSex ;if we skip Sex this should not happen!
-				PlayPunishment("sex")
-				cfgqst.GracePeriod = 6			
-				;CHANGE PunishEffectType
-				elseif D100(5) 						
-	
-					String TempType = PunishEffectType
-					GetPunishType()		
 				
-					if TempType == PunishEffectType
-					;do nothing
-					else	
-				;	ScreenMessage("Your captors get bored and change your punishment spell")	
-							
-					Utility.Wait(1.0)
-					StartPunishmentEffect(PunishEffectType)
-					SendModEvent("Moan")
-					Utility.Wait(0.5)
-					StartPunishmentEffect(PunishEffectType)
+				if !Nym()
+				cfgqst.Immobilize(false)
+				endif 
+		
+				SetStage(1000)
+				return
+			endif
 
-					SendModEvent("Moan")
-					Utility.Wait(0.5)			
-					StartPunishmentEffect(PunishEffectType)
+			Utility.Wait(2.0)
+			SendModEvent("Moan")
+				
+			;>>>>>>>>>>>>>>>> "Your bindings finally feel loose." >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>		
+			If Success || Utility.RandomInt(1,100) <= (EscapeDifficulty + loose + random)
+			
+				
+				
+				defqst.DrippingPussy(false)
+				
+				;cfgqst.PlayerRef.RemoveItem(Squirt[0], 1, true, None)
+			
+				;----- START WAIT POSE -------------------------------------------------
+				if cfgqst.IsPoseScenario() && (cfgqst.DefeatTypeScenario != "DDeEvent")	;DDe --> no posing!
+				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)
+				endif
+				
+			ScreenMessage("Your bindings finally feel loose.")
+				Success = true 	;no longer necessary???
+				Free = true 
+				SendModEvent("Moan")
+				Utility.Wait(1.0)
+				SendModEvent("Moan")
+				Utility.Wait(1.0)
+				SendModEvent("Moan")
+				Utility.Wait(1.0)
+				SendModEvent("Moan")
+				ScreenMessage("You can easily remove them now... wiggle one last time.")
+		  
+			;NOT required at the moment. we use DebugPunishment for Scenarios.
+			;	if cfgqst.DebugPunishmentType > 0
+			;	ScreenMessage("NAKED DEFEAT DEBUG: you can only break free with ActionKey.")
+			;		ScreenMessage("NAKED DEFEAT DEBUG: set PunishmentType slider in MCM > System to 0 to disable.")
+			;		Free = false	
+			;		Success = false
+			;	endif
+				
+			;>>>>>>>>>>>>>>>> PUNISHMENT START >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+			else   
+			
+			NymTrace("Wiggle TRUE")
+			Wiggling = true 
+			RegisterForSingleUpdate(3)
+
+				Utility.Wait(1.0)   
+			   Int i = 2
+				loose += loosenDiff
+				harsh += 5
+
+				defqst.DrippingPussy(true)
+				
+				while i
+					i -= 1
+					Int j = 3
+					while j
+						j -= 1		
+						SendModEvent("Moan")
+						Utility.Wait(1.0)
+						SendModEvent("Moan")
+						Utility.Wait(1.0)
+						cfgqst.StartPunishmentEffect(PunishEffectType)
+						SendModEvent("Moan")			
+					endwhile
+				endwhile
+				
+				;PUNISHMENTS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #punishment type
+				;#GUIDE: we determin the type of punishment here
+				if D100(Utility.RandomInt(20,50) + harsh)		
+				
+				int sevpunish = 0
+				
+					if cfgqst.IsPoseScenario()
+					DebugTrace("PlayPoseOnActor #758")
+					calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Struggle", false)
+					Endif 
+				
+					if cfgqst.GracePeriod > 0
+					cfgqst.GracePeriod -= 1
+					endif
+					if cfgqst.GracePeriod < 0
+					cfgqst.GracePeriod = 0
+					endif
+				
+					;NEED a BREAK
+					if D100(20)
+					PlayPunishment("break")
+					cfgqst.GracePeriod = 2
+					;WHIP
+					elseif (cfgqst.GracePeriod == 0) && D100(cfgqst.PunishWhipChance) && capqst.IsWhippingAllowed()
+					PlayPunishment("whip")
+					cfgqst.GracePeriod = 4
+					;BUKKAKE
+					elseif (cfgqst.GracePeriod == 0) && D100(cfgqst.PunishBukkakeChance) && capqst.IsBukkakeAllowed() && !cfgqst.SkipSex ;if we skip Sex this should not happen! || cfgqst.ShowDebugMessages ;&& capqst.IsFurnitureOnVehicle()
+					PlayPunishment("bukkake")
+					cfgqst.GracePeriod = 4
+					;SEX
+					elseif (cfgqst.GracePeriod == 0) && D100(cfgqst.PunishSexChance) && !cfgqst.SkipSex ;if we skip Sex this should not happen!
+					PlayPunishment("sex")
+					cfgqst.GracePeriod = 6			
+					;CHANGE PunishEffectType
+					elseif D100(5) 						
+		
+						String TempType = PunishEffectType
+						GetPunishType()		
+					
+						if TempType == PunishEffectType
+						;do nothing
+						else	
+					;	ScreenMessage("Your captors get bored and change your punishment spell")	
+								
+						Utility.Wait(1.0)
+						cfgqst.StartPunishmentEffect(PunishEffectType)
+						SendModEvent("Moan")
+						Utility.Wait(0.5)
+						cfgqst.StartPunishmentEffect(PunishEffectType)
+
+						SendModEvent("Moan")
+						Utility.Wait(0.5)			
+						cfgqst.StartPunishmentEffect(PunishEffectType)
+						SendModEvent("Moan")
+						Utility.Wait(2.0)
+						endif
+						
+					elseif D100(5) ;&& !cfgqst.BoolCaptiveFuckBelt	;change this for PunishmentOutfits
+					PlayPunishment("furniturechange")
+					
+					elseif D100(5) && !cfgqst.BoolCaptiveFuckBelt	;change this for PunishmentOutfits
+					PlayPunishment("equipment")
+					elseif D100(2) && (cfgqst.DefeatSlaveryProb > 0) && !storqst.IsLocalSlave()
+					Wiggling = false 
+					PlayPunishment("sold")
+					elseif D100(5) && storqst.ModSlaveTat; && !cfgqst.BoolCaptiveFuckBelt	;change this for PunishmentOutfits
+					PlayPunishment("paint")	
+					elseif D100(1) && (cfgqst.DefeatRescueProb > 0)	&& !storqst.IsLocalSlave()
+					Wiggling = false 
+					PlayPunishment("rescued")	
+					elseif D100(35)
+					PlayPunishment("pain")
+					else 
+					Utility.Wait(3.0)
+					cfgqst.StartPunishmentEffect(PunishEffectType)
 					SendModEvent("Moan")
 					Utility.Wait(2.0)
 					endif
-				
-				elseif D100(5) && !cfgqst.BoolCaptiveFuckBelt	;change this for PunishmentOutfits
-				PlayPunishment("equipment")
-				elseif D100(2) && (cfgqst.DefeatSlaveryProb > 0)
-				PlayPunishment("sold")
-				elseif D100(5) ; && !cfgqst.BoolCaptiveFuckBelt	;change this for PunishmentOutfits
-				PlayPunishment("paint")	
-				elseif D100(1) && (cfgqst.DefeatRescueProb > 0)
-				PlayPunishment("rescued")	
-				else
-				PlayPunishment("pain")
-				endif
 
-				;DEBUGGING OUTCOMES
-			;	else ;(cfgqst.DebugPunishmentType > 0) 
-			;		if cfgqst.DebugPunishmentType == 1.0
-			;		PlayPunishment("whip")
-			;		elseif cfgqst.DebugPunishmentType == 2.0
-			;		PlayPunishment("bukkake")
-			;		elseif cfgqst.DebugPunishmentType == 3.0
-			;		PlayPunishment("sex")
-			;		elseif cfgqst.DebugPunishmentType == 4.0
-			;		PlayPunishment("break")
-			;		elseif cfgqst.DebugPunishmentType == 5.0
-			;		PlayPunishment("pain")
-			;		elseif cfgqst.DebugPunishmentType == 6.0
-			;		PlayPunishment("sold")
-			;		endif
-			;	endif
-				
-				
-				
-			
-				;----------------------------------------------------------------------------------------------
-				cfgqst.BoolCaptiveNoSound = false
-				;Debug.Trace("NAKED DEFEAT: cfgqst.BoolCaptiveNoSound3"+cfgqst.BoolCaptiveNoSound)
+					;----------------------------------------------------------------------------------------------
+					cfgqst.BoolCaptiveNoSound = false
+					;Debug.Trace("NAKED DEFEAT: cfgqst.BoolCaptiveNoSound3"+cfgqst.BoolCaptiveNoSound)
 
-				;if NOT RapeAgain display "no success" message and strike idles for idlebased Scenes
-				if !cfgqst.RapeAgain
-				ScreenMessage("Your bindings are still too tight, try again.")
-				int TempEscapeChance = EscapeDifficulty + loose
-				InfoMessage("EscapeDifficulty on next attempt: "+TempEscapeChance+"%")
-			
-				cfgqst.PlayerRef.RemoveItem(Squirt[0], 1, true, None)	
-				
-					if cfgqst.IsPoseScenario() ; && (cfgqst.DefeatTypeScenario != "DDeEvent")	;DDe --> no posing!
-					calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)
+					;if NOT RapeAgain display "no success" message and strike idles for idlebased Scenes
+					if !cfgqst.RapeAgain
+					ScreenMessage("Your bindings are still too tight, try again.")
+					int TempEscapeChance = EscapeDifficulty + loose
+					InfoMessage("EscapeDifficulty on next attempt: "+TempEscapeChance+"%")
+					NymTrace("Wiggle FALSE")
+					Wiggling = false 
+					cfgqst.PlayerRef.RemoveItem(Squirt[0], 1, true, None)	
+					
+						if cfgqst.IsPoseScenario() ; && (cfgqst.DefeatTypeScenario != "DDeEvent")	;DDe --> no posing!
+						calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)
+						endif
+
 					endif
-				
-				;	if (cfgqst.DefeatTypeScenario == "Yoke")
-				;	cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesBoundWithYoke[0])	;#yoke normal pose
-				;	elseif (cfgqst.DefeatTypeScenario == "Cuffs")
-				;	cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesDefeatCuffs[Utility.RandomInt(0,20)])		
-				;	elseif (cfgqst.DefeatTypeScenario == "Pillory")
-				;	cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesDefeatPillory[Utility.RandomInt(0,12)])
-					
-					;else
-					;cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesDefeatCuffs[Utility.RandomInt(0,20)]) 
-				;	endif
-					
-				endif
-			;message when escape attempt failed
+				;message when escape attempt failed
 			else
 			
 				;if D100(50)
@@ -856,7 +833,8 @@ if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu")
 				ScreenMessage("Your bindings are still too tight, try harder.")
 				int TempEscapeChance = EscapeDifficulty + loose
 				InfoMessage("EscapeDifficulty on next attempt: "+TempEscapeChance+"%")
-				
+				NymTrace("Wiggle FALSE")
+				Wiggling = false
 				
 			;	InfoMessage("EscapeDifficulty on next attempt: "+loose+"%")
 				cfgqst.PlayerRef.RemoveItem(Squirt[0], 1, true, None)
@@ -870,6 +848,9 @@ if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu")
 	endif
 endif	
 
+	if cfgqst.DefeatStatePlayer == "Punished in Furniture"
+	cfgqst.DefeatStatePlayer = "Idle in Furniture" 
+	endif 
     bLocked = false
 EndEvent
 
@@ -924,31 +905,6 @@ bool HasPunishmentItems = false
 
 string PunishEffectType
 
-Event OnUpdate()
-
-		;ScreenMessage("Short Whipping") 
-		cfgqst.TempIntBridge = 1
-		cfgqst.WhipAgain = true
-		whipq00.StartShortWhipping()
-		EscapeDifficulty += 1
-		;/
-		if cfgqst.NymBeta
-		
-		endif
-		cfgqst.TempIntBridge = 1 ;no scene protectors
-		cfgqst.WhipAgain = true
-		whipq00.StartWhipQuest_00()
-
-		Utility.Wait(8.0)
-		whipq00.SetStage(25)
-		
-		cfgqst.WhipAgain = false
-		cfgqst.TempIntBridge = 0
-		/;
-			
-EndEvent 
-
-
 Function PlayPunishment(string PunishmentType = "none") 		;#PlayPunishment
 	
 		;>>>>>>>>> we change PunishmentTypes based on User Settings (double check and stuff...)
@@ -984,21 +940,22 @@ Function PlayPunishment(string PunishmentType = "none") 		;#PlayPunishment
 		;Utility.Wait(2.0)
 		endif
 		
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 		SendModEvent("Moan")	
 		Utility.Wait(1.0)
 		
 			if cfgqst.IsPoseScenario()
+			DebugTrace("PlayPoseOnActor #1000")
 			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Struggle", false)
 			Endif 
 		
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 		SendModEvent("Moan")
 		Utility.Wait(0.5)
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 		SendModEvent("Moan")
 		Utility.Wait(0.5)			
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 		SendModEvent("Moan")
 		Utility.Wait(2.0)
 						
@@ -1008,40 +965,48 @@ Function PlayPunishment(string PunishmentType = "none") 		;#PlayPunishment
 				if cfgqst.DefeatTypeScenario == "Armbinder"	
 				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Orgasm", false)
 				endif
+				
 			ScreenMessage("The forced sensation makes you cum...")
 			cfgqst.Orgasm = true
 			SendModEvent("Moan")
 			Utility.Wait(2.0)
-			StartPunishmentEffect(PunishEffectType)
-			StartPunishmentEffect(PunishEffectType)
+			cfgqst.StartPunishmentEffect(PunishEffectType)
+			cfgqst.StartPunishmentEffect(PunishEffectType)
 
 			;Forced Pee	
 			elseif D100(cfgqst.DefeatPeeProb)
+			
 				if cfgqst.DefeatTypeScenario == "Armbinder"	
 				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Pee", false)
 				endif
+				
 			pee = true
 			ScreenMessage("The excruciating pain forces you to pee!")
 			cfgqst.PlayerRef.AddItem(Squirt[2], 1, true)
-			cfgqst.PlayerRef.EquipItem(Squirt[2], false, true)					
+			cfgqst.PlayerRef.EquipItem(Squirt[2], false, true)	
+				int CamState = Game.GetCameraState() 
+				if CamState == 3
+				cfgqst.PlayerRef.QueueNiNodeUpdate()
+				defqst.InstantMouthOpening()
+				endif 		
 			endif
 		
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 	
 		SendModEvent("Moan")
 		Utility.Wait(1.5)		
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 		Utility.Wait(0.5)
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 		SendModEvent("Moan")
 		Utility.Wait(1.5)
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 		SendModEvent("Moan")
 		Utility.Wait(0.5)
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 		SendModEvent("Moan")
 		Utility.Wait(1.5)
-		StartPunishmentEffect(PunishEffectType)
+		cfgqst.StartPunishmentEffect(PunishEffectType)
 
 			;If D100(33) 
 			;SendModEvent("RapeTattoos_addTattoo")
@@ -1049,6 +1014,12 @@ Function PlayPunishment(string PunishmentType = "none") 		;#PlayPunishment
 			
 			if pee
 			cfgqst.PlayerRef.RemoveItem(Squirt[2], 1, true, None)	
+			
+				int CamState = Game.GetCameraState() 
+				if CamState == 3
+				cfgqst.PlayerRef.QueueNiNodeUpdate()
+				defqst.InstantMouthOpening()
+				endif 
 			endif
 				
 				
@@ -1067,13 +1038,17 @@ Function PlayPunishment(string PunishmentType = "none") 		;#PlayPunishment
 		SendModEvent("RapeTattoos_addTattoo")
 		cfgqst.FadeToBlack(false)
 
+		; #CHANGE FURNITURE
+		elseif PunishmentType == "furniturechange" 	
+		ScreenMessage("Your captors built a new device for you")
+		capqst.ChangeFurniture()
 		
 		; #WHIP	
 		elseif PunishmentType == "whip" 	
 		ScreenMessage("Your escape attempts caught some attention!")						 
 		SendModEvent("Moan")	
 		cfgqst.WhipAgain = true
-		whipq00.StartWhipQuest_00()
+		storqst.StartWhipping_00(cfgqst.DefeatWhipTime)
 		
 			float whiptime = 0
 			int TempInt = 0
@@ -1178,7 +1153,13 @@ Function PlayPunishment(string PunishmentType = "none") 		;#PlayPunishment
 			cfgqst.RapeAgain = true
 			cfgqst.InFurniture = false ;tell calmquest to set vehicle again
 			
+			if !cfgqst.IsPoseScenario()
 			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "reset", false)
+			endif
+			
+			if Nym()
+			capqst.RemoveFurniturePlayer()
+			endif 
 			
 			bLocked = false	
 			cfgqst.PlayerRef.RemoveItem(Squirt[0], 1, true, None)										
@@ -1224,23 +1205,44 @@ Function PlayPunishment(string PunishmentType = "none") 		;#PlayPunishment
 			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)	
 			endif
 			
+			storqst.PlayerSoundToPlay = "Breathing"					
+			SendModEvent("Moan")
+		
+			Utility.Wait(3.0)
+			storqst.PlayerSoundToPlay = "Breathing"	
+			SendModEvent("Moan")
+		
+			Utility.Wait(3.0)
+			storqst.PlayerSoundToPlay = "Breathing"	
+			SendModEvent("Moan")
+		
+			Utility.Wait(3.0)
+			storqst.PlayerSoundToPlay = "Breathing"	
+			SendModEvent("Moan")
+			
+			Utility.Wait(3.0)
+			storqst.PlayerSoundToPlay = "Breathing"	
+			SendModEvent("Moan")
+			storqst.PlayerSoundToPlay = "Breathing"	
+			Utility.Wait(3.0)
+			storqst.PlayerSoundToPlay = "Breathing"	
+			SendModEvent("Moan")
+			
+			Utility.Wait(3.0)
+			storqst.PlayerSoundToPlay = "Breathing"	
 			SendModEvent("Moan")
 			Utility.Wait(3.0)
+			storqst.PlayerSoundToPlay = "Breathing"	
 			SendModEvent("Moan")
-			Utility.Wait(4.0)
-			SendModEvent("Moan")
-			Utility.Wait(5.0)
-			SendModEvent("Moan")
-			Utility.Wait(6.0)
-			SendModEvent("Moan")
-			Utility.Wait(6.0)
+			
+			storqst.PlayerSoundToPlay = "Pain"
+			
 			ScreenMessage("You feel strong enough to continue.")	
 		
 		; #EQUIPMENT
 		elseif PunishmentType == "equipment"			
 		AddPunishmentItems(1)	
 		HasPunishmentItems = true
-		
 		
 		; #BUKKAKE
 		elseif PunishmentType == "bukkake"
@@ -1266,9 +1268,10 @@ Function PlayPunishment(string PunishmentType = "none") 		;#PlayPunishment
 ;endif	
 				
 EndFunction
-
-
-Function StartPunishmentEffect(string type)	;#shader2 	;#spells		;#StartPunishmentEffect
+	
+;OLD REPLACE
+;/
+Function StartPunishmentEffect(string type)	;#shader2 	;#spells		;#cfgqst.StartPunishmentEffect
 
 	;if cfgqst.Nym()() && D100(50
 	;type = "shock"
@@ -1290,8 +1293,7 @@ Function StartPunishmentEffect(string type)	;#shader2 	;#spells		;#StartPunishme
 		type = "Pain"	
 		endif 
 	endif 
-		
-	
+
 	if type == "Shock"
 	cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 	cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
@@ -1365,10 +1367,9 @@ Function StartPunishmentEffect(string type)	;#shader2 	;#spells		;#StartPunishme
 
 	endif
 	
-
-	
-	
 EndFunction
+
+/;
 
 
 Function AddPunishmentItems(int level)
@@ -1385,7 +1386,7 @@ endif
 		;do nothing --- no Punishment Items will be equiped
 		else
 			if cfgqst.ModPLUGS && D100(equipchance)
-			cfgqst.AddBrutalPlugs("random")
+			defqst.AddBrutalPlugs(0)
 			aMessage = true
 			endif
 			
@@ -1425,7 +1426,7 @@ Function Pee()
 					cfgqst.PlayerRef.AddItem(Squirt[2], 1, true)
 					cfgqst.PlayerRef.EquipItem(Squirt[2], false, true)	
 					
-					StartPunishmentEffect(PunishEffectType)
+					cfgqst.StartPunishmentEffect(PunishEffectType)
 					;cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 					;cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
 				
@@ -1491,6 +1492,35 @@ Function DebugMessage(String Text2)		;#DebugMessage
 	endif
 EndFunction
 
+Function GoodMessage(String Text3)		;#ScreenMessage ;narrative Messages
+	if cfgqst.ShowNarrativeMessages
+	Debug.Notification("<font color='#0AAC00'>"+Text3+"</font>")
+	endif
+	Debug.trace("NAKED DEFEAT captivequest: (#msg) "+Text3)
+EndFunction
+
+Function BadMessage(String Text3)		;#ScreenMessage ;narrative Messages
+	if cfgqst.ShowNarrativeMessages
+	Debug.Notification("<font color='#A52A2A'>"+Text3+"</font>")
+	endif
+	Debug.trace("NAKED DEFEAT captivequest: (#msg) "+Text3)
+EndFunction
+
+
+Function NymTrace(String Text2)		;#NymTrace
+	if Nym()
+	Debug.trace("NAKED DEFEAT captivequest: (#trace NYM) "+Text2)
+	endif
+EndFunction
+
+Function NymBox(String Text2)		;#NymBox
+	if Nym()
+	Debug.MessageBox("captivequest: "+Text2)
+	endif 
+	Debug.trace("NAKED DEFEAT captivequest: BOX (#Box NYM) "+Text2)
+
+EndFunction
+
 Function RealWaiting(float WaitTime)	;#waiting
 
 	float ftimeStart = Utility.GetCurrentRealTime()
@@ -1518,6 +1548,8 @@ Function RealWaiting(float WaitTime)	;#waiting
 
 EndFunction	
 
+
+
 Bool Function Nym()
 
 	if cfgqst.Nym()
@@ -1527,10 +1559,46 @@ Bool Function Nym()
 	endif 
 EndFunction
 
+Bool LoosenNow = false
+Bool TightenNow = false
+Bool Wiggling = false
+
+Event OnUpdate()		;#Update
+	
+	if Nym()
+		if Wiggling 
+		
+			NymTrace("#WIGGLE GAME loosenDiff: "+loosenDiff)
+			if D100(5+loosenDiff)
+			NymTrace("#WIGGLE GAME loose Sound Play")
+			storqst.SOUND_Wiggle_Loosen.Play(cfgqst.PlayerRef)
+			storqst.SPELL_Escape_Loosen.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)
+			LoosenNow = true
+			
+			Utility.Wait(2.0)
+			LoosenNow = false 
+			elseif D100(5)
+			NymTrace("#WIGGLE GAME tighten Sound Play")
+			storqst.SOUND_Wiggle_Tighten.Play(cfgqst.PlayerRef)
+			storqst.SPELL_Escape_Tighten.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)
+			TightenNow = true
+			Utility.Wait(3.0)
+			TightenNow = false 
+			endif 
+
+			RegisterForSingleUpdate(3)
+		
+		endif  
+	endif 
+
+
+EndEvent 
+
 
 ;BASE FUNCTIONS END ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-Function RemovePunishmentItems()
+;/
+Function RemovePunishmentItems() ;OLDE DELETE 
 
 		cfgqst.RemoveFuckBelt()
 		cfgqst.RemoveBrutalPlugs()
@@ -1538,3 +1606,4 @@ Function RemovePunishmentItems()
 		cfgqst.RemoveDefeatGags()
 		
 EndFunction
+/;

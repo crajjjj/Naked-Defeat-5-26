@@ -1,8 +1,6 @@
 ;BEGIN FRAGMENT CODE - Do not edit anything between this and the end comment
 
-
-
-Scriptname nade_allegiancequest_qf_scr Extends Quest Hidden
+Scriptname nade_dropquest_qf_scr Extends Quest Hidden
 
 ReferenceAlias Property Alias_Enemy00 Auto
 ReferenceAlias Property Alias_Enemy01 Auto
@@ -66,11 +64,8 @@ ReferenceAlias Property Alias_Enemy49 Auto
 
 ReferenceAlias Property Alias_Enemy50 Auto
 
-
-
 ReferenceAlias Property Follower Auto 
 ReferenceAlias[] Property NPC Auto			;references NPCs, most likely the NPCs in the area based on the Conditions in ESP
-
 
 nade_storage_qf_scr Property storqst Auto
 nade_defeatquest_qf_scr Property defqst Auto
@@ -82,14 +77,14 @@ nade_slavery_qf_scr Property slaveqst Auto
 NEW IDEAS:
 - add counter to "add faction" and "remove faction" and display as debug to count IN and Outfit
 - increase player health by 100000 during defeat?
-- add "OnHit" as trigger for allegianceQuest?
+- add "OnHit" as trigger for dropquest?
 - add a cleanup Quest that removes factions nonstop? -.-
 - IsInCombat a faulty way to work with?
 - add compatibility for BattleFuck
 
 NEW QUEST SYSTEM:
 
-AllegianceQuest checks actors and determines:
+dropquest checks actors and determines:
 
 - HumanDefeat (Bandits, Forsworn, etc.)
 - OrkDefeat (humans with Orkrace)
@@ -115,9 +110,9 @@ Starts new SpawnQuest
 - GiantDefeat? spawns nothing
 
 
-Defeatquest(allegiancequest): 	
+Defeatquest(dropquest): 	
 
-				+Starts AllegianceQuest
+				+Starts dropquest
 				
 				+StartCombatScan
 
@@ -125,16 +120,16 @@ Stage 10: 	+Allegiance(True)
 			+StartCombatScan
 			+set TCAI OFF
 
-CombatScan:	If PC is in combat, end AllegianceQuest 
+CombatScan:	If PC is in combat, end dropquest 
 
 Stage 1000: end Quest, remove allegiance from all (Allegiance(False))	
 			+set TCAI ON
 		
-Defeatquest(allegiancequest): 		
-CombatScan Restarts AllegianceQuest
+Defeatquest(dropquest): 		
+CombatScan Restarts dropquest
 
 Calmquest End: +Stop DefeatQuestsCombatScan
-				+Stop Allegiancequest (Stage 1000)
+				+Stop dropquest (Stage 1000)
 	
 
 
@@ -142,7 +137,7 @@ Calmquest End: +Stop DefeatQuestsCombatScan
 LATER:
 - DISTANCECHECK
 	check if actor is in rapescan distance or not
-	if NOT spawn actors for rape -> start calmquest via allegiancequest? how to deal with the idles?
+	if NOT spawn actors for rape -> start calmquest via dropquest? how to deal with the idles?
 
 - add race check here?
 - add guard check here?
@@ -193,11 +188,11 @@ EndFunction
 
 Function Fragment_1()						;	#END			;############ STAGE 1000 ############	#1000					
 	
-	Debug.Trace("NAKED DEFEAT: allegiancequest stage 1000 (END)")		
+	Debug.Trace("NAKED DEFEAT: dropquest stage 1000 (END)")		
 	
-	storqst.AllegianceQuestRunning = false 
+	;storqst.dropquestRunning = false 
 	
-	cfgqst.AllegianceShutdown = false		;what is this????
+	;cfgqst.AllegianceShutdown = false		;what is this????
 ;	Allegiance(false)
 	Stop()
 	
@@ -205,13 +200,13 @@ EndFunction
 
 
 Function Fragment_8()		;############ STAGE 500 ############	
-	Debug.Trace("NAKED DEFEAT allegiancequest: stage 500")			
+	Debug.Trace("NAKED DEFEAT dropquest: stage 500")			
 ;not in use					
 
 EndFunction
 
 Function Fragment_15()							;############ STAGE 13 ############		
-Debug.Trace("NAKED DEFEAT allegiancequest: stage 13")
+Debug.Trace("NAKED DEFEAT dropquest: stage 13")
 					
 ;not in use			
 
@@ -219,7 +214,7 @@ Debug.Trace("NAKED DEFEAT allegiancequest: stage 13")
 EndFunction
 	
 Function Fragment_20()							;############ STAGE 14 ############		
-Debug.Trace("NAKED DEFEAT allegiancequest: stage 14 (WAITING)")	
+Debug.Trace("NAKED DEFEAT dropquest: stage 14 (WAITING)")	
 ;not in use		
 
 EndFunction
@@ -228,106 +223,21 @@ Bool IgnoreCombat = false
 
 Function Fragment_3()				;##START				;############ STAGE 10 ;############
 
-QuestID = Random()
 
+Debug.Trace("NAKED DEFEAT #dropquest: stage 10 (START)")
+DropGarbageScan()
 
-
-Debug.Trace("NAKED DEFEAT #allegiancequest: stage 10 (START)")
-
-	storqst.AllegianceQuestRunning = true 
-
-	if cfgqst.AllegianceScanType == "DuplicateEnemyScan"	;WIP - we want to duplicate enemies the more the merrier 
-	cfgqst.AllegianceScanType = "empty"
-	AreaScanDuplicateEnemies()
-	
-	elseif cfgqst.AllegianceScanType == "DuplicateEnemyScan_Forced" 
-	cfgqst.AllegianceScanType = "empty"
-	IgnoreCombat = true 
-	AreaScanDuplicateEnemies()
-
-	elseif cfgqst.AllegianceScanType == "MarkDuplicantsScan"	;WIP - we want to duplicate enemies the more the merrier 
-	cfgqst.AllegianceScanType = "empty"
-	AreaScanMarkDuplicants()
-
-	elseif cfgqst.AllegianceScanType == "AreaScanRapers"	;WIP - we want to duplicate enemies the more the merrier 
-	cfgqst.AllegianceScanType = "empty"
-	AreaScanRapers()
-
-	elseif cfgqst.AllegianceScanType == "AreaScanWhipper"	;WIP - we want to duplicate enemies the more the merrier 
-	cfgqst.AllegianceScanType = "empty"
-	AreaScanWhipper()
-	;/
-	elseif cfgqst.AllegianceScanType == "DropGarbageScan"	;WIP - we want to duplicate enemies the more the merrier 
-	cfgqst.AllegianceScanType = "empty"
-	DropGarbageScan()
-	/;
-	
-	elseif cfgqst.AllegianceScanType == "PrepareDefeat"	;WIP - we want to duplicate enemies the more the merrier 
-	cfgqst.AllegianceScanType = "empty"
-	AreaScanPrepareDefeat()
-	
-	else 
-	
-	SetStage(1000)
-	
-	;	if cfgqst.ShowDebugMessages	
-	;	Debug.Notification("NAKED DEFEAT allegiancequest: stage 10 (START)")
-	;	endif
-				
-	;	Allegiance(true)	;---> calming actors 
-	;	StopCombatScan = false
-	;	while AllegianceRunning
-	;	Utility.Wait(0.5)
-	;	endwhile
-	;	RegisterForSingleUpdate(0.1)	
-	;	SetStage(14) 
-	endif 
 
 EndFunction
 
 ;-----------------------------------------------------------------------------------------------------------------------------------
 
-bool StopCombatScan = false
 
 Function Fragment_13()     ;############ STAGE 600 ############	SCAN STAGE
 
-StopCombatScan = true
-Debug.Trace("NAKED DEFEAT allegiancequest: Stage 600 (WAITING))")
 
 EndFunction
 
-Function CombatScan()
-Debug.Trace("NAKED DEFEAT allegiancequest: CombatScan()")
-	if cfgqst.FirstStartUp
-	int Waiting = 20
-		while (Waiting > 0) && cfgqst.FirstStartUp 		;what is this for again??? wait 20 seconds for what?
-		Waiting -= 2
-		Utility.Wait(2)
-		endwhile
-	Debug.Trace("NAKED DEFEAT allegiancequest: FirstStartUp(END)")
-	cfgqst.FirstStartUp = false
-	endif
-
-	;this is looping until called to stop by End stage of Defeat
-	while !StopCombatScan && (cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning)
-		
-		if PartyInCombat()
-		StopCombatScan = true	
-		else
-		Utility.Wait(3.0)	;change from 2.0 to 5.0... should suffice.	
-		endIf
-	endWhile
-	
-	Allegiance(false)
-	Debug.Trace("NAKED DEFEAT allegiancequest: CombatScan() AllegianceQuest (RESTART)")
-	
-	if (cfgqst.DefeatQuestRunning || cfgqst.CivilRapeRunning)
-	SendModEvent("RestartAllegianceQuest")	
-	endif	
-	SetStage(1000)	
-	Debug.Trace("NAKED DEFEAT allegiancequest: CombatScan(OFF)")
-
-EndFunction
 
 
 ;/ MODS TO IMPROVE:
@@ -376,7 +286,7 @@ EndFunction
 
 Function AreaScanPrepareDefeat()
 
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanPrepareDefeat()")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanPrepareDefeat()")
 	;WE SCAN I VALID RAPERS ARE IN THE vicinity
 	;when checking for misshaps (Traps/Struggling/Potions etc.)
 	
@@ -424,9 +334,9 @@ Function AreaScanPrepareDefeat()
 	endwhile	
 
 	if cfgqst.ProxActorDetected > 0
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanPrepareDefeat(Potential Rapers Nearby)")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanPrepareDefeat(Potential Rapers Nearby)")
 	else 
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanPrepareDefeat(NO Potential Rapers Nearby)")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanPrepareDefeat(NO Potential Rapers Nearby)")
 	endif 
 	
 	;cfgqst.ProxGuardDetected = 0
@@ -435,7 +345,7 @@ Function AreaScanPrepareDefeat()
 
 EndFunction
 
-	;/
+	
 Function DropGarbageScan()			;#AreaScanSlaveryCreatures() 
 
 Debug.Trace("NAKED DEFEAT: DropGarbageScan() START")
@@ -443,12 +353,15 @@ Debug.Trace("NAKED DEFEAT: DropGarbageScan() START")
 	Actor a		
 
 	int i = NPC.Length 		
-
+	
+	
+	
 	while i  ;&& (cfgqst.ProxActorDetected < 3) && !GuardSees	;if a Guard sees you we have the "worst" outcome already, civilians will be continued to check because we can still get a guard					
 	i -= 1	
 	a = NPC[i].GetReference() as Actor	
 
 		if a	
+			NymTrace("NAKED DEFEAT: #DropGarbageScan ACTOR["+i+"] = FOUND")
 			float TempFloatXa = 0
 			float TempFloatXb = 0
 			bool IsMoving = true
@@ -467,13 +380,15 @@ Debug.Trace("NAKED DEFEAT: DropGarbageScan() START")
 			if IsMoving			
 			slaveqst.DropRandomGarbage(a)	
 			endif 
+		else 
+		NymTrace("NAKED DEFEAT: #DropGarbageScan ACTOR["+i+"] = NONE")		
+			
 		endif 
 
 	endwhile	
-	SetStage(1000)
+	RegisterForSingleUpdate(3)
 	
 EndFunction	
-/;
 
 
 ;Function MoveWhipperToPlayer;()
@@ -501,10 +416,9 @@ endif
 
 EndFunction
 
-
 Function AreaScanWhipper()
 
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanWhipper()")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanWhipper()")
 	;WE SCAN I VALID RAPERS ARE IN THE vicinity
 	;when checking for misshaps (Traps/Struggling/Potions etc.)
 
@@ -568,7 +482,7 @@ EndFunction
 
 Function AreaScanRapers()
 
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanRapers()")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanRapers()")
 	;WE SCAN I VALID RAPERS ARE IN THE vicinity
 	;when checking for misshaps (Traps/Struggling/Potions etc.)
 	
@@ -604,9 +518,9 @@ Function AreaScanRapers()
 	endwhile	
 
 	if cfgqst.ProxActorDetected > 0
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanRapers(Potential Rapers Nearby)")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanRapers(Potential Rapers Nearby)")
 	else 
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanRapers(NO Potential Rapers Nearby)")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanRapers(NO Potential Rapers Nearby)")
 	endif 
 	
 	NymTrace("AreaScan Rapers Found: "+cfgqst.Enemy[0]+" "+cfgqst.Enemy[1]+" "+cfgqst.Enemy[2]+" "+cfgqst.Enemy[3]+" "+cfgqst.Enemy[4]+"  "+cfgqst.Enemy[5]+"  "+cfgqst.Enemy[6])
@@ -618,6 +532,12 @@ Function AreaScanRapers()
 
 EndFunction
 
+
+Function StartDropQuest() 
+
+Start()
+
+EndFunction 
 
 ;------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -631,7 +551,7 @@ Keyword DemonicCreature
 Function AreaScanDuplicateEnemies()
 	
 	DuplicationRunning = true
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanDuplicateEnemies()")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanDuplicateEnemies()")
 
 	Actor a		
 	Actor aTempActor 
@@ -686,7 +606,7 @@ Function AreaScanDuplicateEnemies()
 		a = NPC[j].GetReference() as Actor	
 		
 
-			if a && !a.IsInFaction(cfgqst.NakedDuplicantFaction)
+			if a 
 			
 		
 				ActorAggression = a.GetAV("Aggression")
@@ -736,7 +656,7 @@ Function AreaScanDuplicateEnemies()
 						endif 
 					endif 
 					
-					if a && !a.IsInFaction(cfgqst.NakedDuplicantFaction)
+					if a 
 					;	NymTrace("AreaScanDuplicateEnemies(D) "+i)
 						;if !sTempName
 						sTempName = cfgqst.GetActorName(a)	
@@ -850,8 +770,7 @@ Function AreaScanDuplicateEnemies()
 						;elseif a.IsInFaction(cfgqst.NakedDuplicantFaction) ;&& a.IsHostileToActor(cfgqst.PlayerRef) && !a.IsInCombat() && !a.IsInFaction(cfgqst.RobberFaction)	
 						;	ActorsToSpawn = 1
 							bool TestSystem = true 
-							;Actorbase TempActorBase = a.GetActorBase() 
-							Actorbase TempActorBase = a.GetLeveledActorBase() 
+							Actorbase TempActorBase = a.GetActorBase () 
 							Actor SpawnedActor
 
 							if TestSystem 	
@@ -912,7 +831,7 @@ Function AreaScanDuplicateEnemies()
 									endwhile 
 								else 
 						
-								Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR[NO LEVELED ACTOR BASE!")
+								Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR[NO ACTOR BASE!")
 								
 								endif	
 							
@@ -1007,7 +926,7 @@ EndFunction
 
 Function AreaScanMarkDuplicants()		;THIS SHOULD BE SUPERFLUOUS NOW 
 
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanMarkDuplicants()")
+	Debug.Trace("NAKED DEFEAT: dropquest AreaScanMarkDuplicants()")
 
 	Actor a										
 
@@ -1074,238 +993,19 @@ Function AreaScanMarkDuplicants()		;THIS SHOULD BE SUPERFLUOUS NOW
 EndFunction
 
 
-Function Allegiance(Bool value = true)			; #allegiance
-	
-	;ESP
-	;IsChild = FALSE 
-	;IsDead = FALSE 
-	;IsDisabled = FALSE 
-	;IsManakinRace = FALSE 
-	;IsInCombat ----> TRUE 
-	;IsHostileToActor(Player) -----> TRUE 
-	;-- hmm, what if we in bleedout? 
-	
-	;NymMessage("Allegiance ON - DefeatStatePlayer: "+cfgqst.DefeatStatePlayer) 
-
-	AllegianceRunning = true
-	OnlyHumans = true
-	Actor a		
-	Actor aTheEnemy = none			
-	Int i = NPC.Length						
-	int ActorCount = 0
-	Bool NewSystem = true
-	String sTempName = "empty"
-	
-	
-	
-	;GET THE ENEMY FirstStartUp
-	if value
-		while i && !aTheEnemy	 												
-			i -= 1												
-			a = NPC[i].GetReference() as Actor		
-
-			if a && a.IsInFaction(cfgqst.EnemyFaction)		
-			aTheEnemy = a		
-			sTempName = cfgqst.GetLeveledActorBaseName(a)
-			Debug.Trace("NAKED DEFEAT allegiancequest: #Allegiance (The Enemy = ACTOR#"+i+": "+sTempName)	;#DEBUG
-			endif
-
-		endwhile
-		
-		if aTheEnemy
-	;	NymMessage("The Enemy found: "+sTempName)
-		else 
-	;	NymMessage("The Enemy not found")
-		endif 
-	endif 
-	
-
-
-	;Allegiance(TRUE) ----> All Actors (not only enemies)
-	if value		
-	
-		Debug.Trace("NAKED DEFEAT allegiancequest: Allegiance (ON)")
-		while i 	 												
-			i -= 1												
-			a = NPC[i].GetReference() as Actor		
-
-			if a 	
-			sTempName = cfgqst.GetLeveledActorBaseName(a)
-			
-			Debug.Trace("NAKED DEFEAT allegiancequest: #Allegiance (ON) ACTOR#"+i+": "+sTempName)	;#DEBUG
-			
-					;-------- DEFEAT TYPE (if surrendering) -------------------------------------------------------------
-					
-					;---- maybe we also need this to determine defeattype of some other scenarios
-					
-					;check reaction of a towards "The Enemy"
-					if !a.IsInFaction(cfgqst.EnemyFaction) && (a.GetFactionReaction(aTheEnemy) > 1) 
-					;NymTrace("Is Ally/Friend")
-					a.AddToFaction(cfgqst.EnemyFaction)
-					else
-					;NymTrace("Is NOT Ally/Friend")
-					endif 
-
-					if NewSystem
-
-						if cfgqst.AllegianceScanType == "Combat Surrender Start"
-						cfgqst.AllegianceScanType = "Empty"
-						endif 
-						if cfgqst.AllegianceScanType == "Combat Crime Surrender Start"
-						cfgqst.AllegianceScanType = "Empty"
-						endif 
-						
-						if cfgqst.DefeatViaSurrender						;IS ENEMY - in combat, hostile	
-							if a.IsInCombat() && a.IsHostileToActor(cfgqst.PlayerRef)
-							
-								if cfgqst.PlayerRef.GetDistance(a) <= 4000 ;100 units = 1,42 m --> 14 m ca. 
-								cfgqst.GetEnemyType(a)	
-								cfgqst.ProxActorDetected += 1
-								endif
-								
-								if !a.IsInFaction(cfgqst.EnemyFaction)
-								a.AddToFaction(cfgqst.EnemyFaction) ;<<---- we use this to identify our enemies from combat
-								;NymTrace("#NOTE: Added to Enemy Faction: "+sTempName)
-								endif 
-
-							endif
-							
-						;ENEMY DETECTION 	
-						elseif cfgqst.AllegianceScanType == "Combat Defeat Start"
-						cfgqst.AllegianceScanType = "Empty"
-						;combat ends, we need as much INFO as we can get. All Actors within 10.000 Units will be scanned for combatstance and hostility
-						;hope we can get even the fireball slingers from far away this way.
-						
-							if a.IsInCombat() && a.IsHostileToActor(cfgqst.PlayerRef)
-								
-								if cfgqst.PlayerRef.GetDistance(a) <= 12000
-								cfgqst.GetEnemyType(a)	
-								cfgqst.ProxActorDetected += 1
-								endif 
-								
-								if !a.IsInFaction(cfgqst.EnemyFaction)
-								a.AddToFaction(cfgqst.EnemyFaction) ;<<---- we use this to identify our enemies from combat
-								;NymTrace("#NOTE: CombatDefeatStart - Added to Enemy Faction: "+sTempName)
-								endif 
-
-							endif
-						endif 
-						
-					else 	
-						;OLD SYSTEM ------------------------------------------
-						if cfgqst.DefeatViaSurrender ;&& (cfgqst.Enemy[0] == "none")
-						;Debug.Trace("NAKED DEFEAT allegiancequest: cfgqst.DefeatViaSurrender(true)")
-							;if a.IsInCombat() && a.IsHostileToActor(cfgqst.PlayerRef) && (cfgqst.Enemy[5] == "none")
-							if !cfgqst.IsFollower(a) && (cfgqst.PlayerRef.GetDistance(a) <= 3000)
-							Debug.Trace("NAKED DEFEAT allegiancequest: START GetEnemyType()")
-							cfgqst.GetEnemyType(a)	;GUIDE: this gets the enemies type (faction/racekey) to allow us to determine the DefeatType	
-							endif
-						endif
-					endif 
-					
-					
-						;-----------------------------------------------
-					;------------------------------------------------------------------------------------
-					
-					a.StopCombat()		
-					a.StopCombatAlarm()	
-
-					if !a.IsInFaction(FactionDefeat02)
-						a.AddToFaction(FactionDefeat02)
-						;if cfgqst.ShowDebugMessages
-						;Debug.Trace("NAKED DEFEAT allegiancequest: actor ADDED to FactionDefeat02: "+i+": "+cfgqst.GetActorInfo(a))	;check actor alias slots (30)
-						;endif
-						ActorCount += 1
-					endif
-					
-					;backup calmfaction (test)
-					if !a.IsInFaction(CalmFaction)
-					a.AddToFaction(CalmFaction)
-					endif
-					
-					if a.IsAlerted()
-					a.SetAlert(False)
-					endif
-
-			endif
-
-		endwhile
-		
-		;-------- DEFEAT TYPE ----------
-		if cfgqst.DefeatViaSurrender && cfgqst.DefeatTypeScenario != "Afterlife" && cfgqst.IsDefeatRunning()
-		Debug.Trace("NAKED DEFEAT allegiancequest: Starting cfgqst.GetDefeatType()")
-		cfgqst.GetDefeatType("AllegianceQuest")
-		endif
-		;-------------------------------
-		
-		;if cfgqst.IsNymrasGame()
-	;	NymMessage("ALlegiance UPDATE TEST") 
-		;endif 
-		
-		;if (qst1.GetStage() == 1000) && OnlyHumans && !cfgqst.DefeatViaSlavery     ;SLAVERY HAS OWN SPAWN SYSTEM
-
-		;	if cfgqst.NymSpawning && cfgqst.AllowCreatures  
-		;	Debug.Trace("NAKED DEFEAT allegiancequest: #spawn: only humans, calmquest not started, go SpawnRapers") ;#DEBUG
-		;		if cfgqst.DefeatTypeGeneral == "AreHumans"
-		;		cfgqst.SpawnRapers("random", false)	
-		;		endif
-		;		
-		;		;#to do: add extra spawns for different scenarios?
-		;	endif
-		
-		;elseif !OnlyHumans
-		;Debug.Trace("NAKED DEFEAT allegiancequest: #spawn: we already have non-human actors, nothing to do")
-		;else
-		;Debug.Trace("NAKED DEFEAT allegiancequest: #spawn: CalmQuest already running, too late to spawn") ;#DEBUG
-		;endif
-		
-		OnlyHumans = true ;reset 	
-	
-		Debug.Trace("NAKED DEFEAT allegiancequest: Allegiance(ON) ActorCount: "+ActorCount)	;#DEBUG ;compare count!
-			
-		cfgqst.PlayerRef.StopCombat()		
-		cfgqst.PlayerRef.StopCombatAlarm()	
-			
-	;Allegiance(FALSE)			
-	else		
-	Debug.Trace("NAKED DEFEAT allegiancequest: Allegiance (OFF)")
-	;Debug.Trace("NAKED DEFEAT allegiancequest: AllegianceFunction(OFF) QuestID: "+QuestID)					
-		while i												
-			i -= 1
-			a = NPC[i].GetReference() as Actor
-			
-			if a	
-					
-				if (a.GetBaseObject().GetName() == "FEC : Load Screen Detector")
-				;do nothing
-				else
-					
-					if (a.IsInFaction(FactionDefeat02)) ;&&  !(a.IsPlayerTeammate())						
-					a.RemoveFromFaction(FactionDefeat02)
-					ActorCount += 1					
-					endif
-					
-					;backup calmfaction (test)
-					if (a.IsInFaction(CalmFaction))							
-					a.RemoveFromFaction(CalmFaction)
-					endif
-
-				endif
-			endif
-		endwhile	
-		Debug.Trace("NAKED DEFEAT: allegiancequest Allegiance (OFF) ActorCount: "+ActorCount)	 ;#DEBUG compare count!
-
-	;SetStage(1000)	;allegiance false, now shutdown
-	endif		
-	AllegianceRunning = false
-	cfgqst.PlayerDownAlready = false ;TEST NEW SYSTEM 2025
-
-EndFunction
+int DroppedGarbage
 
 Event OnUpdate()			;	#update 
-		
-CombatScan()
 	
+	NymTrace("dropquest OnUpdate ---> FetchTaskType "+slaveqst.FetchTaskType+" TrackedDroppedGarbageItemsCount "+slaveqst.TrackedDroppedGarbageItemsCount)
+
+	if slaveqst.FetchTaskType == "Collect Garbage" && slaveqst.TrackedDroppedGarbageItemsCount < 70
+	NymTrace("Loop Garbage Scan")
+	DropGarbageScan() 
+	else 
+	SetStage(1000)
+	endif 
+
 EndEvent
 
 
@@ -1350,35 +1050,35 @@ Function ScreenMessage(String Text3)		;#ScreenMessage ;narrative Messages
 	if cfgqst.ShowNarrativeMessages
 	Debug.Notification("<font color='#ff0000'>"+Text3+"</font>")
 	endif
-	Debug.trace("NAKED DEFEAT allegiancequest: (#msg) "+Text3)
+	Debug.trace("NAKED DEFEAT dropquest: (#msg) "+Text3)
 EndFunction
 
 Function InfoMessage(String Text2)		;#DebugMessage
 	if cfgqst.ShowInfoMessages
 	Debug.Notification("<font color='#ff7f00'>"+Text2+"</font>")
 	endif
-	Debug.trace("NAKED DEFEAT allegiancequest: (#msg INFO) "+Text2)
+	Debug.trace("NAKED DEFEAT dropquest: (#msg INFO) "+Text2)
 	
 EndFunction
 
 Function DebugMessage(String Text2)		;#DebugMessage
 	if cfgqst.ShowDebugMessages
 	Debug.Notification("<font color='#00ffff'>"+Text2+"</font>")
-	Debug.trace("NAKED DEFEAT allegiancequest: (#msg DEBUG) "+Text2)
+	Debug.trace("NAKED DEFEAT dropquest: (#msg DEBUG) "+Text2)
 	endif
 EndFunction
 
 Function NymMessage(String Text2)		;#NymMessage
 	if cfgqst.Nym()
 	Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
-	Debug.trace("NAKED DEFEAT allegiancequest: (#msg NYM) "+Text2)
+	Debug.trace("NAKED DEFEAT dropquest: (#msg NYM) "+Text2)
 	endif
 EndFunction
 
 Function NymTrace(String Text2)		;#NymTrace
 	if cfgqst.Nym()
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
-	Debug.trace("NAKED DEFEAT allegiancequest: (#trace NYM) "+Text2)
+	Debug.trace("NAKED DEFEAT dropquest: (#trace NYM) "+Text2)
 	endif
 EndFunction
 

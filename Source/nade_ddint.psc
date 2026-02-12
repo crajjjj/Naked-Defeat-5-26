@@ -153,6 +153,49 @@ Bool Function IsWearingDDs(actor akActor, String sType) Global			;#IsWearingDDs
 			endif 	
 		return OnlyPiercings
 		
+	elseif sType == "Yoke Breast Front"		
+	
+		if akActor.WornHasKeyword(Keyword.GetKeyword("zadNG_DeviousYokeFront"))
+		return true
+		else 
+		return false 
+		endif	
+		
+	elseif sType == "Yoke BB (Breast  Yoke)"		
+	
+		if akActor.WornHasKeyword(Keyword.GetKeyword("zad_DeviousYokeBB"))
+		return true
+		else 
+		return false 
+		endif		
+
+	elseif sType == "Armbinder"		
+	
+		if akActor.WornHasKeyword(Keyword.GetKeyword("zad_DeviousArmbinder"))
+		return true
+		elseif akActor.WornHasKeyword(Keyword.GetKeyword("zad_DeviousArmbinderElbow"))
+		return true
+		else 
+		return false 
+		endif		
+		
+	elseif sType == "Strait Jacket"		
+	
+		if akActor.WornHasKeyword(Keyword.GetKeyword("zad_DeviousStraitJacket"))
+		return true
+		else 
+		return false 
+		endif		
+		
+		
+	elseif sType == "Yoke Classic"		
+	
+		if akActor.WornHasKeyword(Keyword.GetKeyword("zad_DeviousYoke"))
+		return true
+		else 
+		return false 
+		endif	
+
 	elseif sType == "Forced Walk"		
 	
 		if akActor.WornHasKeyword(Keyword.GetKeyword("zad_EffectForcedWalk"))
@@ -188,6 +231,14 @@ Bool Function IsWearingDDs(actor akActor, String sType) Global			;#IsWearingDDs
 	elseif sType == "Piercing Vaginal"		
 	
 		if akActor.WornHasKeyword(Keyword.GetKeyword("zad_DeviousPiercingsVaginal"))
+		return true
+		else 
+		return false 
+		endif	
+	
+	elseif sType == "Inventory"	
+	
+		if akActor.WornHasKeyword(Keyword.GetKeyword("zad_InventoryDevice"))
 		return true
 		else 
 		return false 
@@ -308,12 +359,12 @@ Function RemoveAll_DDs_FromActor(actor akActor, bool destroyDevices=false, Strin
 	if !akActor.WornHasKeyword(DeviousBelt) 
 		Armor a = akActor.GetWornForm(0x00040000) as Armor;  Slot 48 - Anal Plug
 		if (a != none) && !a.HasKeyword(libs.zad_Lockable) && !a.HasKeywordString("SexLabNoStrip")
-			akActor.UnequipItem(akActor, false, true)
+			akActor.UnequipItem(a, false, true)
 		endif
 
 		a = akActor.GetWornForm(0x08000000) as Armor;  Slot 57 - Vaginal Plug <<<<<<<<<<<<<-------------------------
 		if (a != none) && !a.HasKeyword(libs.zad_Lockable) && !a.HasKeywordString("SexLabNoStrip")
-			akActor.UnequipItem(akActor, false, true)
+			akActor.UnequipItem(a, false, true)
 		endif
 	endif
 	
@@ -473,12 +524,12 @@ Function RemoveDevicesFromActor(actor akActor, bool destroyDevices=false) Global
 	if !akActor.WornHasKeyword(DeviousBelt) 
 		Armor a = akActor.GetWornForm(0x00040000) as Armor;  Slot 48 - Anal Plug
 		if (a != none) && !a.HasKeyword(libs.zad_Lockable) && !a.HasKeywordString("SexLabNoStrip")
-			akActor.UnequipItem(akActor, false, true)
+			akActor.UnequipItem(a, false, true)
 		endif
 
 		a = akActor.GetWornForm(0x08000000) as Armor;  Slot 57 - Vaginal Plug
 		if (a != none) && !a.HasKeyword(libs.zad_Lockable) && !a.HasKeywordString("SexLabNoStrip")
-			akActor.UnequipItem(akActor, false, true)
+			akActor.UnequipItem(a, false, true)
 		endif
 	endif
 	
@@ -596,12 +647,12 @@ Function RemoveDevices(bool destroyDevices=false) Global
 	if !PlayerRef.WornHasKeyword(DeviousBelt) 
 		Armor a = PlayerRef.GetWornForm(0x00040000) as Armor;  Slot 48 - Anal Plug
 		if (a != none) && !a.HasKeyword(libs.zad_Lockable) && !a.HasKeywordString("SexLabNoStrip")
-			PlayerRef.UnequipItem(PlayerRef, false, true)
+			PlayerRef.UnequipItem(a, false, true)
 		endif
 
 		a = PlayerRef.GetWornForm(0x08000000) as Armor;  Slot 57 - Vaginal Plug
 		if (a != none) && !a.HasKeyword(libs.zad_Lockable) && !a.HasKeywordString("SexLabNoStrip")
-			PlayerRef.UnequipItem(PlayerRef, false, true)
+			PlayerRef.UnequipItem(a, false, true)
 		endif
 	endif
 	
@@ -730,6 +781,16 @@ EndFunction
 	;1201E69B		Mask of Shame
 	;1201AB0E		Iron Scold's Bridle (Light)
 	;1201F6C9		Iron Gag (Bit)
+	
+	;GAGS New
+	;1203B21B		Black Leather Gag (Pony)	
+	;120486D0		Rope Ball Gag 
+	;120486D3		Rope Bit Gag 
+	;11034253		Black Leather Gag (Ball) (Simple)
+	;12001DA6		Black Leather Gag (Large Ball) (Simple)
+	
+	;Gags Heavy 
+	;12A100EC		Heavy Leather Penis Gag (Black) - Mask Gag
 
 	;---- PIERCINGS -----;
 	;1201CB91		Iron Nipple Piercings
@@ -809,25 +870,71 @@ Function EquipDDtoActor(actor akActor, String sVariant) Global
 	libs.LockDevice(akActor, iDevice, false)		
 	
 	elseif sVariant == "DD Iron Nipple Clamps"
-	iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
+	iDevice = ( Game.GetFormFromFile(0x1201C62A, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
 	libs.LockDevice(akActor, iDevice, false)	
 	
 	elseif sVariant == "DD Iron Gag Bit"
 	iDevice = ( Game.GetFormFromFile(0x1201F6C9, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Gag (Bit)
 	libs.LockDevice(akActor, iDevice, false)		
+	
+	elseif sVariant == "DD Black Leather Pony Gag"
+	iDevice = ( Game.GetFormFromFile(0x1203B21B, "Devious Devices - Expansion.esm" ) as Armor ) 	;Black Leather Gag (Pony)	
+	libs.LockDevice(akActor, iDevice, false)		
+	
+	elseif sVariant == "DD Rope Ball Gag "
+	iDevice = ( Game.GetFormFromFile(0x120486D0, "Devious Devices - Expansion.esm" ) as Armor ) 	;Rope Ball Gag 
+	libs.LockDevice(akActor, iDevice, false)		
+	
+	elseif sVariant == "DD Rope Bit Gag "
+	iDevice = ( Game.GetFormFromFile(0x120486D3, "Devious Devices - Expansion.esm" ) as Armor ) 	;Rope Bit Gag 
+	libs.LockDevice(akActor, iDevice, false)		
 
-	elseif sVariant == "DD Iron Nipple Piercings"
-	iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Nipple Piercings
+	elseif sVariant == "DD Black Leather Gag (Big Ball)"
+	iDevice = ( Game.GetFormFromFile(0x12001DA6, "Devious Devices - Expansion.esm" ) as Armor ) 	;Black Leather Gag (Large Ball) (Simple)
 	libs.LockDevice(akActor, iDevice, false)		
-		
-	elseif sVariant == "DD Iron Nipple Clamps"
-	iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
+			
+	elseif sVariant == "DD Black Leather Gag (Ball)"
+	iDevice = ( Game.GetFormFromFile(0x11034253, "Devious Devices - Integration.esm" ) as Armor ) 	;Black Leather Gag (Ball) (Simple)
+	libs.LockDevice(akActor, iDevice, false)				
+			
+	
+	elseif sVariant == "DD Black Chaotic Pentagram Rope Corset"
+	iDevice = ( Game.GetFormFromFile(0x12051FC7, "Devious Devices - Expansion.esm" ) as Armor ) 	;Black Chaotic Pentagram Rope Corset
 	libs.LockDevice(akActor, iDevice, false)		
-		
+	
+	elseif sVariant == "DD Hishi Chaotic Rope Harness"
+	iDevice = ( Game.GetFormFromFile(0x1204E8A7, "Devious Devices - Expansion.esm" ) as Armor ) 	;Hishi Chaotic Rope Harness	
+	libs.LockDevice(akActor, iDevice, false)	
+	
+	elseif sVariant == "DD Hishi Karada Rope Harness"
+	iDevice = ( Game.GetFormFromFile(0x1204EE37, "Devious Devices - Expansion.esm" ) as Armor ) 	;Hishi Karada Rope Harness
+	libs.LockDevice(akActor, iDevice, false)		
+	
+	elseif sVariant == "DD Full Top Rope Harness"
+	iDevice = ( Game.GetFormFromFile(0x1204EE35, "Devious Devices - Expansion.esm" ) as Armor ) 	;Hishi Karada Rope Harness
+	libs.LockDevice(akActor, iDevice, false)		
+
+	elseif sVariant == "Random Gag" 
+			
+			i = Utility.Randomint(1,6)	
+				if i == 1
+				iDevice = ( Game.GetFormFromFile(0x1201F6C9, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Gag (Bit)
+				elseif i == 2
+				iDevice = ( Game.GetFormFromFile(0x1203B21B, "Devious Devices - Expansion.esm" ) as Armor ) 	;Black Leather Gag (Pony)	
+				elseif i == 3
+				iDevice = ( Game.GetFormFromFile(0x120486D0, "Devious Devices - Expansion.esm" ) as Armor ) 	;Rope Ball Gag
+				elseif i == 4
+				iDevice = ( Game.GetFormFromFile(0x120486D3, "Devious Devices - Expansion.esm" ) as Armor ) 	;Rope Bit Gag
+				elseif i == 5
+				iDevice = ( Game.GetFormFromFile(0x12001DA6, "Devious Devices - Expansion.esm" ) as Armor ) 	;Black Leather Gag (Large Ball) (Simple)
+				elseif i == 6
+				iDevice = ( Game.GetFormFromFile(0x11034253, "Devious Devices - Integration.esm" ) as Armor ) 	;Black Leather Gag (Ball) (Simple)
+				endif 
+				
+				libs.LockDevice(akActor, iDevice, false)
 	
 	elseif sVariant == "Random Binds" 
 	
-			
 			;---- Nipple Torture -----;		
 			if (Utility.RandomInt(1,100) < 75) && !FullOutfitEquiped
 				
@@ -836,7 +943,7 @@ Function EquipDDtoActor(actor akActor, String sVariant) Global
 				if i == 1
 				iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Nipple Piercings
 				elseif i == 2
-				iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
+				iDevice = ( Game.GetFormFromFile(0x1201C62A, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
 				endif 
 				
 				if iDevice
@@ -982,7 +1089,7 @@ Function EquipDDtoActor(actor akActor, String sVariant) Global
 			if i == 1
 			iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Nipple Piercings
 			elseif i == 2
-			iDevice = ( Game.GetFormFromFile(0x1201CB91, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
+			iDevice = ( Game.GetFormFromFile(0x1201C62A, "Devious Devices - Expansion.esm" ) as Armor ) 	;Iron Clamps (Nipples)
 			endif 
 			
 			if iDevice
@@ -1080,6 +1187,28 @@ Function EquipDDtoActor(actor akActor, String sVariant) Global
 
 EndFunction
 		
+
+	
+Function EquipSpecificDDtoActor(actor akActor, Armor specificDD) Global
+
+	Quest q =  nade_GetDDQuest()
+	if q == none
+		return
+	endif
+
+	Zadlibs libs = q as Zadlibs
+	bool fastDD = (libs.GetVersion() >= 13)
+	Actor PlayerRef = libs.PlayerRef
+	Armor iDevice
+	
+	iDevice = specificDD
+
+	if iDevice
+	libs.LockDevice(akActor, iDevice, false)
+	endif 
+
+EndFunction		
+		
 ;/ 
 
 		WIGGLE FREE SMART with One Key 
@@ -1102,6 +1231,7 @@ Keyword Function GetDDKeyword(String sKeyword) Global
 	return Keyword.GetKeyword(sKeyword) 
 
 EndFunction
+
 
 Keyword Function GetKeyword(int a) Global
 	if a == 1
@@ -1162,6 +1292,13 @@ Keyword Function GetKeyword(int a) Global
 		return Keyword.GetKeyword("zad_DeviousBondageMittens")
 	elseif a == 29
 		return Keyword.GetKeyword("zad_DeviousHobbleSkirt")
+		
+	elseif a == 30
+		return Keyword.GetKeyword("zadNG_DeviousYokeFront")
+
+	elseif a == 31
+		return Keyword.GetKeyword("zad_InventoryDevice") 	;	zad_InventoryDevice [KYWD:0602B5F0]
+		
 	else
 		return Keyword.GetKeyword("zad_Lockable")
 	endif
@@ -1169,9 +1306,9 @@ Keyword Function GetKeyword(int a) Global
 EndFunction
 
 
-Function DDTrace(String Text2) Global	;#NymTrace
+Function DDTrace(String Text2) Global	;#NymTrace #DDTrace
 	;if IsNymrasGame()
-	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
-	;Debug.trace("NAKED DEFEAT #DDint: "+Text2)
+;	Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
+;	Debug.trace("NAKED DEFEAT #DDint: "+Text2)
 	;endif
 EndFunction
