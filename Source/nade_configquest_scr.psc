@@ -27,7 +27,7 @@ Function VersionCheck()
 	endif	
 
 	if VersionSE
-	NakedDefeat_ModVersion = "6.45 - AE/SE"
+	NakedDefeat_ModVersion = "6.46 - AE/SE"
 	else
 	NakedDefeat_ModVersion = "#ERROR: this is SE Version" ;#MODVERSION
 	Debug.Messagebox("ERROR you are using the AE/SE Version on LE. Not recommended!!!")
@@ -90,31 +90,58 @@ Function RegisterModEvents()		;#RegisterModEvents	#Register1
 	RegisterForAnimationEvent(PlayerRef, "BeginWeaponSheathe")
 	
 	if Nym()
+	
+	UnRegisterForAnimationEvent(PlayerRef, "bashStart")
+;	UnRegisterForAnimationEvent(PlayerRef, "bashExit")
+	UnRegisterForAnimationEvent(PlayerRef, "bashFail")
+	UnRegisterForAnimationEvent(PlayerRef, "bashPowerStart")
+	UnRegisterForAnimationEvent(PlayerRef, "bashRelease")
+	UnRegisterForAnimationEvent(PlayerRef, "bashStart")
+	UnRegisterForAnimationEvent(PlayerRef, "bashStop")
+	UnRegisterForAnimationEvent(PlayerRef, "SoundPlay.WPNSwingUnarmed")
+	
+	UnRegisterForAnimationEvent(PlayerRef, "PowerAttack_Start_end")
+	UnRegisterForAnimationEvent(PlayerRef, "PowerAttackStop")
+	UnRegisterForAnimationEvent(PlayerRef, "attackPowerStartForward")
+	UnRegisterForAnimationEvent(PlayerRef, "attackPowerStartForwardLeftHand")
+	UnRegisterForAnimationEvent(PlayerRef, "attackPowerStartInPlace")	
+	
+	UnRegisterForAnimationEvent(PlayerRef, "blockAnticipateStart")
+	UnRegisterForAnimationEvent(PlayerRef, "blockAnticipateStop")
+	UnRegisterForAnimationEvent(PlayerRef, "blockHitStart")
+	UnRegisterForAnimationEvent(PlayerRef, "blockHitStop")
+	UnRegisterForAnimationEvent(PlayerRef, "blockStart")	
+	UnRegisterForAnimationEvent(PlayerRef, "blockStartOut")
+	UnRegisterForAnimationEvent(PlayerRef, "PowerAttackStop")
+	UnRegisterForAnimationEvent(PlayerRef, "blockStop")
+	UnRegisterForAnimationEvent(PlayerRef, "blockStopInstant")
+	UnRegisterForAnimationEvent(PlayerRef, "blockStopOut")	
+	
 	;RegisterForAnimationEvent(PlayerRef, "bashStart")
 	RegisterForAnimationEvent(PlayerRef, "bashExit")
-	RegisterForAnimationEvent(PlayerRef, "bashFail")
-	RegisterForAnimationEvent(PlayerRef, "bashPowerStart")
-	RegisterForAnimationEvent(PlayerRef, "bashRelease")
-	RegisterForAnimationEvent(PlayerRef, "bashStart")
-	RegisterForAnimationEvent(PlayerRef, "bashStop")
-	RegisterForAnimationEvent(PlayerRef, "SoundPlay.WPNSwingUnarmed")
+	;RegisterForAnimationEvent(PlayerRef, "bashFail")
+	;RegisterForAnimationEvent(PlayerRef, "bashPowerStart")
+	;RegisterForAnimationEvent(PlayerRef, "bashRelease")
+	;RegisterForAnimationEvent(PlayerRef, "bashStart")
+	;RegisterForAnimationEvent(PlayerRef, "bashStop")
+	;RegisterForAnimationEvent(PlayerRef, "SoundPlay.WPNSwingUnarmed")
 	
-	RegisterForAnimationEvent(PlayerRef, "PowerAttack_Start_end")
-	RegisterForAnimationEvent(PlayerRef, "PowerAttackStop")
-	RegisterForAnimationEvent(PlayerRef, "attackPowerStartForward")
-	RegisterForAnimationEvent(PlayerRef, "attackPowerStartForwardLeftHand")
-	RegisterForAnimationEvent(PlayerRef, "attackPowerStartInPlace")	
+	;RegisterForAnimationEvent(PlayerRef, "PowerAttack_Start_end")
+	;RegisterForAnimationEvent(PlayerRef, "PowerAttackStop")
+	;RegisterForAnimationEvent(PlayerRef, "attackPowerStartForward")
+	;RegisterForAnimationEvent(PlayerRef, "attackPowerStartForwardLeftHand")
+	;RegisterForAnimationEvent(PlayerRef, "attackPowerStartInPlace")	
 	
-	RegisterForAnimationEvent(PlayerRef, "blockAnticipateStart")
-	RegisterForAnimationEvent(PlayerRef, "blockAnticipateStop")
-	RegisterForAnimationEvent(PlayerRef, "blockHitStart")
-	RegisterForAnimationEvent(PlayerRef, "blockHitStop")
-	RegisterForAnimationEvent(PlayerRef, "blockStart")	
-	RegisterForAnimationEvent(PlayerRef, "blockStartOut")
-	RegisterForAnimationEvent(PlayerRef, "PowerAttackStop")
-	RegisterForAnimationEvent(PlayerRef, "blockStop")
-	RegisterForAnimationEvent(PlayerRef, "blockStopInstant")
-	RegisterForAnimationEvent(PlayerRef, "blockStopOut")	
+	;RegisterForAnimationEvent(PlayerRef, "blockAnticipateStart")
+	;RegisterForAnimationEvent(PlayerRef, "blockAnticipateStop")
+	;RegisterForAnimationEvent(PlayerRef, "blockHitStart")
+	;RegisterForAnimationEvent(PlayerRef, "blockHitStop")
+	;RegisterForAnimationEvent(PlayerRef, "blockStart")	
+	;RegisterForAnimationEvent(PlayerRef, "blockStartOut")
+	;RegisterForAnimationEvent(PlayerRef, "PowerAttackStop")
+	;RegisterForAnimationEvent(PlayerRef, "blockStop")
+	;RegisterForAnimationEvent(PlayerRef, "blockStopInstant")
+	;RegisterForAnimationEvent(PlayerRef, "blockStopOut")	
 	
 	
 	;/
@@ -630,9 +657,9 @@ Bool EnableFalling = false
 	;LATE 	
 	;NymTrace("bashStop")
 	;NymMessage("bashStop")
-	elseif (asEventName == "blockHitStart") 
-		NymTrace("blockHitStart")
-	NymMessage("blockHitStart")
+;	elseif (asEventName == "blockHitStart") 
+;		NymTrace("blockHitStart")
+;	NymMessage("blockHitStart")
 ;	RegisterForAnimationEvent(PlayerRef, "")
 	
 ;	RegisterForAnimationEvent(PlayerRef, "blockAnticipateStart")
@@ -687,9 +714,9 @@ Bool EnableFalling = false
 ;	NymTrace("PowerAttackStop")
 ;	NymMessage("PowerAttackStop")	
 	
-	elseif (asEventName == "attackPowerStartForward") 	 ;NO
-	NymTrace("attackPowerStartForward")
-	NymMessage("attackPowerStartForward")				
+;	elseif (asEventName == "attackPowerStartForward") 	 ;NO
+;	NymTrace("attackPowerStartForward")
+;	NymMessage("attackPowerStartForward")				
 				
 ;	elseif (asEventName == "attackPowerStartForwardLeftHand") 	 ;NO
 ;;	NymMessage("attackPowerStartForwardLeftHand")	
@@ -1142,10 +1169,14 @@ EndEvent
 ;Event OnStartNakedDefeatExternal(actor Enemy00, actor Enemy01, actor Enemy02, actor Enemy03, actor Enemy04, actor Enemy05)
 
 Event OnStartNakedDefeatExternal(Form Enemy00, Form Enemy01, Form Enemy02, Form Enemy03, Form Enemy04, Form Enemy05)
-   
    if BleedoutCounter > 0
    Debug.Messagebox("NAKED DEFEAT: #WARNING: Defeat on Bleedout needs to be 0% when you are using Acheron. Acheron Bridge abortet. Use Debug Wheel Unstuck Player if needed or reload earlier save.")
    Debug.Trace("NAKED DEFEAT configquest: #WARNING for ACHERON, Bleedout Defeat is > 0%")
+   
+   elseif storqst.AcheronBleedoutFix 
+   Debug.Messagebox("NAKED DEFEAT: #WARNING: Acheron wants to start Naked Defeat but you disabled Acheron Handling (check Page 1 of Naked Defeat MCM).")
+   Debug.Trace("NAKED DEFEAT configquest: #WARNING: Acheron wants to start Naked Defeat but you disabled Acheron Handling")   
+   
    else  
 	   
 	   Debug.Trace("NAKED DEFEAT configquest: OnStartNakedDefeatExternal()")
@@ -1285,11 +1316,11 @@ Event OnStartNakedDefeatExternal(Form Enemy00, Form Enemy01, Form Enemy02, Form 
 		
 		Utility.Wait(1.0)
 		
-		if !storqst.AcheronBleedoutFix ;with the Fix enabled this happens in Bleedout state already
+	;	if !storqst.AcheronBleedoutFix ;with the Fix enabled this happens in Bleedout state already
 		Spell RestoreHealt = Game.GetFormFromFile(0x0002F3B8, "Skyrim.Esm") as Spell
 		;Spell GrandHealing = Game.GetFormFromFile(0x000B62EE, "Skyrim.Esm" as Spell)   
 		RestoreHealt.RemoteCast(PlayerRef, PlayerRef, PlayerRef)
-		endif 
+	;	endif 
 		;RestoreHealt remotecast
 		;MagicEffect FortifyHealth = Game.GetFormFromFile(0x0003EAF3, "Skyrim.Esm")  
 		
@@ -2317,7 +2348,7 @@ Function CheckHardDependencies()
 EndFunction 
 
 
-Function CheckSoftDependencies()
+Function CheckSoftDependencies()		;#CheckSoftDependencies()	;#soft
 
 	DebugTrace("CheckSoftDependencies("+NakedDefeat_ModVersion+")")
 	;GUIDE:
@@ -5331,55 +5362,43 @@ EndFunction
 
 Function OnCellLoadFunction()
 		
-		if Nym()
-		folqst.FollowerStripUpdate()
-		;SpawnNakedEncounters(utility.randomint(4,8), false)
-		endif
 		
 		if NakedTravel
 		CheckFastTravel()
 		endif
 		
-		if Nym() && !IsDefeatRunning()
-			bool Duplicate = true
-			;Countdown += 1
+		Bool OFF = false
+		if OFF
+		NymTrace("OnCellLoadFunction(OFF)")
+		
+		else 
 			if Nym()
-				if Duplicate && (storqst.IsLocalSlave == 0) ;ON LOAD
-				AllegianceQuestStart("DuplicateEnemyScan_Forced")
-				;AllegianceQuestStart("MarkDuplicantsScan")
+			NymTrace("OnCellLoadFunction(A)")
+			Utility.Wait(2.0)
+			NymTrace("OnCellLoadFunction(B)")
+			
+				folqst.FollowerStripUpdate()
+				
+				if !IsDefeatRunning()
+					bool Duplicate = true
+					;Countdown += 1
+					if Nym()
+						if Duplicate && (storqst.IsLocalSlave == 0) ;ON LOAD
+						AllegianceQuestStart("DuplicateEnemyScan_Forced")
+						;AllegianceQuestStart("MarkDuplicantsScan")
+						endif 
+					endif
 				endif 
-			endif
-		endif 
-		
-		if DefeatTypeScenario == "FastTravel"	;this might not work
-		
-			if D100(1)
-			;DestroyAllStuff()
-			elseif D100(5)
-			;they want another round.
-			
-			;NAKED Curse?
-			;TENTACLE ATTACK?
-			
-			endif
-		endif
-			
-		if Nym()
-		Utility.Wait(2.0)
-		Game.SaveGame("Location Change "+QuickSaveCount)
-		QuickSaveCount +=1
-		endif 
-		
-		
-		if Nym() 	
-		playscr.CheckLocation()	;fills the CurrentLocationType
-		StartCombatAmbush("Random Enemies", 0, 300)	;uses the CurrentLocationType
-		endif 
 
+			Game.SaveGame("Location Change "+QuickSaveCount)
+			QuickSaveCount +=1
 
-	;	SendModevent("nade_FuckStates")
-	;	SendModevent("nade_FuckStates")
-	;	SendModevent("nade_FuckStates")
+			playscr.CheckLocation()	;fills the CurrentLocationType
+			StartCombatAmbush("Random Enemies", 0, 300)	;uses the CurrentLocationType
+			
+			PlayerHairMaintenance()
+			endif 
+		endif 
 
 EndFunction
 
@@ -6611,21 +6630,16 @@ Function UnregisterForModEvents()		;#UnregisterForModEvents()
 		
 		UnRegisterForAnimationEvent(PlayerRef, "SlaveWoodChopIdle") ;FOR SLAVERY WOOD CHOPPING
 		
-		if Nym()
-	;	UnRegisterForAnimationEvent(PlayerRef, "bashStart")
-		UnRegisterForAnimationEvent(PlayerRef, "bashStop")
-	;	UnRegisterForAnimationEvent(PlayerRef, "SoundPlay.NPCHumanCombatShieldBash")
-		endif 
-		
 		UnRegisterForModEvent("dt_IsCommonTrap")
-		UnRegisterForModEvent("dt_IsDeviousTrap")
+		UnRegisterForModEvent("dt_IsDeviousTrap")		
+		UnRegisterForModEvent("NakedDefeatTransition")	
 		
-		UnRegisterForModEvent("NakedDefeatTransition")
-		
+		if Nym()
+		UnRegisterForAnimationEvent(PlayerRef, "bashExit")
+	
 		UnRegisterForKey(57)	;SPACE
 		UnRegisterForKey(207)	;End	
-		
-		if Nym()
+
 		UnRegisterForKey(44)
 		
 		UnRegisterForKey(17) ;W
@@ -6897,7 +6911,6 @@ Event OnPageReset(String page)
 		AddTextOption("Defeat Chapter:", DefeatStateChapter, OPTION_FLAG_DISABLED)
 		AddTextOption("Player Status:", DefeatStatePlayer, OPTION_FLAG_DISABLED)
 		AddTextOption("Slavery Location:", slaveqst.CurrentSlaveryLocationName, OPTION_FLAG_DISABLED)
-
 		
 		if Nym()
 		AddTextOption("Current Speed:", PlayerRef.GetAV("Speedmult") as int, OPTION_FLAG_DISABLED)
@@ -9273,6 +9286,133 @@ function ActionLog(String sAction)
 EndFunction 
 
 
+
+
+Int Function ShowWheelMenuSlaveActions() 		;#wheel ##action1
+
+	UIMenuBase wheelMenu = UIExtensions.GetMenu("UIWheelMenu")
+	
+	;DESCRIPTION down in the middle													;"XXXXXXXXXXXXXXXXXXXXXXX"   <--- available space
+
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 0, value = "Start Bathing ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 1, value = "Start Resting ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 2, value = "Change Hair ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 3, value = "Seduce Target ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 4, value = "Place "+slaveqst.RequiredStation+" ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 5, value = "Wiggle Free (DD) ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 6, value = "empty ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionText", index = 7, value = "empty")
+																						
+	;OPTION TEXT on Wheel															     ;"XXXXXXXXXXXXXXXXXXXXXXX" <--- available space
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 0, value = "Start Bathing ")																			
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 1, value = "Start Resting ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 2, value = "Change Hair ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 3, value = "Seduce Target ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 4, value = "Place "+slaveqst.RequiredStation+" ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 5, value = "Wiggle Free (DD) ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 6, value = "empty ")
+	wheelMenu.SetPropertyIndexString(propertyName = "optionLabelText", index = 7, value = "empty ")
+	
+	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 0, value = true)
+	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 1, value = true)
+	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 2, value = true)
+	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 3, value = true)
+	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 4, value = true)
+	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 5, value = true)
+	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 6, value = true)
+	wheelMenu.SetPropertyIndexBool(propertyName = "optionEnabled", index = 7, value = true)
+	
+	int selectedIndex = WheelMenu.OpenMenu()
+	
+	; --- [0] SLAVE Bathing --------------------------------------------------------------
+	if selectedIndex == 0
+
+		if nade_DDint.IsWearingDDs(PlayerRef, "Heavy Bondage")
+		BadMessage("You are bound and cannot clean yourself.")
+		else 
+		ScreenMessage("You thoroughly clean yourself... everywhere...")
+		KeyStartBathing()
+		endif 
+     	
+	; --- [1] SLAVE Resting --------------------------------------------------------------
+	elseif selectedIndex == 1
+
+		GoodMessage("You start to rest")
+		SendModEvent("StartResting")
+
+	; --- [2] SLAVE Hair Change --------------------------------------------------------------	
+	elseif selectedIndex == 2	
+
+		if nade_DDint.IsWearingDDs(PlayerRef, "Heavy Bondage")
+		BadMessage("You are bound and cannot change your hair.")
+		else 
+		KeyHairAndMaintenance()	
+		endif 
+	
+	; --- [3] Seduce Target --------------------------------------------------------------
+	elseif selectedIndex == 3
+
+			ProximityQuestStart("DetectMasterScan")
+			if (ProxActorDetected == 1) 
+			slaveqst.SlaveIsOccupied = 1
+			SendModEvent("StartSeduction")
+			else 
+			BadMessage("Nobody there for you to seduce.")
+			endif 
+
+	; --- [4] Place Station --------------------------------------------------------------
+	elseif selectedIndex == 4	
+
+		slaveqst.PlaceRequiredStation()
+
+
+	; --- [5] Wiggle Free (DD) --------------------------------------------------------------
+	elseif selectedIndex == 5      
+
+		if nade_DDInt.IsWearingDDs(PlayerRef, "Lockable")
+		DD_WiggleScene(false)
+		else 
+		GoodMessage("You are not wearing DD Bondage")
+		endif 
+			;LocationEvent("Slavery Hostile")
+		
+	; --- NONE --------------------------------------------------------------
+	elseif selectedIndex == 6
+	
+	;	LocationEvent("Slavery Public")
+	
+		; --- NONE --------------------------------------------------------------
+	elseif selectedIndex == 7
+
+		;CageGame()
+				
+	endif
+	
+
+	;ACTION WHEEL SHIFT + K 
+	;0	done - Bathing
+	;1	done - Naked Travel
+	;2 	wip - Soul Gem Action 
+	;3  later - Toggle Bait/Beg 
+	;4  later - Sleep? 
+	;5  
+	;6 
+	;7   	
+	
+	;CONCEPT: DURING DEFEAT WHEEL 
+	; Abort All
+	; Change Furniture 
+	; 
+	
+	;K will still be situational 
+	;change hair 
+	;surrender 
+	;bait/beg 
+	;do action 
+
+	;Return wheelMenu.OpenMenu(PlayerRef)
+	
+EndFunction
 
 
 Int Function ShowWheelMenuAction() 		;#wheel ##action1
@@ -13129,7 +13269,7 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 				; endif
 			endif 
 		
-		
+
 		
 		; ---- SUBMIT KEY ----- ;
 		elseif (KeyCode == storqst.SubmitKey) && storqst.LocalSlavery && (storqst.IsLocalSlave > 0) && !IsDefeatRunning() && !SexScene 	;DOWN ARROW 
@@ -13179,6 +13319,11 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 			endif 
 
 		; ---- SLAVE ACTION KEY ----- ;
+		
+		elseif (KeyCode == storqst.RequestKey) && Input.IsKeyPressed(42) && storqst.IsLocalSlave() && !IsDefeatRunning() && !SexScene 	;DOWN ARROW 
+		NymTrace("ShowWheelMenuSlaveActions")
+		ShowWheelMenuSlaveActions()
+		
 
 		elseif (KeyCode == storqst.RequestKey) && storqst.IsLocalSlave && !IsDefeatRunning() && !SexScene ;LEFT ARROW 
 		
@@ -13187,6 +13332,7 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 			NymTrace("Slave Action Key PRESSED - Exhaustion "+storqst.Exhaustion+" SlaveAtWork "+storqst.SlaveAtWork+" SlaveIsOccupied "+slaveqst.SlaveIsOccupied)
 			int GracePeriodSave = 0
 			ProximityQuestStart("DetectMasterScan")
+			
 			String CurrentSlaveSexTask = slaveqst.CheckSexTaskConditions()
 			
 			if !Nym() ;Exhaustion OFF
@@ -13237,6 +13383,12 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 		;	SendModEvent("StartResting")
 			;slaveqst.Rest()
 			
+			
+			elseif (storqst.ProxMasterDetected == 1) && (!storqst.SlaveAtWork)
+			;loop -> modevent
+			slaveqst.SlaveIsOccupied = 1
+			SendModEvent("StartRequestMaster") ;checked SlaveIsOccupied works
+			
 			elseif slaveqst.WantsToMine()
 			;loop -> modevent
 			NymTrace("Wants to Mining")
@@ -13277,12 +13429,16 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 			;sweep street has prio over seducing and Orgy (if outside)	
 			elseif slaveqst.HasSweepStreetsTask() && !PlayerRef.IsInInterior()	
 			;loop -> modevent
-			
+
 				if CurrentSlaveSexTask == "Orgy" && slaveqst.CompletedAreaTasks == 0
 				BadMessage("You need to sweep the streets clean before the Orgy can start!")
 				endif 
 				
-				if !storqst.SlaveAtWork	
+				
+				if nade_DDint.IsWearingDDs(PlayerRef, "Heavy Bondage")
+				BadMessage("You cannot sweep with that device on you")
+				
+				elseif !storqst.SlaveAtWork	
 				storqst.SlaveAtWork = true
 				;loop -> modevent
 				SendModEvent("StartSweeping")		
@@ -13308,12 +13464,15 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 				endif 	
 				
 			elseif slaveqst.HasSweepTask() && PlayerRef.IsInInterior()
-			
+
 				if CurrentSlaveSexTask == "Orgy" && slaveqst.CompletedAreaTasks == 0
 				BadMessage("You need to sweep the location clean before the Orgy can start!")
 				endif 
 				
-				if (storqst.IsLocalSlave > 0) && !storqst.SlaveAtWork ;&& !storqst.DarkNight	;#Clean	;#BROOM
+				if nade_DDint.IsWearingDDs(PlayerRef, "Heavy Bondage")
+				BadMessage("You cannot sweep with that device on you")
+				
+				elseif (storqst.IsLocalSlave > 0) && !storqst.SlaveAtWork ;&& !storqst.DarkNight	;#Clean	;#BROOM
 				storqst.SlaveAtWork = true 
 				SendModEvent("StartSweeping")		
 ;/				
@@ -13344,88 +13503,8 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 			;loop -> modevent
 			ScreenMessage("You start the Orgy with an inviting Pose")
 			slaveqst.SlaveIsOccupied = 1
-			SendModEvent("StartOrgy")	
-			;/
-			storqst.PlayerPosingVehicle(true)	
-				;ProstitutionScenario = "Bound"
-				DefeatEntranceVia = "Orgy"
-				
-				DefeatTypeGeneral = "AreHumans"
-				DefeatType = "Humans"
-				CivilRapeRunning = True
-				DefeatViaSurrender = true
-				DefeatViaSlavery = true
-				StartDefeat()
-				
-				/;
-				
-			elseif (ProxGuardDetected == 1) && (!storqst.SlaveAtWork)
-			;loop -> modevent
-			slaveqst.SlaveIsOccupied = 1
-			SendModEvent("StartRequestMaster") ;checked SlaveIsOccupied works
-			;/
-			ProxGuardDetected = 0
-			storqst.SlaveAtWork = true
-				GoodMessage("You show respect to the Master")
-				Immobilize(True)
-				storqst.PlayerPosingVehicle(true)
-				calmqst.PlayPoseOnActor(PlayerRef, "Offering", false)
-				
-				Utility.Wait(2.0)
-				
-				if !storqst.DarkNight
-				slaveqst.UpdateSlaveReportingTasks()
-				endif 
-				Utility.Wait(5.0)
-				
-				ResetIdle(PlayerRef)
-				
-				if storqst.DarkNight || D100(10)
-				
-					DefeatStateChapter = "Fast Slave Sex"
-					
-					if storqst.DarkNight
-					BadMessage("Aren't you supposed to sleep?")
-					else 
-					BadMessage("The Master wants you now")
-						if storqst.GracePeriodSlave > 0
-						GracePeriodSave = storqst.GracePeriodSlave
-						endif 
-					endif 
-					
-					calmqst.StartSexFast("FastSlaveRape", "Human", slaveqst.TempMaster, none, PlayerRef)
-						
-					while SexScene && ModEnabled
-					Utility.Wait(3.0)
-					;defqst.SexDuration+=2
-					endwhile 
-					
-					if defqst.SexDuration < 80
-					defqst.SexDuration = 0
-					BadMessage("The Master came too fast, useless Slave!")
-					playscr.CalculateSlaveGold("Increase", 0)
-					else 
-					defqst.SexDuration = 0
-					GoodMessage("The Master is happy!")
-					playscr.CalculateSlaveGold("Reduce", 0)
-					
-						if GracePeriodSave > 0
-						storqst.GracePeriodSlave = GracePeriodSave
-						endif 
-					
-					endif 
-					
-					slaveqst.TempMaster = none
-					DefeatStateChapter = "Free"
-					
-				endif 
-				storqst.SlaveAtWork = false
-				storqst.PlayerPosingVehicle(false)
-				if !HeelsOn
-				RestoreHeelsEffectOnActor(PlayerRef)
-				endif 
-				Immobilize(false)
-				/;
+			SendModEvent("StartOrgy")			
+
 			elseif (ProxActorDetected == 1) && (!storqst.SlaveAtWork)	;slave at work is caught earlier anyway? still can cause double start I guess
 			;loop -> modevent
 			SendModEvent("StartSeduction")
@@ -13521,7 +13600,7 @@ Event OnKeyDown(Int KeyCode)				;#keydown
 					IdleEquipBody()
 					UnequipWeapons() 
 					Utility.Wait(1.5)
-					PlayerStripCompletely(0,0,0,0,0)
+					PlayerStripCompletely(0,0,0,0,3)	;last is override!
 					Utility.Wait(1.5)
 					IdleEquipFinish()
 					Utility.Wait(1)
@@ -14297,7 +14376,6 @@ EndFunction
 								
 							endif
 			
-						
 						endif 
 					endif 
 				else 
@@ -15885,8 +15963,16 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 	;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 	Bool DDWiggle = false
+	Bool OldFunction = false
+	
+
 
 	if !storqst.IsLocalSlave() && nade_DDInt.IsWearingDDs(PlayerRef, "Lockable") && (test == 0)	
+	
+	DD_WiggleScene(DevicesRemovedByCheat)
+	DDWiggle = true 
+	
+	elseif OldFunction
 
 		;PRE CHECK PIERCINGS 
 		Bool OnlyPiercings = false
@@ -16301,6 +16387,335 @@ Debug.Trace("NAKED DEFEAT configquest: KeyHairAndMaintenance()")		;#hairandmaint
 
 EndFunction
 		
+		
+Function DD_WiggleScene(bool DevicesRemovedByCheat)
+
+	;PRE CHECK PIERCINGS 
+		Bool OnlyPiercings = false
+		Bool OnlyPiercingsNoBench = false
+		Bool WearsPiercings = false
+		Bool HasPiercingRemovalTool = false
+		Bool HasRestraintskey = false
+		Bool HasChastityKey = false
+		
+
+		; --- CHECK INVENTORY: Piercing Removal Tool // Restraints Key // Chastity Key  -----------------------
+		Formlist FormlistInventory = RobbedStuff ;TODO
+		FormlistInventory.Revert()
+		Form DD_PiercingRemovalTool
+		Form DD_Restraintskey
+		Form DD_ChastityKey
+		
+		PlayerRef.GetAllForms(FormlistInventory)	
+
+		NymTrace("%Wiggle Free from DDs Formlist Length: "+FormlistInventory.GetSize())	
+				
+		if nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Nipples")
+		WearsPiercings = true
+		endif 		
+					
+		DD_PiercingRemovalTool = (Game.GetFormFromFile(0x000409A4, "Devious Devices - Integration.esm") as Form)	;piercing tool	
+		if DD_PiercingRemovalTool
+		NymTrace("%Wiggle Free from DDs DD_PiercingRemovalTool: Form NONE")	
+		else 
+		NymTrace("%Wiggle Free from DDs DD_PiercingRemovalTool: Form FOUND")	
+		endif 
+		
+		if FormlistInventory.HasForm(DD_PiercingRemovalTool) 
+		HasPiercingRemovalTool = true 
+		endif 
+
+		DD_Restraintskey = (Game.GetFormFromFile(0x0001775F, "Devious Devices - Integration.esm") as Form)	;restraints key 	
+		if FormlistInventory.HasForm(DD_Restraintskey) 
+		HasRestraintskey = true 
+		endif 
+		DD_ChastityKey = (Game.GetFormFromFile(0x00008A4F, "Devious Devices - Integration.esm") as Form)	;restraints key 	
+		
+		if FormlistInventory.HasForm(DD_ChastityKey) 
+		HasChastityKey = true 
+		endif 	
+		
+		NymTrace("%Wiggle Free from DDs HasPiercingRemovalTool: "+HasPiercingRemovalTool )	
+		NymTrace("%Wiggle Free from DDs HasRestraintskey: "+HasRestraintskey )	
+		NymTrace("%Wiggle Free from DDs HasChastityKey: "+HasChastityKey )	
+		
+		;-------------------------------------------------------------------
+		
+
+		if !AlreadyImmobilized && ModDDNG && DeviousPiercingEffects
+		NymTrace("DeviousPiercingEffects")
+		
+			if WearsPiercings && nade_DDInt.IsWearingDDs(PlayerRef, "Only Piercings") ;|| nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Vaginal")
+			;	if !nade_DDInt.IsWearingDDs(PlayerRef, "BlockingSex")
+				if !IsWorkbenchNearby() && !HasPiercingRemovalTool
+				ScreenMessage("You need a nearby workbench or a removal tool to remove piercings.")
+				OnlyPiercingsNoBench = true
+				endif 
+				
+			OnlyPiercings = true
+			else 
+			OnlyPiercings = false ;what is this for? ah, different idles!
+			endif			
+			
+		endif 
+			
+		if !OnlyPiercingsNoBench && !AlreadyImmobilized && !DevicesRemovedByCheat && ModDDNG && (KeyDDWiggleFreeChance > 0) && nade_DDInt.IsWearingDDs(PlayerRef, "Lockable")
+		NymTrace("IsWearingDDs")
+		
+			if Nym()
+			AddRapeTears()	
+			endif
+		
+			NymTrace("Immobilize(true) for DD Wiggle Free")
+			Immobilize(True)
+			
+			if HeelsFix
+			;DisableHeelsEffectOnActor(PlayerRef)
+			;not required, we currently only use standing poses
+			endif 
+			
+			WhipAgain = true
+			
+			Bool FollowersHelp = false
+			Bool TestSexHelp = false
+			
+			if TestSexHelp
+			ScreenMessage("You try to help each other out of the Devices.")
+			FollowersHelp = true 		
+			calmqst.StartSexFast()
+			
+			else 
+			
+				if HasRestraintskey
+				ScreenMessage("You try to wiggle free from the Devices. The Restraints Key makes it easier.")
+				else 
+				ScreenMessage("You try to wiggle free from the Devices.")
+				endif 
+				SetExpression(Utility.RandomInt(1,6))
+			;	DefeatStateBindings = "Cuffs"
+				if OnlyPiercings
+				IdleEquipBody()
+				else 
+				calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Wiggling", false)
+				endif 
+					if folqst.IsWithUs_Follower(0) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower01, "Lockable")
+					calmqst.PlayPoseOnActor(folqst.Actor_Follower01, "DD Removal Wiggling", false)
+					Endif
+					if folqst.IsWithUs_Follower(1) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower02, "Lockable")
+					calmqst.PlayPoseOnActor(folqst.Actor_Follower02, "DD Removal Wiggling", false)
+					Endif		
+					if folqst.IsWithUs_Follower(2) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower03, "Lockable")
+					calmqst.PlayPoseOnActor(folqst.Actor_Follower03, "DD Removal Wiggling", false)
+					Endif		
+					if folqst.IsWithUs_Follower(3) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower04, "Lockable")
+					calmqst.PlayPoseOnActor(folqst.Actor_Follower04, "DD Removal Wiggling", false)
+					Endif				
+					if folqst.IsWithUs_Follower(4) && nade_DDInt.IsWearingDDs(folqst.Actor_Follower05, "Lockable")
+					calmqst.PlayPoseOnActor(folqst.Actor_Follower05, "DD Removal Wiggling", false)
+					Endif	
+				
+				
+					SendModEvent("Moan")
+					Utility.Wait(3.0)
+					SetExpression(Utility.RandomInt(1,6))
+					PlayerRef.DamageAV("Stamina", 100)
+					PlayerRef.RestoreAV("Stamina", 100)
+					if Nym()
+					StartPunishmentEffect("Varied")
+					endif 
+					
+					if OnlyPiercings
+					IdleEquipBody()
+					else 
+					calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Wiggling", false)
+					endif
+								
+					PlayBreathing()
+					Utility.Wait(3.0)
+							if Nym()
+					StartPunishmentEffect("Varied")
+					endif 
+					SetExpression(Utility.RandomInt(1,6))
+					PlayerRef.DamageAV("Stamina", 100)
+					PlayerRef.RestoreAV("Stamina", 100)
+					SendModEvent("Moan")
+					Utility.Wait(3.0)
+							if Nym()
+					StartPunishmentEffect("Varied")
+					endif 
+						SetExpression(Utility.RandomInt(1,6))
+					PlayerRef.DamageAV("Stamina", 100)
+					PlayerRef.RestoreAV("Stamina", 100)
+				
+				if D100(50)
+				
+				if OnlyPiercings
+				IdleEquipBody()
+				else 
+				calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Wiggling", false)
+				endif
+		
+					SendModEvent("Moan")
+					Utility.Wait(3.0)
+							if Nym()
+					StartPunishmentEffect("Varied")
+					endif 
+					SetExpression(Utility.RandomInt(1,6))
+				WhipAgain = false
+				endif 
+				
+				if OnlyPiercings
+				;IdleEquipBody()
+				else 
+				calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Resting", false)
+				storqst.PlayerSoundToPlay = "Breathing"
+				SendModEvent("Moan")
+				Utility.Wait(Utility.RandomInt(2, 4))
+				
+				SetExpression(Utility.RandomInt(1,6))
+				SendModEvent("Moan")
+				Utility.Wait(Utility.RandomInt(2, 4))
+				SendModEvent("Moan")
+				SetExpression(Utility.RandomInt(1,6))
+				storqst.PlayerSoundToPlay = "Pain"
+				endif 
+
+			
+			endif 
+			
+			Float WiggleFreeChanceTemp = KeyDDWiggleFreeChance
+			
+			if IsWorkbenchNearby() 		;easier with workbench, risk stays the same
+			WiggleFreeChanceTemp = KeyDDWiggleFreeChance + KeyDDWiggleFreeChance 
+			endif 
+			
+			if HasRestraintskey && !OnlyPiercings
+			NymMessage("RestraintsKey used")
+			WiggleFreeChanceTemp = WiggleFreeChanceTemp + KeyDDWiggleFreeChance 	
+			PlayerRef.RemoveItem(DD_Restraintskey, 1, true, None)	;metal
+			endif 
+			
+			if WearsPiercings
+
+				if HasPiercingRemovalTool
+				PlayerRef.RemoveItem(DD_PiercingRemovalTool, 1, true, None)	;piercing tool	
+				NymMessage("Piercing Removal Tool used")
+				endif 
+			
+			endif 	
+			
+			if FollowersHelp
+			WiggleFreeChanceTemp = WiggleFreeChanceTemp+WiggleFreeChanceTemp
+			endif 
+				
+			if D100(WiggleFreeChanceTemp)
+			
+				if ModDDframework && DeviousPiercingEffects && nade_DDInt.IsWearingDDs(PlayerRef, "Piercing Nipples")
+					if IsWorkbenchNearby() || HasPiercingRemovalTool
+					
+					
+						if OnlyPiercings
+						ScreenMessage("You could remove the piercings.")
+						else 
+						ScreenMessage("You could wiggle free from the Devices and remove the piercings.")
+						endif
+					
+						RemoveAllDDevices(false, "empty01", "empty02", "empty03", "empty04", "empty05")		
+					
+				
+					else 
+					ScreenMessage("You could wiggle free from the Devices but not remove the piercings.")
+					ScreenMEssage("You need a workbench nearby to remove the Piercings [Devious Piercings]")
+					RemoveAllDDevices(false, "zad_DeviousPiercingsNipple", "zad_DeviousPiercingsVaginal", "empty03", "empty04", "empty05")
+					endif 
+				else	
+				ScreenMessage("You could wiggle free from the Devices.")
+				RemoveAllDDevices(false, "empty01", "empty02", "empty03", "empty04", "empty05")	
+				endif 
+
+			Immobilize(False)
+			calmqst.PlayPoseOnActor(PlayerRef, "reset", false)
+			ResetExpressions()
+			;DefeatStateBindings = "Unbound"
+		
+		
+		
+			elseif D100(KeyDDWiggleFreeFailChance)
+			;............ooooooooooooooooOOOOOOOOOOOOO	FADE TO BLACK TRUE OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+				FadeToBlack(true) 
+				SendModEvent("Moan")
+				Utility.Wait(5.0)
+				SetExpression(Utility.RandomInt(1,6))
+				SendModEvent("Moan")
+				Immobilize(False)		
+
+				if Nym()
+				ProximityQuestStart("RaperScan")
+				endif 
+				
+				if ProxActorDetected > 0
+
+				ScreenMessage("Your moaning and wiggling attracts somebody (B)")
+				KeySurrender("Forced Surrender") ;<<<<--- IMPROVE!
+					
+				elseif D100(50)
+					if DefeatRobberyProb > 0
+						if storqst.ImmersiveRobbery
+						StartRobberyAtLocation()
+						endif 
+					endif 
+				NymTrace("SSLV Entry CODE 13300")
+				SendModEvent("SSLV Entry")
+				else
+					if DefeatRobberyProb > 0
+						if storqst.ImmersiveRobbery
+						StartRobberyAtLocation()
+						endif 
+					endif 
+				SendModevent("StartNakedAfterlife")
+				endif 
+				
+			else 
+			
+			calmqst.PlayPoseOnActor(PlayerRef, "DD Removal Resting", false)
+			storqst.PlayerSoundToPlay = "Breathing"
+				SendModEvent("Moan")
+				Utility.Wait(3.0)
+					SetExpression(Utility.RandomInt(1,6))
+				SendModEvent("Moan")
+				Utility.Wait(3.0)
+				SendModEvent("Moan")
+				storqst.PlayerSoundToPlay = "Pain"
+					SetExpression(Utility.RandomInt(1,6))
+			Immobilize(False)
+			calmqst.PlayPoseOnActor(PlayerRef, "Reset", false)
+			
+				if folqst.IsWithUs_Follower(0)
+				calmqst.PlayPoseOnActor(PlayerRef, "Reset", false)
+				Endif
+				if folqst.IsWithUs_Follower(1)
+				calmqst.PlayPoseOnActor(PlayerRef, "Reset", false)
+				Endif		
+				if folqst.IsWithUs_Follower(2)
+				calmqst.PlayPoseOnActor(PlayerRef, "Reset", false)
+				Endif		
+				if folqst.IsWithUs_Follower(3)
+				calmqst.PlayPoseOnActor(PlayerRef, "Reset", false)
+				Endif				
+				if folqst.IsWithUs_Follower(4)
+				calmqst.PlayPoseOnActor(PlayerRef, "Reset", false)
+				Endif	
+				SetExpression(Utility.RandomInt(1,6))
+			ScreenMessage("You could not wiggle free. Try again")
+			Utility.Wait(1.0)
+			ResetExpressions()
+			DefeatStateBindings = "Unbound"
+			endif 
+
+			folqst.FollowerStripUpdate()
+		endif 
+
+EndFunction 		
 		
 		
 Bool Function IsWorkbenchNearby()
@@ -25290,7 +25705,7 @@ Debug.Trace("NAKED DEFEAT configquest: ResetBools()")
 	SpawnedGroups[11] = 0
 	
 	storqst.ActorEnemyLastHitter[0] = none
-	
+	storqst.WantWhipping = false
 	ResetPlayer()
 	storqst.ForceOpen = 0
 	DefeatGagAdded = 0
@@ -30549,10 +30964,11 @@ EndFunction
 ;OFFICIAL LATEST STRIPPING COMPLETE	
 Function PlayerStripCompletely(int Exception1, int Exception2, int Exception3, int Exception4, int Override)		;#StripCompletely()	;#PlayerStripCompletely
 		
-		if Override < 3
-		storqst.OverrideStripMode = Override 		;0 unequip, 1 drop, 2 destroy
+		if Override == 3
+		storqst.OverrideStripMode = 3 		;0 unequip, 1 drop, 2 destroy
 		;IMPORTANT - DO NOT REMOVE!!! 
 		;it is used for voluntary Unequipping of clothes....
+		;OverrideMode == 3 means we only unequip and NOT drop or destroy for this.... omg
 		endif
 
 		int a = 30
@@ -30569,7 +30985,7 @@ Function PlayerStripCompletely(int Exception1, int Exception2, int Exception3, i
 		endwhile
 		
 		;3 is OFF
-		storqst.OverrideStripMode = 3	;return to normal state
+		storqst.OverrideStripMode = 404	;return to normal state
 
 
 EndFunction	
@@ -31061,7 +31477,7 @@ Function Strip(int slot, actor akactor)			;#strip
 		if a
 
 			; >>>> PLAYER - Setup Strip Options >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			if IsPlayerItem && storqst.OverrideStripMode == 3
+			if IsPlayerItem 
 			
 			StripBehaviour = StripOptions
 			Objectreference TempCheckObject = a as Objectreference			
@@ -31110,13 +31526,16 @@ Function Strip(int slot, actor akactor)			;#strip
 				NymTrace("NO STRIP: IsQuestItem")
 				PreventStrip = true 
 				endif 
-			
-			elseif IsPlayerItem && storqst.OverrideStripMode < 3
-			StripBehaviour = storqst.OverrideStripMode
+
 			;this is needed for voluntary UNEQUIPPING of an Item!
 			
 			; >>>> FOLLOWER - Setup Strip Options >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 			else 
+			StripBehaviour = 0
+			endif 
+			
+			if IsPlayerItem && storqst.OverrideStripMode == 3
+			;override MCM --> we only Unequip the Item!!! 
 			StripBehaviour = 0
 			endif 
 
@@ -32732,17 +33151,22 @@ Function PlayerSpeedMaintenance()		;#PlayerSpeedMaintenance()
 			
 			if PlayerRef.IsWeaponDrawn()
 			PlayerSpeedMultToSet-=10.0
-			endif 
-			
-			if Nym()
-			Float ExhaustionTempMod = storqst.Exhaustion*2
-			PlayerSpeedMultToSet-=ExhaustionTempMod
-			endif 
-			
+			endif 	
 		endif 
 		
 		if (storqst.IsLocalSlave > 0) && !IsDefeatRunning()
 		PlayerSpeedMultToSet -= storqst.SpeedReduction
+		DebugTrace("SpeedMult Maintenance: storqst.SpeedReduction" +storqst.SpeedReduction)
+		
+			if Nym()
+				Float ExhaustionTempMod = storqst.Exhaustion*2
+				if ExhaustionTempMod > 10
+				ExhaustionTempMod = 10 
+				endif 
+				DebugTrace("SpeedMult Maintenance: ExhaustionTempMod" +ExhaustionTempMod)
+				PlayerSpeedMultToSet-=ExhaustionTempMod
+			endif 
+		
 		endif 
 		
 		;stamina potion speeds up by 10 
@@ -32753,6 +33177,11 @@ Function PlayerSpeedMaintenance()		;#PlayerSpeedMaintenance()
 		
 		DebugTrace("SpeedMult Maintenance: Target Speed:"+PlayerSpeedMultToSet) 
 		;Function SetAVTo(actor akActor, Float fValueToSet, String sAV) 
+		
+		if PlayerSpeedMultToSet < 50
+		PlayerSpeedMultToSet = 50
+		endif 
+		
 		SetAVto(PlayerRef, PlayerSpeedMultToSet, "SpeedMult")
 		;SetSpeedMultTo(PlayerSpeedMultToSet)
 		
@@ -32771,7 +33200,8 @@ Function PlayerTripping()		;#PlayerTripping()	;#tripping1
 	Float TripForce = 0
 	
 		if !storqst.SlaveATWork && !storqst.Resting && !AlreadyImmobilized && !SlaveAuction && !IsBathing && !PlayerRef.IsSwimming() && !IsDefeatRunning() && (PlayerBarefoot || defqst.HasPlayerAssLight())	
-		
+		NymTrace("PlayerBarefoot: "+PlayerBarefoot)
+		NymTrace("defqst.HasPlayerAssLight()"+defqst.HasPlayerAssLight())
 			TripChance = 0
 			TripForce = 0
 			
@@ -32847,7 +33277,7 @@ Function WaitLoopPlayerMaintenance()		;#monitor
 	JustGotUp = false 
 	endif 
 	
-	if DefeatStateChapter == "Cage Escape"
+	if DefeatStateChapter == "Cage Escape"		;IMPROVE!!!  ---> move elsewhere 
 	ProximityQuestStart("CageMaintenanceScan")
 	endif 
 	
@@ -32870,41 +33300,44 @@ Function WaitLoopPlayerMaintenance()		;#monitor
 		
 	;	endif 
 	endif 	
+
 		
+	if IsDefeatRunning() && PlayerInCombat()	
+	NymMessage("#INFO Player in Combat")
+	SPE_Actor.SetActorCalmed(PlayerRef, true)
+	PlayerRef.StopCombatAlarm()
+	endif 
+
+	PlayerSpeedMaintenance()
+
+	;>>>>>>>>> NYMRA STUFF >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	if Nym() ;&& IsPlayerInDungeon()
 	NymTrace("#MONITOR Enemies: "+Enemy[0]+" "+Enemy[1]+" "+Enemy[2]+" "+Enemy[3]+" "+Enemy[4]+"  "+Enemy[5])
-		if Enemy[0] != "none"
-		;NymMessage("#MONITOR Enemies: "+Enemy[0]+" "+Enemy[1]+" "+Enemy[2]+" "+Enemy[3]+" "+Enemy[4]+"  "+Enemy[5])
+		
+
+		;FEATURE -- Duplicate Enemies 
+		bool Duplicate = true
+		if Duplicate && !IsDefeatRunning()
+		AllegianceQuestStart("DuplicateEnemyScan")
 		endif 
-	
-		bool Duplicate = true ;ON LOOP
-		;Countdown += 1
-		if Nym()
-			if Duplicate && !IsDefeatRunning()
-			AllegianceQuestStart("DuplicateEnemyScan")
-			;AllegianceQuestStart("MarkDuplicantsScan")
-			endif 
+		
+		;FEATURE -- Player Stats 	
+		PlayerBuffsMaintenance()
+		
+		if !PlayerRef.IsInCombat()
+		PlayerStyleMaintenance()
 		endif 
-			
-		if IsDefeatRunning() && PlayerInCombat()	
-		NymMessage("#INFO Player in Combat")
-		SPE_Actor.SetActorCalmed(PlayerRef, true)
-		PlayerRef.StopCombatAlarm()
-		endif 
-	
-	PlayerSpeedMaintenance()
-	PlayerBuffsMaintenance()
-	if !PlayerRef.IsInCombat()
-	PlayerStyleMaintenance()
-	endif 
-	
-	GroupStripMaintenance()
-	
+		
+		;FEATURE -- Follower Strip Sync
+		GroupStripMaintenance()
+		
 	;	if IsFucking(PlayerRef)
 	;	SendModEvent("StartNakedSexExpressions")
 	;	endif 
 	
 	endif 
+	;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	
 	
 	;--- In Combat ---;
 	if PlayerRef.IsInCombat()
@@ -35103,6 +35536,8 @@ NymTrace("SetExpression("+type+")")
 				defqst.SetModifier_FACE(PlayerRef, 11, Utility.RandomInt(90,100), 0.1) ;LOOK UP
 			
 				if Nym() ;skip squint
+				;do nothing
+				else 
 					if D100(33)
 					defqst.SetModifier_FACE(PlayerRef, 12, Utility.RandomInt(0,100), 0.1) ;SquintL
 					defqst.SetModifier_FACE(PlayerRef, 13, Utility.RandomInt(0,100), 0.1) ;SquintR
@@ -35121,6 +35556,8 @@ NymTrace("SetExpression("+type+")")
 				defqst.SetModifier_FACE(PlayerRef, 8, Utility.RandomInt(90,100), 0.1) ;LOOK DOWN
 				
 				if Nym() ;skip squint
+				;do nothing
+				else 
 					if D100(33)
 					defqst.SetModifier_FACE(PlayerRef, 12, Utility.RandomInt(0,100), 0.1) ;SquintL
 					defqst.SetModifier_FACE(PlayerRef, 13, Utility.RandomInt(0,100), 0.1) ;SquintR

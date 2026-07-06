@@ -965,6 +965,7 @@ Debug.Trace("NAKED DEFEAT capturequest: stage 1000")
 LocalFurnitureFound = false
 Furniture_Elevation = 0.0
 RemoveFurniturePlayer()
+storqst.WantWhipping = false
 
 ;RemoveFurniture() ;;; LOL NO LONGER IN USE! 
 		
@@ -1073,7 +1074,15 @@ EndFunction
 
 Function RestoreFurniture()
 Debug.Trace("NAKED DEFEAT capturequest: RestoreFurniture()")
-	
+	if storqst.ModAcheron
+		if Acheron.IsDefeated(cfgqst.PlayerRef)
+			Acheron.RescueActor(cfgqst.PlayerRef, false)
+			Utility.Wait(3)
+			Acheron.ReleaseActor(cfgqst.PlayerRef)
+		elseif Acheron.IsPacified(cfgqst.PlayerRef)
+			Acheron.ReleaseActor(cfgqst.PlayerRef)
+		endif
+	endif
 	cfgqst.Immobilize(true)
 	
 	if (cfgqst.PlayerRef.GetSitState() == 0)
@@ -5290,6 +5299,10 @@ NymTrace("FillAttributeRequirements()")
 	Require_DD_YokeFiddle = 100
 	Require_DD_Armbinders = 100 
 	Require_DD_StraitJacket = 100
+	
+	if storqst.WantWhipping
+	Require_Whipping = 1
+	endif 
 	
 	;Check DDs
 	if nade_DDInt.IsWearingDDs(cfgqst.PlayerRef, "Lockable")

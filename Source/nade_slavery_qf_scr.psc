@@ -98,14 +98,14 @@ Formlist Property CraftingStationList Auto
 Formlist Property CraftingStationListTemp Auto
 Formlist Property IronOreVeinList Auto
 Formlist Property QuickSilverOreVeinList Auto
-
+Formlist Property GoldOreVeinList Auto
+Formlist Property Mushroomlist Auto
 
 Faction Property WhippingFaction Auto
 
 Keyword Property KWD_GiftFlower Auto
 Keyword Property KWD_NakedGarbage Auto
 Keyword Property KWD_SlaveryCleanup Auto
-
 
 Location Property CurrentLocalSlaveryLoc Auto
 
@@ -117,6 +117,9 @@ ObjectReference Property PlacedAnvil Auto
 ObjectReference Property PlacedTanningRack Auto
 ObjectReference Property PlacedSmelter Auto
 ObjectReference Property PlacedGrindstone Auto
+ObjectReference Property PlacedChoppingBlock Auto
+
+
 
 int Property CreatureTask Auto
 int Property AreaTaskCounter Auto
@@ -125,7 +128,6 @@ int Property CompletedAreaTasks Auto
 
 String Property SexTaskRaceKey Auto
 String Property SlaveReturnLocation Auto
-
 
 String Property RequiredStation Auto
 
@@ -616,8 +618,8 @@ Function OnStartRequestMaster(String EventName, String ArgString, Float ArgNum, 
 		int GracePeriod_SAVE = 0
 		
 		DebugTrace("OnStartRequestMaster(START)")
-		
-				cfgqst.ProxGuardDetected = 0
+				
+				;cfgqst.ProxGuardDetected = 0
 				SlaveIsOccupied = 1
 				storqst.SlaveAtWork = true
 				GoodMessage("You show respect to the Master")
@@ -679,7 +681,8 @@ Function OnStartRequestMaster(String EventName, String ArgString, Float ArgNum, 
 
 				cfgqst.Immobilize(false)
 				SlaveIsOccupied = 0
-
+				storqst.ProxMasterDetected = 0
+				
 		DebugTrace("OnStartRequestMaster(END)")
 
 EndFunction 
@@ -781,6 +784,7 @@ Function OnStartResting(String EventName, String ArgString, Float ArgNum, Form S
 	endif 
 	
 	cfgqst.PlayerRef.SetHeadTracking(false)
+	cfgqst.PlayerRef.ClearLookAt()
 	storqst.Resting = true
 	
 	if storqst.Exhaustion > 5
@@ -1048,6 +1052,12 @@ Function EndLocalSlavery()	;##End
 		PlacedAnvil = none 
 		endif 
 		
+		if PlacedChoppingBlock
+		PlacedChoppingBlock.DisableNoWait()
+		PlacedChoppingBlock.Delete()
+		PlacedChoppingBlock = none 
+		endif 		
+		
 		if PlacedTanningRack
 		PlacedTanningRack.DisableNoWait()
 		PlacedTanningRack.Delete()
@@ -1074,10 +1084,13 @@ Function EndLocalSlavery()	;##End
 		cfgqst.DefeatStateChapter = "Free"
 		playscr.ClearCurrentSlaveryLocation()
 		
+		cfgqst.RemoveAllDDevices(false, "empty01", "empty02", "empty03", "empty04", "empty05")	
+		
 		;cfgqst.PlayerRef.RemoveFromFaction(storqst.LocalSlaveFaction) ---> only when no other location enslaved us still
 		SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, false)
 		folqst.SetFollowersCalmed(false)
 		TotalSlaveTasksCompleted = 0
+		
 	Endif 
 EndFunction 
 
@@ -1894,7 +1907,39 @@ EndFunction
 
 
 
+;We need to check for the presence of stuff before we give tasks 
+;Check for Veins Iron etc.
+;check for flowers 
+;check for Mushrooms 
 
+
+Bool AllowTask_Mushrooms
+Bool AllowTask_Flowers
+Bool AllowTask_MineIron
+Bool AllowTask_MineQuicksilver 
+
+;StationTasks are always allowed since we can place them!
+
+Function CheckLocationForTasks()
+
+	NymTrace("CheckLocationForTasks()")
+	Bool returnvalue = false 
+	int i
+	
+	;--- Mushrooms ---;
+	ObjectReference[] MushroomArray  = PO3_SKSEFunctions.FindAllReferencesOfType(cfgqst.PlayerRef, Mushroomlist, 50000)
+	if MushroomArray.Length > 0
+	AllowTask_Mushrooms = true 
+	endif
+	
+	;--- Iron Ore ---;
+	ObjectReference[] IronVeinArray  = PO3_SKSEFunctions.FindAllReferencesOfType(cfgqst.PlayerRef, IronOreVeinList, 50000)
+	if IronVeinArray.Length > 0
+	AllowTask_MineIron = true 
+	endif	
+	
+
+EndFunction 
 
 Function PlaceOreVeins_NEW(String Type)
 
@@ -2501,7 +2546,16 @@ Function PlaceRequiredStation()
 			PlacedGrindstone = cfgqst.PlayerRef.PlaceAtMe(storqst.Station_Grindstone) ;as OBJECTREFERENCE
 			endif 
 			PlacedGrindstone.Moveto(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
-			PlacedGrindstone.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+90.0)	
+			PlacedGrindstone.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+0.0)	
+			
+		elseif RequiredStation == "Chopping Block"
+		
+			if !PlacedChoppingBlock
+			NymTrace("PlaceRequiredStation(CREATE NEW Chopping Block)")
+			PlacedChoppingBlock = cfgqst.PlayerRef.PlaceAtMe(storqst.Station_ChoppingBlock) ;as OBJECTREFERENCE
+			endif 
+			PlacedChoppingBlock.Moveto(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
+			PlacedChoppingBlock.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+0.0)	
 		
 		elseif RequiredStation == "Anvil"
 		
@@ -2541,7 +2595,11 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 	DDHeavyBondage = TRUE
 	endif 
 	
-	if Gold > 0	
+	if playscr.CheckEndOfSlavery()
+	;do nothing, Slavery ends
+	DebugTrace("Slavery End conditions met while requesting from Master")
+	
+	elseif Gold > 0	
 	BadMessage("They take "+Gold+" gold from you.")
 	cfgqst.PlayerRef.RemoveItem(cfgqst.Gold001, Gold, false, none)
 	playscr.CalculateSlaveGold("Take Gold", Gold)
@@ -3080,6 +3138,16 @@ EndFunction
 ;############################################################################################################################################################################################################
 ;#############	 	NOTES & IDEAS		############################################################################################################################################################################
 ;############################################################################################################################################################################################################
+
+
+;WARM SOURCES 
+;RemoveableTorch01 (00091f1F (ACTI)
+;Campfire01Burning (00035F49 (MSST) Moveable Static 
+;FXFireWithEmberyHeavy 00033DA4 Moveable Stratic MSST
+
+
+;FLORA
+;WhiteCap FLORA 0004DA06	 --> empty, try regen
 
 ;/
 

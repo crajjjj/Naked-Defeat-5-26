@@ -77,6 +77,8 @@ Bool Property ModAcheron Auto
 Bool Property ModFishing Auto 
 Bool Property ModSS Auto 
 
+Bool Property WantWhipping Auto 
+
 ;###############	 INTS	 #################
 
 int Property Defeat_ID Auto
@@ -87,6 +89,7 @@ int Property Parried Auto
 int Property SlavePunishmentLevel Auto
 int Property SlaveWantsToRest Auto
 int Property CurrentMood Auto
+int Property ProxMasterDetected Auto
 
 ;int Property MoveWhipperMode Auto
 
@@ -199,6 +202,8 @@ Furniture Property Station_Smelter Auto 	;vanilla Smelter
 Furniture Property Station_TanningRack Auto ;vanilla TanningRack
 Furniture Property Station_Grindstone Auto 	;vanilla Grindstone  
 Furniture Property Station_Anvil Auto 		;vanilla Anvil 
+Furniture Property Station_ChoppingBlock Auto 		;vanilla Wood Chopping
+
 ;cooking pot?
 
 
@@ -670,6 +675,26 @@ Bool Function IsHuman(actor akActor)
 EndFunction
 
 
+Bool Function IsFemale(actor akActor)
+
+	ActorBase akActorBase = akActor.GetLeveledActorBase()
+	int TempGender = 0
+	
+	if akActorBase
+	TempGender = akActorBase.GetSex()
+	endif 
+		;-1: None 
+		;0: Male
+		;1: Female
+		
+	if TempGender == 1
+	return true 
+	else 
+	return false 
+	endif 
+	
+EndFunction 
+
 int Function GetGender(actor akActor)
 
 	String sRaceType = SPE_Actor.GetRaceType(akActor)
@@ -709,6 +734,118 @@ Bool Function IsFishingRod(Form akBaseObject)
 		
 		;KWD_ccBGSSSE001_FishingPoleKW 		 		ccBGSSSE001-Fish.esm 
 	
+EndFunction 
+
+
+Bool Function ValidateWhipper(Actor akActor, string sName)
+
+	DebugTrace("ValidateWhipper("+sName+")")
+	;Attempt to make a Speedy Detection Method for Combat 
+	
+	String sRaceType = SPE_Actor.GetRaceType(akActor)
+	Bool returnvalue = false 
+	
+	if cfgqst.IsDefeatRunning()
+
+		;====================
+		; HUMAN
+		;====================
+			
+		if sRaceType == "Human" && (cfgqst.DefeatType == "AreHumans") ;dire need of Faction Checks!!!
+		returnvalue = true 
+
+		;====================
+		; HUMANOIDS
+		;====================
+		elseif sRaceType == "Draugr" && (cfgqst.DefeatType == "Undead" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		elseif sRaceType == "Riekling" && (cfgqst.DefeatType == "Rieklings" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		elseif sRaceType == "Falmer" && (cfgqst.DefeatType == "Falmers" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+	;	elseif sRaceType == "Gargoyle"	 ;TEST
+	;		ReturnCode = 160
+	;	elseif sRaceType == "Troll"	 ;TEST
+	;		ReturnCode = 161
+	;	elseif sRaceType == "VampireLord"	 ;TEST
+	;		ReturnCode = 162
+	;	elseif sRaceType == "Werewolf" ;TEST
+	;		ReturnCode = 163
+		elseif sRaceType == "Spriggan" && (cfgqst.DefeatType == "Spriggans" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		;elseif sRaceType == "FlameAtronach"	;TEST
+		;	ReturnCode = 170
+		;elseif sRaceType == "Wispmother"		;TEST
+		;	ReturnCode = 192
+		elseif sRaceType == "Hagraven" && (cfgqst.DefeatType == "Hagravens" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		elseif sRaceType == "DragonPriest"	&& (cfgqst.DefeatType == "Undead" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		
+
+		;====================
+		; DWARVEN
+		;====================
+	;	elseif sRaceType == "DwarvenSphere" ;TEST
+	;		ReturnCode = 500
+	;
+	;	elseif sRaceType == "DwarvenCenturion" ;TEST
+	;		ReturnCode = 520
+	;	elseif sRaceType == "DwarvenBallista" ;TEST
+	;		ReturnCode = 530
+
+
+		;====================
+		; REST
+		;====================
+	
+	;	elseif sRaceType == "Seeker"		;TEST
+	;		ReturnCode = 610
+	
+		endif 
+	;elseif IsLocalSlave()
+	
+	;	if sRaceType == "Human" 
+	;	returnvalue = true 
+	;	endif 
+
+	else 
+
+		if sRaceType == "Human" ;&& (cfgqst.DefeatType == "AreHumans") ;dire need of Faction Checks!!!
+		returnvalue = true 
+
+		;====================
+		; HUMANOIDS
+		;====================
+		elseif sRaceType == "Draugr" ;&& (cfgqst.DefeatType == "Undead" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		elseif sRaceType == "Riekling" ;&& (cfgqst.DefeatType == "Rieklings" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		elseif sRaceType == "Falmer" ;&& (cfgqst.DefeatType == "Falmers" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+	;	elseif sRaceType == "Gargoyle"	 ;TEST
+	;		ReturnCode = 160
+	;	elseif sRaceType == "Troll"	 ;TEST
+	;		ReturnCode = 161
+	;	elseif sRaceType == "VampireLord"	 ;TEST
+	;		ReturnCode = 162
+	;	elseif sRaceType == "Werewolf" ;TEST
+	;		ReturnCode = 163
+		elseif sRaceType == "Spriggan" ;&& (cfgqst.DefeatType == "Spriggans" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		;elseif sRaceType == "FlameAtronach"	;TEST
+		;	ReturnCode = 170
+		;elseif sRaceType == "Wispmother"		;TEST
+		;	ReturnCode = 192
+		elseif sRaceType == "Hagraven" ;&& (cfgqst.DefeatType == "Hagravens" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		elseif sRaceType == "DragonPriest"	;&& (cfgqst.DefeatType == "Undead" || cfgqst.DefeatType == "Funny")
+		returnvalue = true 
+		endif
+	endif 
+
+	Return returnvalue
+
 EndFunction 
 
 int Function GetHitterRaceCode(Actor akAggressor)			;#GetHitterRace
@@ -954,6 +1091,7 @@ Int Function GetCurrentSlaveGold()
 EndFunction 
 
 String Function GetRaceKeyFast(actor akActor)
+	;Guide: (latest as of 2026) internal function using Script Extenders (RaceCode) to get RaceKey faster than via Sexlab (hopefully)
 	
 	int RaceCode = GetHitterRaceCode(akActor)
 	string MyRaceKey = "empty"

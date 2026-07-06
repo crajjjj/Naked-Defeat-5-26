@@ -1397,7 +1397,9 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 							;if 
 							;storqst.TargetActorProfession = "Guard"
 							slaveqst.TempMaster = a			
-							cfgqst.ProxGuardDetected += 1
+							;cfgqst.ProxGuardDetected += 1
+							storqst.ProxMasterDetected += 1
+
 							MasterName01 = sTempName
 							NymTrace(MasterName01+" is the Master") 
 							;endif 
@@ -1444,8 +1446,8 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 		
 	endwhile	
 
-	if cfgqst.ProxGuardDetected > 0
-	cfgqst.ProxGuardDetected = 1
+	if storqst.ProxMasterDetected > 1
+	storqst.ProxMasterDetected = 1
 	
 		if Nym()
 	;	NymMessage(MasterName01+" (a Master) sees you") 
@@ -1453,7 +1455,7 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 		InfoMessage(MasterName01+" (a Master) sees you") 
 		endif 
 	else 	
-	cfgqst.ProxGuardDetected = 0
+	storqst.ProxMasterDetected = 0
 	endif 
 
 

@@ -2780,12 +2780,6 @@ Endfunction
 
 Event OnEnterBleedout()			;#bleedout1 ##BLEED##	;#OnBleedout #OnEnterBleedout()
 
-	if storqst.AcheronBleedoutFix && storqst.ModAcheron
-		DebugTrace("Global Acheron Bleedout Fix Applied")
-		Spell RestoreHealth = Game.GetFormFromFile(0x0002F3B8, "Skyrim.Esm") as Spell
-		RestoreHealth.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)
-	endif 
-
 	cfgqst.DefeatStatePlayer = "Bleedout"
 
 	Debug.Trace("NAKED DEFEAT playeraliasquest: OnEnterBleedout() ##Bleedout## Version:"+cfgqst.NakedDefeat_ModVersion)
@@ -4039,25 +4033,7 @@ EndEvent
 Event OnCellLoad()
 Debug.trace("NAKED DEFEAT playeraliasquest: OnCellLoad()")
 
-	cfgqst.CheckEssentiality()
-
-	if Nym()
-	;DO nothing
-	else 
-	;	if !cfgqst.PlayerMonitorOn			;DISABLE MONITOR 2025
-	;	PlayerMonitor()
-	;	endif
-	endif 
-
 	cfgqst.OnCellLoadFunction()
-	
-
-	
-	if Nym()
-	cfgqst.PlayerHairMaintenance()
-;	cfgqst.ProximityQuestStart("DuplicateEnemyScan")
-;	cfgqst.ProximityQuestStart("MarkDuplicantsScan")
-	endif 
 	
 EndEvent
 
@@ -5939,13 +5915,32 @@ NymTrace("CalculateSlaveGold(Mode: "+sMode+", Amount: "+iAmount+")")
 			endif
 		endif 
 			
-		if sMode == "Reduce" && slaveqst.HasCompletedSlaveTasks() ;&& storqst.GracePeriodSlave == 0
+		if sMode == "Reduce" ;&& slaveqst.HasCompletedSlaveTasks() && (slaveqst.ActiveSlaveTasks == 0) && (storqst.ProxMasterDetected > 0) ;&& storqst.GracePeriodSlave == 0
 		;NymTrace ("THIS SHIT HAPPENS")
-			if !cfgqst.PlayerRef.IsInInterior() && PriceForFreedomPaid()
-			slaveqst.EndLocalSlavery()
-			endif 
+		
+		CheckEndOfSlavery()
+		
+			;if !cfgqst.PlayerRef.IsInInterior() && PriceForFreedomPaid()
+			;slaveqst.EndLocalSlavery()
+			;endif 
 		endif 
 	
+EndFunction 
+
+
+Bool Function CheckEndOfSlavery()
+
+	if slaveqst.HasCompletedSlaveTasks() && (slaveqst.ActiveSlaveTasks == 0) && (storqst.ProxMasterDetected > 0) ;&& storqst.GracePeriodSlave == 0
+		;NymTrace ("THIS SHIT HAPPENS")
+			if !cfgqst.PlayerRef.IsInInterior() && PriceForFreedomPaid()		;UPDATE FOR INDOOR SLAVERY!!!
+			slaveqst.EndLocalSlavery()
+			return true
+			else 
+			return false
+			endif 
+	else 
+	return false
+	endif 
 EndFunction 
 
 ;String storqst.CurrentLocName

@@ -482,6 +482,7 @@ EndFunction
 
 ;EndFunction 
 
+
 Bool Function CheckWhippingRace(String sTempRaceKey)
 NymTrace("CheckWhippingRace("+sTempRaceKey+")")
 
@@ -532,22 +533,25 @@ Function AreaScanWhipper()
 			sTempDistance = cfgqst.PlayerRef.GetDistance(a)
 			sTempName = cfgqst.GetActorName(a)
 			sTempRaceKey = cfgqst.GetRaceKey(a)
+		
+			if a.IsInFaction(slaveqst.WhippingFaction)
+			a.RemoveFromFaction(slaveqst.WhippingFaction)
+			NymMessage("Actor "+sTempName+" WAS IN WHIPPINGFACTION")
+			endif 
 			
 			Debug.Trace("NAKED DEFEAT: #AreaScanWhipper ACTOR["+j+"]["+sTempName+"] [Distance = "+sTempDistance+"]")
 			
 			if folqst.IsPresentFollower(a) || (a.GetBaseObject().GetName() == "FEC : Load Screen Detector")
 			Debug.Trace("NAKED DEFEAT: #AreaScanWhipper ACTOR["+j+"]["+sTempName+"] [IS FOLLOWER]")		
-			
-				if Nym() && a.IsInFaction(slaveqst.WhippingFaction)
-				a.RemoveFromFaction(slaveqst.WhippingFaction)
-				NymMessage("MJOLL WAS IN WHIPPINGFACTION")
-				endif 
-			
-			elseif CheckWhippingRace(sTempRaceKey) && !cfgqst.IsFucking(a) && !a.IsDead()
+			;do nothing 
+			;elseif CheckWhippingRace(sTempRaceKey) && !cfgqst.IsFucking(a) && !a.IsDead()
+			elseif storqst.ValidateWhipper(a, sTempName) && !cfgqst.IsFucking(a) && !a.IsDead()
+			;this is the main check for the whipper.
 			
 			a.AddToFaction(slaveqst.WhippingFaction)
 			WhipperFound = true
-		
+			;this ends the loop, we only need ONE whipper 
+			
 			a.MoveTo(cfgqst.PlayerRef, -100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), -100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 115.0, abMatchRotation = false)
 			Debug.Trace("NAKED DEFEAT: #AreaScanWhipper ACTOR["+j+"]["+sTempName+"] [Distance = "+sTempDistance+"]")
 			endif	

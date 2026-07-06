@@ -1234,10 +1234,12 @@ Function GetMainSequenceLastSteps()		;#LastSteps
 
 		if cfgqst.Allow_Whipping
 		SelectWhipper()
+		storqst.WantWhipping = true
 		endif 
 		
 		if cfgqst.Allow_Whipping && !WhipperFound
 		cfgqst.Allow_Whipping = false
+		storqst.WantWhipping = false
 		endif 
 		
 		;MCM and Diceroll ---> BATHING / GOLDEN SHOWER
@@ -1265,6 +1267,11 @@ Function GetMainSequenceLastSteps()		;#LastSteps
 			if Allow_ForcedBathing && !cfgqst.Forced_Bathing_TOGGLE
 			Allow_ForcedBathing = false	
 			endif 
+			
+			if Allow_ForcedBathing && nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage")
+			Allow_ForcedBathing = false 		
+			endif 
+			
 		endif 
 		
 		
@@ -1354,7 +1361,7 @@ Function GetMainSequenceLastSteps()		;#LastSteps
 
 
 	;main bools
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: :::::::::::::::::::::: #Sequence Setp 2 FINAL ::::::::::::::::::::::")
+	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: :::::::::::::::::::::: #Sequence Setp 2 FINAL ::::::::::::::::::::::")		;#final
 	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: DefeatEntranceVia: "+cfgqst.DefeatEntranceVia)
 	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapeAgain: "+cfgqst.RapeAgain)
 	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: DefeatTypeScenario: "+cfgqst.DefeatTypeScenario)
@@ -1870,9 +1877,12 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 (Defeat #
 			cfgqst.SexSceneCountPlayer = 0
 			cfgqst.ResetExpressions()
 
-			if !cfgqst.AcheronEnabled 
-			cfgqst.EnableAcheron()		;#ACHERON
-			endif
+			if storqst.ModAcheron && !storqst.AcheronBleedoutFix ;disabled Acheron Scripts
+				if !cfgqst.AcheronEnabled 
+				cfgqst.EnableAcheron()		;#ACHERON
+				endif
+			endif 
+
 
 			cfgqst.SendModEvents(false)	
 			cfgqst.PlaceFloor("remove") ;#floor
@@ -1883,7 +1893,7 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 (Defeat #
 			cfgqst.PlayerRef.RemoveFromFaction(cfgqst.ProtectedActorFaction)
 			endif 
 
-			if storqst.ModAcheron
+			if storqst.ModAcheron && !storqst.AcheronBleedoutFix ;disabled Acheron Scripts
 				If(Acheron.IsDefeated(cfgqst.PlayerRef))
 					Acheron.RescueActor(cfgqst.PlayerRef, false)
 					Utility.Wait(3)
@@ -4090,12 +4100,12 @@ Function Fragment_3()	;############ STAGE 10 ############			##Start1 ##START##
 	Message.ResetHelpMessage("Sneak")
 	Utility.Wait(0.1)
 	storqst.MSG_SexSlaveDutiesStart.ShowAsHelpMessage("Sneak", 4, 0, 1)
-	Utility.Wait(5.0)
-	cfgqst.Immobilize(false)
-	cfgqst.PlayerRef.StartSneaking()
-	Utility.Wait(0.1)
-	cfgqst.PlayerRef.StartSneaking()
-	cfgqst.Immobilize(true)
+	;Utility.Wait(5.0)
+	;cfgqst.Immobilize(false)
+	;cfgqst.PlayerRef.StartSneaking()
+	;Utility.Wait(0.1)
+	;cfgqst.PlayerRef.StartSneaking()
+	;cfgqst.Immobilize(true)
 	Message.ResetHelpMessage("Empty")
 	storqst.MSG_TutorialEmptyMSG.ShowAsHelpMessage("Empty", 1, 0, 1)
 ;	Message.ResetHelpMessage("SexSlaveDutiesStart")
@@ -7549,7 +7559,7 @@ elseif sType == "Boars"		;Groupsize 2-4  Boars for Rieklings
 	endif
 	
 	
-elseif sType == "Werwolves"		;Groupsize 1-2
+elseif sType == "Werewolves"		;Groupsize 1-2
 	
 	if iRaperCount == 4
 	
@@ -12031,17 +12041,21 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartSexFast("+FastS
 						
 						elseif FastSexSubType == "Human" 
 						
-							NymTrace("Fast Rape we are here")
-							if j == 1 
-							CageTags = "MF, Doggy, "
-							elseif j == 2
-							CageTags = "MF, Blowjob, "
-							elseif j == 3
-							CageTags = "MF, Standing, "
-							elseif j == 4
-							CageTags = "MF, Cowgirl, "
-							storqst.Riding = true
+							if storqst.IsFemale(Rapers[0])
+							CageTags = "FF, "
+							else 
+								NymTrace("Fast Rape we are here")
+								if j == 1 
+								CageTags = "MF, Doggy, "
+								elseif j == 2
+								CageTags = "MF, Blowjob, "
+								elseif j == 3
+								CageTags = "MF, Standing, "
+								elseif j == 4
+								CageTags = "MF, Cowgirl, "
+								storqst.Riding = true
 
+								endif 
 							endif 
 						
 						else 						
@@ -12378,7 +12392,7 @@ Function StartSoloAggressor(actor akactor)	;#StartSoloAggressor #solo2
 	;OnOrgasmSoloX will apply Cum Overlays to the PC 
 
 	SolosRunning += 1
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartAggressorSolo("+SolosRunning+")")
+	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartAggressorSolo("+SolosRunning+")(DefeatStateChapter: "+cfgqst.DefeatStateChapter+")")
 			
 		if akactor	
 
@@ -13038,7 +13052,7 @@ EndFunction
 
 ;----------------------------------------------------------------------------------------------------------------------
 
-Event OnStartSolo(String EventName, String ArgString, Float ArgNum, Form Sender)	;SEXFINISHSCENE		;#solo		#events #bukkake
+Event OnStartSolo(String EventName, String ArgString, Float ArgNum, Form Sender)	;	;#solo		#events #bukkake
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStartSolo()")
 	
 	;IMPROVE THIS!!!
@@ -13538,6 +13552,7 @@ Bool Function IsPlayerSucking()
 		Int i = 0
 		Int PlayerPos
 		Actor NextActor
+		
 		While i < actorList.Length
 			NextActor = actorList[i]
 			If NextActor == cfgqst.PlayerRef
@@ -13546,7 +13561,7 @@ Bool Function IsPlayerSucking()
 			i += 1
 		EndWhile
 		
-		if Anim.UseOpenMouth(PlayerPos, SexLab.GetController(tid).Stage) 
+		if Anim && Anim.UseOpenMouth(PlayerPos, SexLab.GetController(tid).Stage) 
 		return true
 		else
 		return false 
@@ -18066,7 +18081,7 @@ Bool Function DoubleCheckRaceKey(string GroupKey)
 	return cfgqst.AllowDwarven
 	
 
-	elseif (GroupKey == "Giants") || (GroupKey == "Trolls") || (GroupKey == "Lurkers") || (GroupKey == "Werwolves")  ;done
+	elseif (GroupKey == "Giants") || (GroupKey == "Trolls") || (GroupKey == "Lurkers") || (GroupKey == "Werewolves")  ;done
 	return cfgqst.AllowHumanoidBeasts	
 	
 	elseif (GroupKey == "Spiders") || (GroupKey == "LargeSpiders") || (GroupKey == "GiantSpiders") ;done
