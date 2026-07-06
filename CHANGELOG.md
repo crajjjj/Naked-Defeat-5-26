@@ -37,8 +37,9 @@ All changed scripts recompiled; full project (244 scripts) compiles with 0 error
     human scenario with zero humans;
   - the scenario is really reset to `"none"` after Afterlife rescue, Girlfriend betrayal and ChainRape betrayal.
   (`nade_calmquest_qf_scr`)
-- **Devious Followers resumes after defeat** — the resume path sent `DF-Pause` a second time instead of
-  `DF-Resume`. (`nade_configquest_scr`)
+- **Devious Followers is now really paused during defeat and resumed after.** NADE sent `DF-Pause` as a plain
+  mod event, but DF's handler expects custom args (Bool pause/resume + sender Form) - the event never arrived,
+  in either direction. Now sent via `ModEvent.Create` with the proper arguments. (`nade_configquest_scr`)
 - **Scene protectors spawn every whipping scene again** — the placed-flag was never reset, so protectors only
   ever appeared once per savegame. (`nade_whipquest_00`)
 - **Bad-defeat-type warning can fire** — it compared against `"Funny"` but the value is `"AreFunny"`.

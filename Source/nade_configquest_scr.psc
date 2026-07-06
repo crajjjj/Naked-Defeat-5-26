@@ -25633,17 +25633,26 @@ EndFunction
 
 Function SendModEvents(bool value)
 
-if value 
+if value
 		SendModEvent("dhlp-Suspend")
 		SendModEvent("nade-Suspend")
 		SendModEvent("SLTR-Suspend") 	;submissiveLolaSuspend
-		SendModEvent("DF-Pause")
 else
 		SendModEvent("dhlp-Resume")
 		SendModEvent("nade-Resume")
 		SendModEvent("SLTR-Resume")
-		SendModEvent("DF-Resume")
 endif
+
+	;Devious Followers uses a single "DF-Pause" event with custom args (Bool pause + Form sender, handler: _dtick.psc PauseByEvent).
+	;A plain SendModEvent("DF-Pause") never reached it - argument signature mismatch.
+	;DF keeps a list of pausing mods keyed by the sender Form, so pause and resume must send the SAME form.
+	Int DFhandle = ModEvent.Create("DF-Pause")
+	if DFhandle
+	ModEvent.PushBool(DFhandle, value) 	;true = pause, false = resume
+	ModEvent.PushForm(DFhandle, self as Form)
+	ModEvent.Send(DFhandle)
+	endif
+
 EndFunction
 
 Function ResetBools() 	;#ResetBools
