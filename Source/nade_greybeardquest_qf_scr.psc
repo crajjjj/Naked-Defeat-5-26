@@ -179,8 +179,8 @@ EndFunction
 Function DoOrgasm()
 	Actor a = Alias_Player.GetReference() as Actor
 	if cfgqst.WhipMarks
-		cfgqst.AddTattoo("Cane Marks", "Cane Marks on Tits")
-		cfgqst.AddTattoo("Cane Marks", "Red Pussy")
+		;cfgqst.AddTattoo("Cane Marks", "Cane Marks on Tits")
+		;cfgqst.AddTattoo("Cane Marks", "Red Pussy")
 		cfgqst.SyncTattoos()
 	endif
 	if Aroused.GetActorExposure(a) > 70

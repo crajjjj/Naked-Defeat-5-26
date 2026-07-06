@@ -130,7 +130,7 @@ Event OnUpdate()			;#update
 		if !cfgqst.BoolCaptiveNoSound 
 		int y = Utility.RandomInt (1, 4) 
 			if y < 3
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			elseif y == 3
 			cfgqst.SexLabMoan(cfgqst.PlayerRef)
 			endif
@@ -676,7 +676,7 @@ elseif KeyCode == cfgqst.EscapeKey
 		Free = true 
 		cfgqst.SexLabMoan(player)
 		Utility.Wait(1.0)
-		cfgqst.PlaySound()
+		;cfgqst.PlaySound()
 		Utility.Wait(1.0)
         cfgqst.SexLabMoan(player)
 		Utility.Wait(1.0)
@@ -707,9 +707,9 @@ elseif KeyCode == cfgqst.EscapeKey
 
             while j
                 j -= 1		
-				cfgqst.PlaySound()
+				;cfgqst.PlaySound()
 				Utility.Wait(1.0)
-				cfgqst.PlaySound()
+				;cfgqst.PlaySound()
 				Utility.Wait(1.0)
 				cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 				cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"		
@@ -752,13 +752,13 @@ elseif KeyCode == cfgqst.EscapeKey
 				
 			;SUPER SHOCK EVENT
 			if (sevpunish == 2) || (sevpunish == 3)					
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
 			cfgqst.SexLabMoan(player)	
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
  
 			if (cfgqst.DefeatPeeProb > 0) && (Utility.RandomInt(1,2) < 2) 
 			cfgqst.PlayerRef.AddItem(Squirt[2], 1, true)
@@ -770,14 +770,14 @@ elseif KeyCode == cfgqst.EscapeKey
 			Utility.Wait(0.5)
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
 			cfgqst.SexLabMoan(player)
 			Utility.Wait(0.5)			
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
 			cfgqst.SexLabMoan(player)
@@ -786,13 +786,13 @@ elseif KeyCode == cfgqst.EscapeKey
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			cfgqst.ShockSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;WORKING ONLY EFFECT USES "ShockPlayerCloakFXShader [EFSH:0010F9A6]"
 			cfgqst.SoundSpell.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)	;ONLY SOUND USES "ShockFXShader [EFSH:00057C67]"
 			
@@ -801,7 +801,7 @@ elseif KeyCode == cfgqst.EscapeKey
 			endif
 			
 			Utility.Wait(1.0)
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			Utility.Wait(1.0)
 			cfgqst.SexLabMoan(player)
 			;PEE EVENT--------------------
@@ -816,13 +816,13 @@ elseif KeyCode == cfgqst.EscapeKey
 			endif
 			
 			Utility.Wait(1.0)
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			Utility.Wait(1.0)
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			Utility.Wait(1.0)
 			cfgqst.SexLabMoan(player)	
 			Utility.Wait(1.0)
-			cfgqst.PlaySound()
+			;cfgqst.PlaySound()
 			Utility.Wait(1.0)
 			
 			if cfgqst.DefeatPeeProb > 0

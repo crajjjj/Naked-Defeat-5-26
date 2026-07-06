@@ -97,17 +97,17 @@ Function Fragment_19()
 if cfgqst.WhipMarks
 	if WeaponIndex
 		if (TatNames1[FurnitureIndex] != "<none>")
-			cfgqst.AddTattoo("Cane Marks", TatNames1[FurnitureIndex])
+			;cfgqst.AddTattoo("Cane Marks", TatNames1[FurnitureIndex])
 		endif
 		if (TatNames2[FurnitureIndex] != "<none>")
-			cfgqst.AddTattoo("Cane Marks", TatNames2[FurnitureIndex])
+			;cfgqst.AddTattoo("Cane Marks", TatNames2[FurnitureIndex])
 		endif
 	else
 		if (TatNames1[FurnitureIndex] != "<none>")
-			cfgqst.AddTattoo("Cane Marks", TatNames3[FurnitureIndex])
+			;cfgqst.AddTattoo("Cane Marks", TatNames3[FurnitureIndex])
 		endif
 		if (TatNames2[FurnitureIndex] != "<none>")
-			cfgqst.AddTattoo("Cane Marks", TatNames4[FurnitureIndex])
+			;cfgqst.AddTattoo("Cane Marks", TatNames4[FurnitureIndex])
 		endif
 	endif
 	cfgqst.SyncTattoos()

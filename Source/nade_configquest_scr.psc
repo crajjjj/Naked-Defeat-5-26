@@ -1197,59 +1197,19 @@ Event OnStartNakedDefeatExternal(Form Enemy00, Form Enemy01, Form Enemy02, Form 
 			
 		bool NoActor = false
 		
-		if Assailants[0]
-		GetEnemyType(Assailants[0])	
-			if !Assailants[0].IsInFaction(EnemyFaction)
-			Assailants[0].AddToFaction(EnemyFaction)
-			endif 
-			;Assailants[0].AddToFaction(AcheronEnemyFaction)
-		else
-		InfoMessage("NAKED DEFEAT: #ERROR Enemy00 not found")	
-		NoActor = true
-		endif
-		
-		if Assailants[1]
-		GetEnemyType(Assailants[1])
-			if !Assailants[1].IsInFaction(EnemyFaction)
-			Assailants[0].AddToFaction(EnemyFaction)
-			endif 
-		;Assailants[1].AddToFaction(AcheronEnemyFaction)
-		endif
-
-		if Assailants[2]
-		GetEnemyType(Assailants[2])
-				if !Assailants[2].IsInFaction(EnemyFaction)
-				Assailants[2].AddToFaction(EnemyFaction)
-				endif 
-		;Assailants[2].AddToFaction(AcheronEnemyFaction)
-		endif
-
-		if Assailants[3]
-		GetEnemyType(Assailants[3])
-		
-				if !Assailants[3].IsInFaction(EnemyFaction)
-			Assailants[3].AddToFaction(EnemyFaction)
-			endif 
-		
-		;Assailants[3].AddToFaction(AcheronEnemyFaction)
-		endif
-
-		if Assailants[4]
-		GetEnemyType(Assailants[4])
-		
-				if !Assailants[4].IsInFaction(EnemyFaction)
-			Assailants[4].AddToFaction(EnemyFaction)
-			endif 
-		;Assailants[4].AddToFaction(AcheronEnemyFaction)
-		endif
-
-		if Assailants[5]
-		GetEnemyType(Assailants[5])
-				if !Assailants[5].IsInFaction(EnemyFaction)
-			Assailants[5].AddToFaction(EnemyFaction)
-			endif 
-		;Assailants[5].AddToFaction(AcheronEnemyFaction)
-		endif	
+		int iAssailant = 0
+		while iAssailant < 6
+			if Assailants[iAssailant]
+			GetEnemyType(Assailants[iAssailant])
+				if !Assailants[iAssailant].IsInFaction(EnemyFaction)
+				Assailants[iAssailant].AddToFaction(EnemyFaction)
+				endif
+			elseif iAssailant == 0
+			InfoMessage("NAKED DEFEAT: #ERROR Enemy00 not found")
+			NoActor = true
+			endif
+		iAssailant += 1
+		endwhile
 		
 		if folqst.Actor_Follower01			
 		;folqst.Actor_Follower01.AddToFaction(AcheronVictimFaction)
@@ -1261,12 +1221,20 @@ Event OnStartNakedDefeatExternal(Form Enemy00, Form Enemy01, Form Enemy02, Form 
 		
 		if NoActor
 		NoActor = false
+		PlayerDownAlready = false 	;a stuck true here blocks all future defeats
+			int iCleanup = 0
+			while iCleanup < 6
+				if Assailants[iCleanup] && Assailants[iCleanup].IsInFaction(EnemyFaction)
+				Assailants[iCleanup].RemoveFromFaction(EnemyFaction)
+				endif
+			iCleanup += 1
+			endwhile
 		ScreenMessage("NAKED DEFEAT: #ERROR Quest not started because actor missing")
 		else
 		
 		GetDefeatType("AcheromBridge")
 		
-		if DefeatTypeGeneral == "Funny"
+		if DefeatTypeGeneral == "AreFunny" 	;GetDefeatType() sets the General value to "AreFunny" ("Funny" is only the DefeatType)
 		ScreenMessage("NAKED DEFEAT: #ERROR failed to get a proper defeat type from Acheron actors")
 		endif
 		
@@ -1337,18 +1305,7 @@ Event OnStartNakedDefeatExternal(Form Enemy00, Form Enemy01, Form Enemy02, Form 
 	;	PlayerRef.PushActorAway(PlayerRef, 0.1)
 			
 			
-		if PlayerRef.IsWeaponDrawn() 
-		PlayerRef.SheatheWeapon() 
-	;	Utility.Wait(1.0)
-		endif			
-		
-		if PlayerRef.GetEquippedWeapon()
-		PlayerRef.UnequipItem(PlayerRef.GetEquippedWeapon())
-		endif
-		
-		if PlayerRef.GetEquippedWeapon(true)
-		PlayerRef.UnequipItem(PlayerRef.GetEquippedWeapon(true))
-		endif
+		;(weapon sheathe/unequip already done above and again in StartDefeat())
 
 		DefeatEntranceVia = "Acheron Bridge"
 		;SendModEvent("StartRestartCalmQuest")
@@ -1771,10 +1728,12 @@ Function StartDefeat()				;#StartDefeat()
 	Utility.Wait(4.0)
 	endif 
 	
-	while Ragdolling		;#ragdoll
+	int Cowntdown2 = 10
+	while Ragdolling && ModEnabled && (Cowntdown2 > 0)		;#ragdoll 	;bounded: a missed "getupend" event must not hang the defeat start forever
 	WasRagdolling = true
 	Debug.trace ("NAKED DEFEAT configquest: RAGDOLLING BB")
 	Utility.Wait(1.0)
+	Cowntdown2 -= 1
 	endwhile
 
 ;	if HealthBoost
@@ -14607,10 +14566,14 @@ Function KeyAbortAll()
 		Immobilize(false)
 		FadeToBlack(false)
 
+		if LastAddedDevice
 		LastAddedDevice.DisableNoWait()
 		LastAddedDevice.Delete()
 		LastAddedDevice = None
-	endif 
+		endif
+
+		RestorePlayerState() 	;an abort must not leave Acheron disabled or the player without bleedout recovery
+	endif
 
 EndFunction
 
@@ -14706,8 +14669,12 @@ Debug.Trace("NAKED DEFEAT #DEBUG: KeyFixBleedout() FIX BLEEDOUT. PressedTimes: "
 
 	Immobilize(false)
 	PlayerRef.PushActorAway(PlayerRef, 0.1)
-	PlayerRef.RestoreActorValue("Health", 100)		
-	PlayerRef.SetNoBleedoutRecovery(true)			
+	PlayerRef.RestoreActorValue("Health", 100)
+	if DefeatQuestRunning || CivilRapeRunning
+	PlayerRef.SetNoBleedoutRecovery(true) 	;mid-defeat reposition: keep the defeat bleedout state
+	else
+	RestorePlayerState() 	;out-of-defeat unstuck: re-enable Acheron and restore bleedout recovery
+	endif
 	SendModEvent("Moan")
 	Utility.Wait(1.0)
 		
@@ -25675,7 +25642,7 @@ else
 		SendModEvent("dhlp-Resume")
 		SendModEvent("nade-Resume")
 		SendModEvent("SLTR-Resume")
-		SendModEvent("DF-Pause")
+		SendModEvent("DF-Resume")
 endif
 EndFunction
 
@@ -26035,12 +26002,15 @@ Debug.trace("NAKED DEFEAT configquest: GetEnemyType: "+GetActorName(Hitter))
 	;		endif
 	;	endif
 		
-		;treat tame trolls as humans (to start defeattypehumans) ;PROBLEMATIC 
+		;treat tame trolls as humans (to start defeattypehumans) ;PROBLEMATIC
+		;/ never worked: "RaceKey == "Humans"" was a comparison, not an assignment, so this block always did nothing.
+		;Kept disabled on purpose (marked PROBLEMATIC above) - change == to = to activate it.
 		if RaceKey == ("Trolls")
 			if (Hitter.GetBaseObject().GetName() == "Armored Troll") || (Hitter.GetBaseObject().GetName() == "Armored Frost Troll") || (Hitter.GetBaseObject().GetName() == "Tame Troll")
 			RaceKey == "Humans"
 			endif
 		endif
+		/;
 		
 		;---------------------------------------------------------------------------------------------------------
 	
@@ -29689,6 +29659,7 @@ Function DisableAcheron()
 
 if VersionSE
 	If storqst.ModAcheron
+	  AcheronEnabled = false 	;so EnableAcheron() knows processing must be switched back on
 	  InfoMessage("NAKED DEFEAT: Acheron disabled")
 	  ;Acheron.DisableConsequences(true) ; hinder Acheron to start other outcomes while yours is running
 	  ; or
@@ -29700,15 +29671,35 @@ EndFunction
 Function EnableAcheron()
 if VersionSE
 	If storqst.ModAcheron
+		if !AcheronEnabled
+		AcheronEnabled = true
 		;Acheron.DisableConsequences(false) ; enable Acheron again
 		; or
 		InfoMessage("NAKED DEFEAT: Acheron enabled")
 		Acheron.DisableProcessing(false) ; enable
+		endif
 
-		Acheron.RescueActor(PlayerRef)
-		Acheron.ReleaseActor(PlayerRef) ; needed so you don't soft-lock the player
+		;free the player from a lingering Acheron defeat/pacify state (soft-lock guard)
+		If Acheron.IsDefeated(PlayerRef)
+			Acheron.RescueActor(PlayerRef, false)
+			Utility.Wait(3)
+			Acheron.ReleaseActor(PlayerRef) ; needed so you don't soft-lock the player
+		ElseIf Acheron.IsPacified(PlayerRef)
+			Acheron.ReleaseActor(PlayerRef)
+			Debug.SendAnimationEvent(PlayerRef, "IdleForceDefaultState")
+		EndIf
 	EndIf
 endif
+EndFunction
+
+Function RestorePlayerState() 	;#unstuck 	;central release/abort restore. Idempotent - safe to call from any exit path.
+
+	Debug.Trace("NAKED DEFEAT configquest: RestorePlayerState()")
+
+	EnableAcheron()
+	PlayerRef.SetNoBleedoutRecovery(false) 	;set true on every defeat entry, previously never reset after release
+	PlayerDownAlready = false
+
 EndFunction
 
 ;WIP

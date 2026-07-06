@@ -4,7 +4,7 @@ nade_configquest_scr Property cfgqst Auto
 GlobalVariable Property nade_Stomach Auto
 
 Event OnPlayerLoadGame()
-	cfgqst.UpdatePotions()
+	;cfgqst.UpdatePotions()
 	Debug.Notification("<font color='#ff0000'>Potions Updated</font>")
 EndEvent
 
@@ -44,7 +44,7 @@ Event OnObjectEquipped(Form akBaseItem, ObjectReference akItemReference)
 			stomach = fullcapacity
 		endif
 		nade_Stomach.SetValue(stomach)
-		Debug.Notification(akBaseItem.GetName()+" ("+cfgqst.DecimalStr(weight, 10)+") fills your stomach to "+cfgqst.DecimalStr(100*stomach/capacity, 10)+"%")
+		;Debug.Notification(akBaseItem.GetName()+" ("+cfgqst.DecimalStr(weight, 10)+") fills your stomach to "+cfgqst.DecimalStr(100*stomach/capacity, 10)+"%")
 		weight = (GetReference() as Actor).GetActorBase().GetWeight()
 		if (weight == 100.0) || (weight == 0.0)
 			cfgqst.UpdateSlowdown(false, true)

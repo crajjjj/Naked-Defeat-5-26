@@ -1722,8 +1722,8 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 (Defeat #
 			ScreenMessage("They cannot fuck you but they can sell you...") 
 			elseif cfgqst.AbortAll ;&& !NoActors_StartSlavery
 			ScreenMessage("NAKED DEFEAT Aborted")	
-			elseif Rescued && cfgqst.DefeatTypeScenario == "Afterlife"		
-			cfgqst.DefeatTypeScenario == "none"
+			elseif Rescued && cfgqst.DefeatTypeScenario == "Afterlife"
+			cfgqst.DefeatTypeScenario = "none"
 			ScreenMessage("You are alive. Again?")
 			elseif Rescued 	
 			ScreenMessage("You were miraculously rescued!")
@@ -1877,14 +1877,10 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 (Defeat #
 			cfgqst.SexSceneCountPlayer = 0
 			cfgqst.ResetExpressions()
 
-			if storqst.ModAcheron && !storqst.AcheronBleedoutFix ;disabled Acheron Scripts
-				if !cfgqst.AcheronEnabled 
-				cfgqst.EnableAcheron()		;#ACHERON
-				endif
-			endif 
+			cfgqst.RestorePlayerState()		;#ACHERON 	;re-enables Acheron, restores bleedout recovery, resets PlayerDownAlready
 
 
-			cfgqst.SendModEvents(false)	
+			cfgqst.SendModEvents(false)
 			cfgqst.PlaceFloor("remove") ;#floor
 			cfgqst.PlaceLight("remove")
 			cfgqst.AddVictimsToCalmFactions(false)
@@ -1893,16 +1889,7 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 (Defeat #
 			cfgqst.PlayerRef.RemoveFromFaction(cfgqst.ProtectedActorFaction)
 			endif 
 
-			if storqst.ModAcheron && !storqst.AcheronBleedoutFix ;disabled Acheron Scripts
-				If(Acheron.IsDefeated(cfgqst.PlayerRef))
-					Acheron.RescueActor(cfgqst.PlayerRef, false)
-					Utility.Wait(3)
-					Acheron.ReleaseActor(cfgqst.PlayerRef)
-				ElseIf(Acheron.IsPacified(cfgqst.PlayerRef))
-					Acheron.ReleaseActor(cfgqst.PlayerRef)
-					Debug.SendAnimationEvent(cfgqst.PlayerRef, "IdleForceDefaultState")
-				EndIf
-			endif 
+			;(Acheron rescue/release now happens inside cfgqst.RestorePlayerState() above)
 
 			Stop() ;this is before the Transitions because they could be VOIDS I think... Should be mostly Save now due to the ModEvents. But it works so....
 			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #STOP")
@@ -2468,7 +2455,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		StartPlayerFree()
 		else
 		ScreenMessage("The evil bastards betrayed you!")
-		cfgqst.DefeatTypeScenario == "none"
+		cfgqst.DefeatTypeScenario = "none"
 		cfgqst.Allow_EscapeDifficulty = "Hard"
 		StartPlayerRobbed()
 		StartPlayerCaptured()
@@ -2565,7 +2552,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		StartPlayerFree()	
 		else
 		ScreenMessage("Those bastards still have the strength to bind you!")
-		cfgqst.DefeatTypeScenario == "none"
+		cfgqst.DefeatTypeScenario = "none"
 		cfgqst.Allow_EscapeDifficulty = "Hard"
 		StartPlayerRobbed()
 		StartPlayerCaptured()
@@ -4476,13 +4463,13 @@ Function Fragment_3()	;############ STAGE 10 ############			##Start1 ##START##
 					NoActorsAbort = true
 					else 
 					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ABORT - AreHumans > no Humans but there are Creatures available")
-					(cfgqst.DefeatTypeGeneral == "AreCreatures")
+					cfgqst.DefeatTypeGeneral = "AreCreatures"
 						if cfgqst.DefeatTypeScenario == "DD"
 						;do NOTHING
-						else 
-						cfgqst.DefeatTypeScenario == "none"
-						Allow_Foreplay = false 
-						Allow_GoldenShower = false 
+						else
+						cfgqst.DefeatTypeScenario = "none"
+						Allow_Foreplay = false
+						Allow_GoldenShower = false
 						endif
 					NoActorsAbort = false
 					endif 
@@ -7568,24 +7555,25 @@ elseif sType == "Werewolves"		;Groupsize 1-2
 	endif 
 	
 	;LvLWerewolfBoss 000A1980
-	
+
+	Form WerewolfForm = game.GetFormFromFile(0x0001E7CC, "Skyrim.esm")		;LvlWerewolf - resolve once, not per spawn
 	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001E7CC, "Skyrim.esm"), 1)		;LvlWerewolf
+	TempAnActor	= cfgqst.playerref.PlaceAtMe(WerewolfForm, 1)
 	SpawnedActor[0] = TempAnActor as actor
 	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
 	endif
 	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001E7CC, "Skyrim.esm"), 1)		;LvlWerewolf
+	TempAnActor	= cfgqst.playerref.PlaceAtMe(WerewolfForm, 1)
 	SpawnedActor[1] = TempAnActor as actor
 	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
 	endif
 	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001E7CC, "Skyrim.esm"), 1)		;LvlWerewolf
+	TempAnActor	= cfgqst.playerref.PlaceAtMe(WerewolfForm, 1)
 	SpawnedActor[2] = TempAnActor as actor
 	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
 	endif
 	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001E7CC, "Skyrim.esm"), 1)		;LvlWerewolf
+	TempAnActor	= cfgqst.playerref.PlaceAtMe(WerewolfForm, 1)
 	SpawnedActor[3] = TempAnActor as actor
 	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
 	endif
@@ -16132,7 +16120,7 @@ Function SelectWhipper()
 		WhipperFound = true
 		
 		if cfgqst.DefeatTypeGeneral == "AreHumans"
-		
+
 			if RapersC[3]
 			RapersC[3].AddToFaction(WhippingFaction)
 			RapersC[3] = none
@@ -16145,12 +16133,12 @@ Function SelectWhipper()
 			RapersC[1].AddToFaction(WhippingFaction)
 			RapersC[1] = none
 			RapersCCount = 1
-			
+
 		;	elseif VictimCount < 2 && RapersC[0]
 		;	RapersC[0].AddToFaction(WhippingFaction)
 		;	RapersC[0] = none
 		;	RapersCCount = 0
-			
+
 			elseif RapersB[3]
 			RapersB[3].AddToFaction(WhippingFaction)
 			RapersB[3] = none
@@ -16175,22 +16163,28 @@ Function SelectWhipper()
 			RapersA[1].AddToFaction(WhippingFaction)
 			RapersA[1] = none
 			RapersACount = 1
-			
+			else
+			WhipperFound = false ;no free human whipper available
+			storqst.NeedAwhipper = true
+			NymTrace("SelectWhipper (no free human whipper, storqst.NeedAwhipper:"+storqst.NeedAwhipper+")")
+			endif
+
 		elseif cfgqst.DefeatTypeGeneral == "AreHumanoids" && (cfgqst.DefeatType == "Undead" || cfgqst.DefeatType == "Rieklings" || cfgqst.DefeatType == "Spriggans" || cfgqst.DefeatType == "Falmers")
-			
-			elseif CreaturesF[3] && CheckWhipperRaceTypeVsScenario(CreaturesFRace)	
+
+			;this ladder was unreachable before: the elseif above had an empty body that swallowed exactly these DefeatTypes
+			if CreaturesF[3] && CheckWhipperRaceTypeVsScenario(CreaturesFRace)
 			CreaturesF[3].AddToFaction(WhippingFaction)
 			CreaturesF[3] = none
 			CreaturesFCount = 3
-			elseif CreaturesF[2] && CheckWhipperRaceTypeVsScenario(CreaturesFRace)	
+			elseif CreaturesF[2] && CheckWhipperRaceTypeVsScenario(CreaturesFRace)
 			CreaturesF[2].AddToFaction(WhippingFaction)
 			CreaturesF[2] = none
 			CreaturesFCount = 2
-			elseif CreaturesF[1] && CheckWhipperRaceTypeVsScenario(CreaturesFRace)	
+			elseif CreaturesF[1] && CheckWhipperRaceTypeVsScenario(CreaturesFRace)
 			CreaturesF[1].AddToFaction(WhippingFaction)
 			CreaturesF[1] = none
 			CreaturesFCount = 1
-			;CreaturesD and E missing 
+			;CreaturesD and E missing
 			elseif CreaturesC[3] && CheckWhipperRaceTypeVsScenario(CreaturesCRace)
 			CreaturesC[3].AddToFaction(WhippingFaction)
 			CreaturesC[3] = none
@@ -16227,14 +16221,19 @@ Function SelectWhipper()
 			CreaturesA[1].AddToFaction(WhippingFaction)
 			CreaturesA[1] = none
 			CreaturesACount = 1
-			else 
-			
+			else
+
 			WhipperFound = false ;if we dont land anywhere above, this becomes false
 			storqst.NeedAwhipper = true
 			NymTrace("SelectWhipper A (storqst.NeedAwhipper:"+storqst.NeedAwhipper)
-			endif 
-		endif 
-	endif		
+			endif
+
+		else
+		WhipperFound = false ;this DefeatType has no valid whippers - cancel instead of starting an empty whip scene
+		storqst.NeedAwhipper = true
+		NymTrace("SelectWhipper (DefeatTypeGeneral "+cfgqst.DefeatTypeGeneral+" has no whippers)")
+		endif
+	endif
 
 EndFunction 
 
@@ -19010,7 +19009,7 @@ Function RealWaiting(float WaitTime)	;#waiting
 ;	DebugTrace("ftimeStart = "+ftimeStart)
 
 	while cfgqst.ModEnabled && (ftimeCurrent < (ftimeStart + cfgqst.FindSpotTime))
-	Utility.Wait(0.1)
+	Utility.Wait(0.25) 	;duration timer - no need to wake the VM 10x per second
 	ftimeCurrent = Utility.GetCurrentRealTime()
 
 		if (cfgqst.FindSpotTime > 0) && showmessage && (ftimeCurrent > ((ftimeStart + cfgqst.FindSpotTime) - 5.0))

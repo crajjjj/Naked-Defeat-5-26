@@ -10,7 +10,7 @@ EndEvent
 
 Event OnMagicEffectApply(ObjectReference akCaster, MagicEffect akEffect)
 	if (akEffect == CureDiseaseEffect) && cfgqst.WhipMarks
-		cfgqst.RemoveCaneMarks()
+		;cfgqst.RemoveCaneMarks()
 ;		cfgqst.HealGaping()
 	endif
 EndEvent

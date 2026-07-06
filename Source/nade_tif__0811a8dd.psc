@@ -7,7 +7,7 @@ Function Fragment_0(ObjectReference akSpeakerRef)
 Actor akSpeaker = akSpeakerRef as Actor
 ;BEGIN CODE
 ;start sex for money
-(GetOwningQuest() as nade_rapequest_qf_scr).DoOutcome("Oral", 40)
+;(GetOwningQuest() as nade_rapequest_qf_scr).DoOutcome("Oral", 40)	;disabled: DoOutcome no longer exists in rapequest
 ;END CODE
 EndFunction
 ;END FRAGMENT

@@ -301,9 +301,9 @@ Function Fragment_2()				;CAPTURE EVENT	//// decides if Furniture OR DDe game	;#
 
 ;>>>>>>>>>>>>>>>>>> CAPTURE SETUP >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-	RegisterForKey(cfgqst.DefeatKey)
-	
-	Debug.Trace("NAKED DEFEAT capturequest: stage 20")	
+	;RegisterForKey(cfgqst.DefeatKey) 	;removed: both OnKeyDown handlers in this script are commented out, the DefeatKey is handled centrally in nade_configquest_scr
+
+	Debug.Trace("NAKED DEFEAT capturequest: stage 20")
 	Debug.Trace("NAKED DEFEAT capturequest: DefeatTypeScenario: "+cfgqst.DefeatTypeScenario)
 
 	if !Nym()
@@ -1273,7 +1273,13 @@ Function CreateFurniture_NEW()			;#_NEW
 	
 	;iFurnARRAYsize is now the number of furnitures added, but we need to do -1 for the array...
 	iFurnARRAYsize -= 1
-	
+
+	if iFurnARRAYsize < 0 	;no suitable furniture at all - bail out before RandomInt(0,-1) and a negative array index
+	Debug.Trace("NAKED DEFEAT capturequest: CreateFurniture_NEW() found NO suitable furniture - aborting placement")
+	Debug.Messagebox("Naked Defeat: no suitable furniture found - #ERROR 1274b")
+	return
+	endif
+
 	CurrentFurnitureNum = Utility.RandomInt(0, iFurnARRAYsize)
 
 	CurrentPlacementAngle = Furniture_PlacementAngle_ARRAY[CurrentFurnitureNum]		

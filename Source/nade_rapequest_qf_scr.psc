@@ -106,7 +106,7 @@ nade_WhipQuest_01 Property whipq01 Auto
 nade_WhipQuest_02 Property whipq02 Auto
 
 nade_FollowerIdleQuest_01_qf_scr Property folidle01 Auto
-nade_FollowerIdleQuest_02_qf_scr Property folidle02 Auto
+;nade_FollowerIdleQuest_02_qf_scr Property folidle02 Auto	;disabled: script no longer exists (merged into FollowerIdleQuest_01, see StartDoingNothing_02) and property was never used
 
 Quest Property calmqst Auto
 
@@ -557,43 +557,43 @@ Debug.Trace("NAKED DEFEAT rapequest: stage 10")
 	if VictimCount > 0
 		if Victims0	
 		StripFollower(0)
-		folidle01.IdleVictims0(0, "none")	
+		;folidle01.IdleVictims0(0, "none")	
 			if FollowersAreBound
-			folidle01.IdleVictims0(1, "struggleBound")
+			;folidle01.IdleVictims0(1, "struggleBound")
 			else
-			folidle01.IdleVictims0(1, "struggle")
+			;folidle01.IdleVictims0(1, "struggle")
 			endif
 		Vehicle_Follower_01("restore") 
 		endif
 	
 		if Victims1
 		StripFollower(1)
-		folidle01.IdleVictims1(0, "none")
+		;folidle01.IdleVictims1(0, "none")
 			if FollowersAreBound
-			folidle01.IdleVictims1(1, "struggleBound")
+			;folidle01.IdleVictims1(1, "struggleBound")
 			else
-			folidle01.IdleVictims1(1, "struggle")
+			;folidle01.IdleVictims1(1, "struggle")
 			endif
 		;Vehicle_Follower_01("setup") 
 		endif
 		
 		if Victims2
 		StripFollower(2)
-		folidle01.IdleVictims2(0, "none")
-		folidle01.IdleVictims2(1, "struggle")
+		;folidle01.IdleVictims2(0, "none")
+		;folidle01.IdleVictims2(1, "struggle")
 		endif
 		
 		if Victims3
 		StripFollower(3)			
-		folidle01.IdleVictims3(0, "none")
-		folidle01.IdleVictims3(1, "struggle")
+		;folidle01.IdleVictims3(0, "none")
+		;folidle01.IdleVictims3(1, "struggle")
 		endif
 			
 	endif
 
 	;-----------------------------------
 	SortActors()		
-	cfgqst.PlaySound()
+	;cfgqst.PlaySound()
 	
 	;>>>>>>>>>>>>>>>>>> forced bathing >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 		
@@ -2438,16 +2438,16 @@ Debug.Trace("NAKED DEFEAT rapequest: - onPeefinished")
 
 	Immobilize(true)
 
-	cfgqst.PlaySound()
+	;cfgqst.PlaySound()
 
 	Utility.Wait (3.0)
-	cfgqst.PlaySound()
+	;cfgqst.PlaySound()
 	
 	Utility.Wait (3.0)
-	cfgqst.PlaySound()
+	;cfgqst.PlaySound()
 	
 	Utility.Wait (3.0)
-	cfgqst.PlaySound()
+	;cfgqst.PlaySound()
 
 	UnRegisterForModEvent("AnimationEnd_NadePee")
 	UnRegisterForModEvent("AnimationEnding_NadePee")  
@@ -2524,7 +2524,7 @@ Function OnAnimationEnding(String EventName, String ArgString, Float ArgNum, For
 	Vehicle("restore") 	;double check
 	cfgqst.SexLabMoan(cfgqst.PlayerRef)	
 	Immobilize(true)	;double check
-	cfgqst.PlaySound()	
+	;cfgqst.PlaySound()	
 	ForcePosing_2 = true				;#pose
 	RegisterForSingleUpdate(0.1)
 	Debug.Trace("NAKED DEFEAT rapequest: OnUpdate (sent: ForcePosing_2")
@@ -2536,12 +2536,12 @@ Function OnAnimationEnding(String EventName, String ArgString, Float ArgNum, For
 	
 	;followermaintenance
 	if Victims2
-	folidle01.IdleVictims2(0, "none")
-	folidle01.IdleVictims2(1, "struggle")
+	;folidle01.IdleVictims2(0, "none")
+	;folidle01.IdleVictims2(1, "struggle")
 	endIf
 	if Victims3
-	folidle01.IdleVictims3(0, "none")
-	folidle01.IdleVictims3(1, "struggle")
+	;folidle01.IdleVictims3(0, "none")
+	;folidle01.IdleVictims3(1, "struggle")
 	endif
 	
 	;wait for FollowerScenes to finish
@@ -2558,11 +2558,11 @@ Function OnAnimationEnding(String EventName, String ArgString, Float ArgNum, For
 	IdleWaitTime =- 4.0
 	cfgqst.SexLabMoan(cfgqst.PlayerRef)
 	Utility.Wait(3.0)
-	cfgqst.PlaySound()					
+	;cfgqst.PlaySound()					
 	Utility.Wait(1.0)
 	endwhile
 	
-	cfgqst.PlaySound()					
+	;cfgqst.PlaySound()					
 	Utility.Wait(1.0)
 	
 	Vehicle("restore") 	;#vehicle
@@ -2609,10 +2609,10 @@ Function OnAnimationEnd01(String EventName, String ArgString, Float ArgNum, Form
 	if cfgqst.DefeatTypeScenario == "Bound"
 	StripFollower(0)
 	AddDefeatBindsFollowers(Victims[0])
-	folidle01.IdleVictims0(1, "struggleBound")
+	;folidle01.IdleVictims0(1, "struggleBound")
 	else
 	StripFollower(0)
-	folidle01.IdleVictims0(1, "struggle")
+	;folidle01.IdleVictims0(1, "struggle")
 	endif
 	
 	UnRegisterForModEvent("AnimationEnd_Naderapefollower01")  
@@ -2651,10 +2651,10 @@ Function OnAnimationEnd02(String EventName, String ArgString, Float ArgNum, Form
 	if cfgqst.DefeatTypeScenario == "Bound"
 	StripFollower(1)
 	AddDefeatBindsFollowers(Victims[1])
-	folidle01.IdleVictims1(1, "struggleBound")
+	;folidle01.IdleVictims1(1, "struggleBound")
 	else
 	StripFollower(1)
-	folidle01.IdleVictims1(1, "struggle")
+	;folidle01.IdleVictims1(1, "struggle")
 	endif
 	
 	UnRegisterForModEvent("AnimationEnd_Naderapefollower02")  
@@ -2703,7 +2703,7 @@ Function Immobilize(Bool value = true)				;REWORK THIS SHIT PLEASE IMMOBILIZE FU
 
 	if value
 		cfgqst.PlayerRef.StopCombat()
-		cfgqst.PlaySound()
+		;cfgqst.PlaySound()
 		cfgqst.PlayerRef.StopCombatAlarm()
 		Game.DisablePlayerControls(1, 1, 0, 0, 1, 1, 1, 1, 1)
 		Game.SetPlayerAIDriven(true)
@@ -3940,12 +3940,12 @@ Function StartRapeSequence(Int Round = 0)
 		;female 		
 		if (SexLab.GetGender(Victims[0]) == 1) && cfgqst.FemaleFollower  
 		SelectAggressor(Round, 1)							
-		folidle01.IdleVictims0(0, "none")	
+		;folidle01.IdleVictims0(0, "none")	
 		StartRapeFollower01(Aggressors[0])
 		;male
 		elseif (SexLab.GetGender(Victims[0]) == 0) && cfgqst.MaleFollower  
 		SelectAggressor(Round, 1)						
-		folidle01.IdleVictims0(0, "none")
+		;folidle01.IdleVictims0(0, "none")
 		StartRapeFollower01(Aggressors[0])
 		endif
 		
@@ -3955,12 +3955,12 @@ Function StartRapeSequence(Int Round = 0)
 		;female 	
 		if (SexLab.GetGender(Victims[1]) == 1) && cfgqst.FemaleFollower  	
 		SelectAggressor(Round, 1)						
-		folidle01.IdleVictims1(0, "none")
+		;folidle01.IdleVictims1(0, "none")
 		StartRapeFollower02(Aggressors[0])
 		;male
 		elseif (SexLab.GetGender(Victims[1]) == 0) && cfgqst.MaleFollower  
 		SelectAggressor(Round, 1)						
-		folidle01.IdleVictims1(0, "none")
+		;folidle01.IdleVictims1(0, "none")
 		StartRapeFollower02(Aggressors[0])
 		endif
 		

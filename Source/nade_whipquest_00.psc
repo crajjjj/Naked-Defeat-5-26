@@ -70,18 +70,20 @@ bool blocked = true
 bool DebugKeyAbort = false
 
 
+;/ DEAD CODE: this script never calls RegisterForKey, so this handler never fired.
+;The skip-whipping key is handled centrally in nade_configquest_scr OnKeyDown (DefeatKey -> WhippingDuration = 0).
 Event OnKeyDown (Int KeyCode)		;#key
 ;bLocked = true
 
 if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu") ;&& !SexLab.IsRunning && !PlayerRef.IsOnMount()
 	if KeyCode == cfgqst.DefeatKey
-	
+
 	Debug.trace ("NAKED DEFEAT whipquest_00: Keypress DefeatKey (Skip whipping)")
-	
+
 	DebugKeyAbort = true
-	cfgqst.SexLabMoan(cfgqst.PlayerRef)	
+	cfgqst.SexLabMoan(cfgqst.PlayerRef)
 	Debug.Notification("<font color='#ff0000'>Your whipper got bored by your whimpering.</font>")		;MESSAGE
-		Debug.Trace("NAKED DEFEAT Notification: Your whipper got bored by your whimpering.")	
+		Debug.Trace("NAKED DEFEAT Notification: Your whipper got bored by your whimpering.")
 
 	SetStage(25)	;end of whipping
 	else
@@ -89,8 +91,9 @@ if !Utility.IsInMenuMode() && !UI.IsMenuOpen("Crafting Menu") ;&& !SexLab.IsRunn
 	endif
 else
 	Debug.trace ("NAKED DEFEAT whipquest_00: Keypress DefeatKey (Skip whipping FAILED 02)")
-endif  
+endif
 EndEvent
+/;
 
 Function AbortWhipping()
 
@@ -141,13 +144,16 @@ Function RemoveSceneProtectors()
 	NymMessage("Remove Scene Protector 01a")
 	TheSceneProtector_01.DisableNoWait()
 	TheSceneProtector_01.Delete()
-	endif 
-	if TheSceneProtector_02	
+	TheSceneProtector_01 = None
+	endif
+	if TheSceneProtector_02
 	NymMessage("Remove Scene Protector 02a")
 	TheSceneProtector_02.DisableNoWait()
 	TheSceneProtector_02.Delete()
+	TheSceneProtector_02 = None
 	endif
-EndFunction 
+	storqst.SceneProtectorsPlaced = false 	;allow protectors to be placed again in the next scene
+EndFunction
 
 Function Fragment_2()				;#whipscene	#20 ;##Start		;WHIPSCENE START
 
@@ -194,13 +200,14 @@ Function Fragment_2()				;#whipscene	#20 ;##Start		;WHIPSCENE START
 				if CheckWhipper() 
 					
 					PlaceSceneProtectors()
-					
+
 					AddCane()
 					if cfgqst.AlreadyImmobilized	;we dont want this in some situations.
 					MoveWhipperToPlayer()
-					endif 
+					endif
 					SaveWhipperStats()
 					AdjustAttackSpeed(true)
+					WhipperStateApplied = true 	;so CleanupWhipper() knows there is something to restore
 					
 					RegisterForSingleUpdate(1.0)
 					;RegisterForSingleUpdate(5.0)	
@@ -288,6 +295,7 @@ Function Fragment_0()								;############ STAGE 1000 ############		#endofquest
 	;Debug.SetGodMode(false)
 
 	RemoveSceneProtectors()
+	CleanupWhipper()	;abort paths (stage 21 -> 1000) used to skip stage 25: whipper kept Cane, WhippingFaction, zeroed Stamina and the WeaponSpeedMult debuff
 
 	if cfgqst.ModPrecision
 	cfgqst.PrecisionCollision(TheWhipper, true)
@@ -329,17 +337,29 @@ Debug.Trace("NAKED DEFEAT: whipquest_00 stage 25 (end of whipping)")
 
 	RemoveSceneProtectors()
 
-	AdjustAttackSpeed(false)
-
 	Whipping = false
 	cfgqst.WhipAgain = false
-	TheWhipper.RemoveFromFaction(WhippingFaction)
-	RemoveCane()
-	ResetWhipperStats()
 
-						
+	CleanupWhipper()
+
 SetStage(1000)
-	
+
+EndFunction
+
+bool WhipperStateApplied = false
+
+Function CleanupWhipper() 	;restores everything Fragment_2 changed on TheWhipper. Safe to call from any exit path (idempotent).
+
+	if WhipperStateApplied
+	WhipperStateApplied = false
+		if TheWhipper
+		AdjustAttackSpeed(false)
+		ResetWhipperStats()
+		TheWhipper.RemoveFromFaction(WhippingFaction)
+		endif
+	RemoveCane()
+	endif
+
 EndFunction
 
 Function Startwhipquest_00()	;this starts Capturequest from Stage 500 calmquest
@@ -543,33 +563,20 @@ Function ManageWhipperStats()
 		;SpeedMult will ONLY be changed when the Player is stationary while whipped (Controls Disabled -> Bool cfgqst.AlreadyImmobilized
 		
 		;--- Stamina ---;
-		;get current
+		;only act when there is something to zero out - no per-tick waits or verify-reads (this runs every second)
 		WhipperStaminaCURRENT = TheWhipper.GetActorValue("Stamina")
 		NymTrace("OnUpdate Whipper Stamina:" +WhipperStaminaCURRENT)
-		;set to 0
 			if WhipperStaminaCURRENT > 0
 			cfgqst.SetAVTo(TheWhipper, 0.0, "Stamina")
+			TheWhipper.DamageActorValue("Stamina", 1000)
 			endif
-		;check
-		WhipperStaminaCURRENT = TheWhipper.GetActorValue("Stamina")
-		NymTrace("OnUpdate Whipper Stamina REDUCED:" +WhipperStaminaCURRENT)
-		Utility.Wait(0.1)
-		TheWhipper.DamageActorValue("Stamina", 1000)
-		Utility.Wait(0.1)
-		WhipperStaminaCURRENT = TheWhipper.GetActorValue("Stamina")
-		NymTrace("OnUpdate Whipper Stamina DAMAGED:" +WhipperStaminaCURRENT)
-		
+
 		;--- Stamina Rate ---;
-		;get current
 		WhipperStaminaRateCURRENT = TheWhipper.GetActorValue("StaminaRate")
 		NymTrace("OnUpdate Whipper StaminaRate:" +WhipperStaminaRateCURRENT)
-		;set to 0
 			if WhipperStaminaRateCURRENT > 0
 			cfgqst.SetAVTo(TheWhipper, 0.0, "StaminaRate")
 			endif
-		;get current
-		WhipperStaminaRateCURRENT = TheWhipper.GetActorValue("StaminaRate")
-		NymTrace("OnUpdate Whipper StaminaRate REDUCED:" +WhipperStaminaRateCURRENT)
 
 		;--- SpeedMult ---;
 		;get current
@@ -610,7 +617,7 @@ Function ManageWhipperDistance()
 EndFunction 
 
 Event OnUpdate()	;#update
-Debug.trace("NAKED DEFEAT whipquest_00: OnUpdate("+WaitTicks+") WhippingDuration("+storqst.WhippingDuration+")")
+NymTrace("OnUpdate("+WaitTicks+") WhippingDuration("+storqst.WhippingDuration+")")
 
 	if storqst.WhippingQuest_00_Running
 	WaitTicks += 1
@@ -636,15 +643,12 @@ Debug.trace("NAKED DEFEAT whipquest_00: OnUpdate("+WaitTicks+") WhippingDuration
 		
 		if storqst.WhippingDuration > 0
 		storqst.WhippingDuration -= 1
-		;proceed
-		elseif storqst.WhippingDuration == 0	
-		SetStage(25) ;END OF WHIPPING 
-		endif 
+		endif
 
 		if storqst.WhippingQuest_00_Running && storqst.WhippingDuration > 0
 		RegisterForSingleUpdate(1)
-		else 
-		SetStage(25)
+		else
+		SetStage(25) ;END OF WHIPPING
 		endif
 	else 
 	SetStage(25)
