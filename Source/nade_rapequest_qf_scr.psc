@@ -179,7 +179,26 @@ sslBaseAnimation[] Property AnimationsPee2 Auto
 sslBaseAnimation[] Property AnimationsPee3 Auto
 sslBaseAnimation[] Property AnimationsPee4 Auto
 
-sslBaseAnimation[] Property AnimationsIdle01 Auto	
+sslBaseAnimation[] Property AnimationsIdle01 Auto
+
+;#SLPP native scene IDs (SexLab P+): scene selection now runs through the P+ registry (SexlabRegistry/GetByTagsImpl)
+;instead of the legacy sslBaseAnimation arrays above, which are capped by the P+ legacy proxy pool.
+String[] Property Animations1_IDs Auto Hidden
+String[] Property Animations2_IDs Auto Hidden
+String[] Property Animations3_IDs Auto Hidden
+String[] Property Animations4_IDs Auto Hidden
+String[] Property Animations1_Follower01_IDs Auto Hidden
+String[] Property Animations2_Follower01_IDs Auto Hidden
+String[] Property Animations3_Follower01_IDs Auto Hidden
+String[] Property Animations4_Follower01_IDs Auto Hidden
+String[] Property Animations1_Follower02_IDs Auto Hidden
+String[] Property Animations2_Follower02_IDs Auto Hidden
+String[] Property Animations3_Follower02_IDs Auto Hidden
+String[] Property Animations4_Follower02_IDs Auto Hidden
+String[] Property AnimationsPee1_IDs Auto Hidden
+String[] Property AnimationsPee2_IDs Auto Hidden
+String[] Property AnimationsPee3_IDs Auto Hidden
+String[] Property AnimationsPee4_IDs Auto Hidden
 
 Bool Property IsHuman Auto ;remove?
 ;Bool Property IsHumanoid Auto
@@ -1391,45 +1410,45 @@ Debug.Trace("NAKED DEFEAT rapequest: SelectAggressorPee START")
 	
 	if humangroup	
 		if AggressorCount == 4            ;5P  			
-			AnimationsPee4 = SexLab.GetAnimationsByTags(5, "goldenshower", none , True)
+			AnimationsPee4_IDs = cfgqst.SLPP_GetSceneIDs(5, "goldenshower", none , True)
 			if cfgqst.ShowDebugMessages
-			Debug.Trace("NAKED DEFEAT rapequest: 5-person animations found: "+AnimationsPee4.Length)
-			Debug.Notification("NAKED DEFEAT: 5-person animatioxns found: "+AnimationsPee4.Length)
+			Debug.Trace("NAKED DEFEAT rapequest: 5-person animations found: "+AnimationsPee4_IDs.Length)
+			Debug.Notification("NAKED DEFEAT: 5-person animatioxns found: "+AnimationsPee4_IDs.Length)
 			endif
-			if AnimationsPee4.Length < 1			;5P if 4 Aggressors and no 5P anims -> reduce Aggressors to 3
+			if AnimationsPee4_IDs.Length < 1			;5P if 4 Aggressors and no 5P anims -> reduce Aggressors to 3
 			AggressorCount = 3
 			Aggressors[3] = None
 			endif
 		endif
 		if AggressorCount == 3           ;4p
-			AnimationsPee3 = SexLab.GetAnimationsByTags(4, "goldenshower", none, True)
+			AnimationsPee3_IDs = cfgqst.SLPP_GetSceneIDs(4, "goldenshower", none, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Trace("NAKED DEFEAT rapequest: 4-person animations found: "+AnimationsPee3.Length)
-			Debug.Notification("NAKED DEFEAT: 4-person animations found: "+AnimationsPee3.Length)
+			Debug.Trace("NAKED DEFEAT rapequest: 4-person animations found: "+AnimationsPee3_IDs.Length)
+			Debug.Notification("NAKED DEFEAT: 4-person animations found: "+AnimationsPee3_IDs.Length)
 			endif
-			if AnimationsPee3.Length < 1				
+			if AnimationsPee3_IDs.Length < 1				
 			AggressorCount = 2
 			Aggressors[2] = None
 			endif
 		endif
 		if AggressorCount == 2            ;3P
-			AnimationsPee2 = SexLab.GetAnimationsByTags(3, "goldenshower", none, True)
+			AnimationsPee2_IDs = cfgqst.SLPP_GetSceneIDs(3, "goldenshower", none, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Trace("NAKED DEFEAT rapequest: 3-person animations found: "+AnimationsPee2.Length)
-			Debug.Notification("NAKED DEFEAT: 3-person animations found: "+AnimationsPee2.Length)
+			Debug.Trace("NAKED DEFEAT rapequest: 3-person animations found: "+AnimationsPee2_IDs.Length)
+			Debug.Notification("NAKED DEFEAT: 3-person animations found: "+AnimationsPee2_IDs.Length)
 			endif
-			if AnimationsPee2.Length  < 1			;3P if 2 Aggressors and no 3P anims -> reduce Aggressors to 1
+			if AnimationsPee2_IDs.Length  < 1			;3P if 2 Aggressors and no 3P anims -> reduce Aggressors to 1
 			AggressorCount = 1
 			Aggressors[1] = None
 			endif
 		endif
 		if AggressorCount == 1            ;2P
-			AnimationsPee1 = SexLab.GetAnimationsByTags(2, "goldenshower", none, True)
+			AnimationsPee1_IDs = cfgqst.SLPP_GetSceneIDs(2, "goldenshower", none, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Trace("NAKED DEFEAT rapequest: 2-person animations found: "+AnimationsPee1.Length)
-			Debug.Notification("NAKED DEFEAT: 2-person animations found: "+AnimationsPee1.Length)
+			Debug.Trace("NAKED DEFEAT rapequest: 2-person animations found: "+AnimationsPee1_IDs.Length)
+			Debug.Notification("NAKED DEFEAT: 2-person animations found: "+AnimationsPee1_IDs.Length)
 			endif
-			if AnimationsPee1.Length  < 1			;2P if 1 Aggressors and no 2P anims -> reduce Aggressors to 0
+			if AnimationsPee1_IDs.Length  < 1			;2P if 1 Aggressors and no 2P anims -> reduce Aggressors to 0
 			AggressorCount = 0
 			Aggressors[0] = None
 			endif
@@ -1784,45 +1803,45 @@ if VictimNumber == 0
 	String raceKey = sslCreatureAnimationSlots.GetRaceKeyByID(raceID) 
 	
 		if AggressorCount == 4           	 ;5P  
-			Animations4 = SexLab.GetCreatureAnimationsByRaceKey(5, RaceKey)
+			Animations4_IDs = cfgqst.SLPP_GetCreatureSceneIDs(5, RaceKey)
 		;	if cfgqst.ShowDebugMessages
-			Debug.Trace("NAKED DEFEAT rapequest: 5P creature animations found (Player): "+Animations4.Length)
+			Debug.Trace("NAKED DEFEAT rapequest: 5P creature animations found (Player): "+Animations4_IDs.Length)
 		;	Debug.Notification("NAKED DEFEAT: 5P creature animations found: "+Animations4.Length)
 		;	endif
-			if Animations4.Length < 1			
+			if Animations4_IDs.Length < 1			
 			AggressorCount = 3
 			Aggressors[3] = None
 			endif
 		endif
 		if AggressorCount == 3            ;4P  
-			Animations3 = SexLab.GetCreatureAnimationsByRaceKey(4, RaceKey)
+			Animations3_IDs = cfgqst.SLPP_GetCreatureSceneIDs(4, RaceKey)
 		;	if cfgqst.ShowDebugMessages
-			Debug.Trace("NAKED DEFEAT rapequest: 4P creature animations found (Player): "+Animations3.Length)
+			Debug.Trace("NAKED DEFEAT rapequest: 4P creature animations found (Player): "+Animations3_IDs.Length)
 		;	Debug.Notification("NAKED DEFEAT: 4P creature animations found: "+Animations3.Length)
 		;	endif
-			if Animations3.Length < 1			
+			if Animations3_IDs.Length < 1			
 			AggressorCount = 2
 			Aggressors[2] = None
 			endif
 		endif
 		if AggressorCount == 2            ;3P  
-			Animations2 = SexLab.GetCreatureAnimationsByRaceKey(3, RaceKey)
+			Animations2_IDs = cfgqst.SLPP_GetCreatureSceneIDs(3, RaceKey)
 		;	if cfgqst.ShowDebugMessages
-			Debug.Trace("NAKED DEFEAT rapequest: 3P creature animations found (Player): "+Animations2.Length)
+			Debug.Trace("NAKED DEFEAT rapequest: 3P creature animations found (Player): "+Animations2_IDs.Length)
 		;	Debug.Notification("NAKED DEFEAT: 3P creature animations found: "+Animations2.Length)
 		;	endif
-			if Animations2.Length < 1			
+			if Animations2_IDs.Length < 1			
 			AggressorCount = 1
 			Aggressors[1] = None
 			endif
 		endif
 		if AggressorCount == 1            ;2P  
-			Animations1 = SexLab.GetCreatureAnimationsByRaceKey(2, RaceKey)
+			Animations1_IDs = cfgqst.SLPP_GetCreatureSceneIDs(2, RaceKey)
 		;	if cfgqst.ShowDebugMessages
-			Debug.Trace("NAKED DEFEAT rapequest: 2P creature animations found (Player): "+Animations1.Length)
+			Debug.Trace("NAKED DEFEAT rapequest: 2P creature animations found (Player): "+Animations1_IDs.Length)
 		;	Debug.Notification("NAKED DEFEAT: 2P creature animations found: "+Animations1.Length)
 		;	endif
-			if Animations1.Length < 1			
+			if Animations1_IDs.Length < 1			
 			AggressorCount = 0
 			Aggressors[0] = None
 			endif
@@ -1850,45 +1869,45 @@ if VictimNumber == 0
 	Debug.Trace("NAKED DEFEAT rapequest: Supressed Tags (Player): "+SuppressedTags)
 	
 		if AggressorCount == 4            ;5P  							
-			Animations4 = SexLab.GetAnimationsByTags(5, GroupTags, SuppressedTags, True)
+			Animations4_IDs = cfgqst.SLPP_GetSceneIDs(5, GroupTags, SuppressedTags, True)
 			if cfgqst.ShowDebugMessages	
-			Debug.Notification("NAKED DEFEAT: 5-person animations found (Player): "+Animations4.Length)
+			Debug.Notification("NAKED DEFEAT: 5-person animations found (Player): "+Animations4_IDs.Length)
 			endif
-			Debug.Trace("NAKED DEFEAT rapequest: 5-person animations found (Player): "+Animations4.Length)
-			if Animations4.Length < 1			;5P if 4 Aggressors and no 5P anims -> reduce Aggressors to 3
+			Debug.Trace("NAKED DEFEAT rapequest: 5-person animations found (Player): "+Animations4_IDs.Length)
+			if Animations4_IDs.Length < 1			;5P if 4 Aggressors and no 5P anims -> reduce Aggressors to 3
 			AggressorCount = 3
 			Aggressors[3] = None
 			endif
 		endif
 		if AggressorCount == 3           ;4p
-			Animations3 = SexLab.GetAnimationsByTags(4, GroupTags, SuppressedTags, True)
+			Animations3_IDs = cfgqst.SLPP_GetSceneIDs(4, GroupTags, SuppressedTags, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Notification("NAKED DEFEAT: 4-person animations found (Player): "+Animations3.Length)
+			Debug.Notification("NAKED DEFEAT: 4-person animations found (Player): "+Animations3_IDs.Length)
 			endif
-			Debug.Trace("NAKED DEFEAT rapequest: 4-person animations found (Player): "+Animations3.Length)
-			if Animations3.Length < 1				
+			Debug.Trace("NAKED DEFEAT rapequest: 4-person animations found (Player): "+Animations3_IDs.Length)
+			if Animations3_IDs.Length < 1				
 			AggressorCount = 2
 			Aggressors[2] = None
 			endif
 		endif
 		if AggressorCount == 2            ;3P
-			Animations2 = SexLab.GetAnimationsByTags(3, GroupTags, SuppressedTags, True)
+			Animations2_IDs = cfgqst.SLPP_GetSceneIDs(3, GroupTags, SuppressedTags, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Notification("NAKED DEFEAT: 3-person animations found (Player): "+Animations2.Length)
+			Debug.Notification("NAKED DEFEAT: 3-person animations found (Player): "+Animations2_IDs.Length)
 			endif
-			Debug.Trace("NAKED DEFEAT rapequest: 3-person animations found (Player): "+Animations2.Length)
-			if Animations2.Length  < 1			;3P if 2 Aggressors and no 3P anims -> reduce Aggressors to 1
+			Debug.Trace("NAKED DEFEAT rapequest: 3-person animations found (Player): "+Animations2_IDs.Length)
+			if Animations2_IDs.Length  < 1			;3P if 2 Aggressors and no 3P anims -> reduce Aggressors to 1
 			AggressorCount = 1
 			Aggressors[1] = None
 			endif
 		endif
 		if AggressorCount == 1            ;2P
-			Animations1 = SexLab.GetAnimationsByTags(2, GetCustomTags(), SuppressedTags, True)
+			Animations1_IDs = cfgqst.SLPP_GetSceneIDs(2, GetCustomTags(), SuppressedTags, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Notification("NAKED DEFEAT: 2-person animations found (Player): "+Animations1.Length)
+			Debug.Notification("NAKED DEFEAT: 2-person animations found (Player): "+Animations1_IDs.Length)
 			endif
-			Debug.Trace("NAKED DEFEAT rapequest: 2-person animations found (Player): "+Animations1.Length)
-			if Animations1.Length  < 1			;2P if 1 Aggressors and no 2P anims -> reduce Aggressors to 0
+			Debug.Trace("NAKED DEFEAT rapequest: 2-person animations found (Player): "+Animations1_IDs.Length)
+			if Animations1_IDs.Length  < 1			;2P if 1 Aggressors and no 2P anims -> reduce Aggressors to 0
 			AggressorCount = 0
 			Aggressors[0] = None
 			endif
@@ -1922,33 +1941,33 @@ elseif VictimNumber == 1
 	String raceKey = sslCreatureAnimationSlots.GetRaceKeyByID(raceID) 
 	
 		if AggressorCount == 4           	 ;5P  		
-			Animations4_Follower01 = SexLab.GetCreatureAnimationsByRaceKey(5, RaceKey)
-			Debug.Trace("NAKED DEFEAT rapequest: 5P creature animations found (Follower01): "+Animations4_Follower01.Length)
-			if Animations4_Follower01.Length < 1			
+			Animations4_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(5, RaceKey)
+			Debug.Trace("NAKED DEFEAT rapequest: 5P creature animations found (Follower01): "+Animations4_Follower01_IDs.Length)
+			if Animations4_Follower01_IDs.Length < 1			
 			AggressorCount = 3
 			Aggressors[3] = None
 			endif
 		endif
 		if AggressorCount == 3            ;4P  		
-			Animations3_Follower01 = SexLab.GetCreatureAnimationsByRaceKey(4, RaceKey)		
-			Debug.Trace("NAKED DEFEAT rapequest: 4P creature animations found (Follower01): "+Animations3_Follower01.Length)
-			if Animations3_Follower01.Length < 1			
+			Animations3_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(4, RaceKey)
+			Debug.Trace("NAKED DEFEAT rapequest: 4P creature animations found (Follower01): "+Animations3_Follower01_IDs.Length)
+			if Animations3_Follower01_IDs.Length < 1			
 			AggressorCount = 2
 			Aggressors[2] = None
 			endif
 		endif
 		if AggressorCount == 2            ;3P  	
-			Animations2_Follower01 = SexLab.GetCreatureAnimationsByRaceKey(3, RaceKey)
-			Debug.Trace("NAKED DEFEAT rapequest: 3P creature animations found (Follower01): "+Animations2_Follower01.Length)
-			if Animations2_Follower01.Length < 1			
+			Animations2_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(3, RaceKey)
+			Debug.Trace("NAKED DEFEAT rapequest: 3P creature animations found (Follower01): "+Animations2_Follower01_IDs.Length)
+			if Animations2_Follower01_IDs.Length < 1			
 			AggressorCount = 1
 			Aggressors[1] = None
 			endif
 		endif
 		if AggressorCount == 1            ;2P  	
-			Animations1_Follower01 = SexLab.GetCreatureAnimationsByRaceKey(2, RaceKey)
-			Debug.Trace("NAKED DEFEAT rapequest: 2P creature animations found (Follower01): "+Animations1_Follower01.Length)
-			if Animations1_Follower01.Length < 1			
+			Animations1_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(2, RaceKey)
+			Debug.Trace("NAKED DEFEAT rapequest: 2P creature animations found (Follower01): "+Animations1_Follower01_IDs.Length)
+			if Animations1_Follower01_IDs.Length < 1			
 			AggressorCount = 0
 			Aggressors[0] = None
 			endif
@@ -1978,45 +1997,45 @@ elseif VictimNumber == 1
 	Debug.Trace("NAKED DEFEAT rapequest: CustomTags (Follower01): "+GetCustomTags())
 	Debug.Trace("NAKED DEFEAT rapequest: Supressed Tags (Follower01): "+SuppressedTags)
 		if AggressorCount == 4            ;5P  								
-			Animations4_Follower01 = SexLab.GetAnimationsByTags(5, GroupTags, SuppressedTags, True)
+			Animations4_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(5, GroupTags, SuppressedTags, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Notification("NAKED DEFEAT: 5-person animations found (Follower01): "+Animations4_Follower01.Length)
+			Debug.Notification("NAKED DEFEAT: 5-person animations found (Follower01): "+Animations4_Follower01_IDs.Length)
 			endif
-			Debug.Trace("NAKED DEFEAT rapequest: 5-person animations found (Follower01): "+Animations4_Follower01.Length)
-			if Animations4_Follower01.Length < 1			;5P if 4 Aggressors and no 5P anims -> reduce Aggressors to 3
+			Debug.Trace("NAKED DEFEAT rapequest: 5-person animations found (Follower01): "+Animations4_Follower01_IDs.Length)
+			if Animations4_Follower01_IDs.Length < 1			;5P if 4 Aggressors and no 5P anims -> reduce Aggressors to 3
 			AggressorCount = 3
 			Aggressors[3] = None
 			endif
 		endif
 		if AggressorCount == 3           ;4p
-			Animations3_Follower01 = SexLab.GetAnimationsByTags(4, GroupTags, SuppressedTags, True)
+			Animations3_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(4, GroupTags, SuppressedTags, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Notification("NAKED DEFEAT: 4-person animations found (Follower01): "+Animations3_Follower01.Length)
+			Debug.Notification("NAKED DEFEAT: 4-person animations found (Follower01): "+Animations3_Follower01_IDs.Length)
 			endif
-			Debug.Trace("NAKED DEFEAT rapequest: 4-person animations found (Follower01): "+Animations3_Follower01.Length)
-			if Animations3_Follower01.Length < 1				
+			Debug.Trace("NAKED DEFEAT rapequest: 4-person animations found (Follower01): "+Animations3_Follower01_IDs.Length)
+			if Animations3_Follower01_IDs.Length < 1				
 			AggressorCount = 2
 			Aggressors[2] = None
 			endif
 		endif
 		if AggressorCount == 2            ;3P
-			Animations2_Follower01 = SexLab.GetAnimationsByTags(3, GroupTags, SuppressedTags, True)
+			Animations2_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(3, GroupTags, SuppressedTags, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Notification("NAKED DEFEAT: 3-person animations found (Follower01): "+Animations2_Follower01.Length)
+			Debug.Notification("NAKED DEFEAT: 3-person animations found (Follower01): "+Animations2_Follower01_IDs.Length)
 			endif
-			Debug.Trace("NAKED DEFEAT rapequest: 3-person animations found (Follower01): "+Animations2_Follower01.Length)
-			if Animations2_Follower01.Length  < 1			;3P if 2 Aggressors and no 3P anims -> reduce Aggressors to 1
+			Debug.Trace("NAKED DEFEAT rapequest: 3-person animations found (Follower01): "+Animations2_Follower01_IDs.Length)
+			if Animations2_Follower01_IDs.Length  < 1			;3P if 2 Aggressors and no 3P anims -> reduce Aggressors to 1
 			AggressorCount = 1
 			Aggressors[1] = None
 			endif
 		endif
 		if AggressorCount == 1            ;2P
-			Animations1_Follower01 = SexLab.GetAnimationsByTags(2, GetCustomTags(), SuppressedTags, True)
+			Animations1_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(2, GetCustomTags(), SuppressedTags, True)
 			if cfgqst.ShowDebugMessages
-			Debug.Notification("NAKED DEFEAT: 2-person animations found (Follower01): "+Animations1_Follower01.Length)
+			Debug.Notification("NAKED DEFEAT: 2-person animations found (Follower01): "+Animations1_Follower01_IDs.Length)
 			endif
-			Debug.Trace("NAKED DEFEAT rapequest: 2-person animations found (Follower01): "+Animations1_Follower01.Length)
-			if Animations1_Follower01.Length  < 1			;2P if 1 Aggressors and no 2P anims -> reduce Aggressors to 0
+			Debug.Trace("NAKED DEFEAT rapequest: 2-person animations found (Follower01): "+Animations1_Follower01_IDs.Length)
+			if Animations1_Follower01_IDs.Length  < 1			;2P if 1 Aggressors and no 2P anims -> reduce Aggressors to 0
 			AggressorCount = 0
 			Aggressors[0] = None
 			endif
@@ -2075,13 +2094,13 @@ Debug.Trace("NAKED DEFEAT rapequest: StartRape (Player) START")
 				endif
 				
 				if i == 4
-				Thread.SetForcedAnimations(Animations4)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations4_IDs))
 				elseif i == 3
-				Thread.SetForcedAnimations(Animations3)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations3_IDs))
 				elseif i == 2
-				Thread.SetForcedAnimations(Animations2)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations2_IDs))
 				elseif i == 1
-				Thread.SetForcedAnimations(Animations1)	
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations1_IDs))	
 				endif			
 				
 				
@@ -2162,7 +2181,7 @@ Debug.Trace("NAKED DEFEAT rapequest: StartRape (Player) START")
 		ForcePosing_2 = false
 		cfgqst.SexScene = true
 			
-		Animations1 = SexLab.GetAnimationsByTags(1, "Solo", "", True)
+		Animations1_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo", "", True)
 		
 		RegisterForModEvent("AnimationEnding_NadeRape", "OnAnimationEnding")
 		RegisterForModEvent("AnimationEnd_NadeRape", "OnAnimationEnd")
@@ -2174,7 +2193,7 @@ Debug.Trace("NAKED DEFEAT rapequest: StartRape (Player) START")
 			
 	if Thread && (Thread.AddActor(cfgqst.PlayerRef, true) >= 0) 			;makes Thread with PC and Aggressor(0)
 
-		Thread.SetForcedAnimations(Animations1)		
+		Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations1_IDs))		
 		Thread.CenterOnObject(vehicle)			
 		Thread.DisableBedUse(true)
 		Thread.DisableLeadIn(true)
@@ -2236,13 +2255,13 @@ Debug.Trace("NAKED DEFEAT rapequest: StartRape (Follower01) START")
 				endif
 				
 				if i == 4
-				Thread.SetForcedAnimations(Animations4_Follower01)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations4_Follower01_IDs))
 				elseif i == 3
-				Thread.SetForcedAnimations(Animations3_Follower01)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations3_Follower01_IDs))
 				elseif i == 2
-				Thread.SetForcedAnimations(Animations2_Follower01)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations2_Follower01_IDs))
 				elseif i == 1
-				Thread.SetForcedAnimations(Animations1_Follower01)	
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations1_Follower01_IDs))	
 				endif						
 				Thread.CenterOnObject(vehicle_foll_01)	
 				Thread.DisableBedUse(true)
@@ -2313,13 +2332,13 @@ Debug.Trace("NAKED DEFEAT rapequest: StartRape (Follower02) START")
 				endif
 				
 				if i == 4
-				Thread.SetForcedAnimations(Animations4_Follower02)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations4_Follower02_IDs))
 				elseif i == 3
-				Thread.SetForcedAnimations(Animations3_Follower02)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations3_Follower02_IDs))
 				elseif i == 2
-				Thread.SetForcedAnimations(Animations2_Follower02)
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations2_Follower02_IDs))
 				elseif i == 1
-				Thread.SetForcedAnimations(Animations1_Follower02)	
+				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(Animations1_Follower02_IDs))	
 				endif						
 				Thread.CenterOnObject(Victims[1])	
 				Thread.DisableBedUse(true)
@@ -2384,13 +2403,13 @@ Debug.Trace("NAKED DEFEAT rapequest: StartPee START")
 				endif
 								
 				if i == 4
-				Thread.SetAnimations(AnimationsPee4)
+				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsPee4_IDs))
 				elseif i == 3
-				Thread.SetAnimations(AnimationsPee3)
+				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsPee3_IDs))
 				elseif i == 2
-				Thread.SetAnimations(AnimationsPee2)
+				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsPee2_IDs))
 				elseif i == 1
-				Thread.SetAnimations(AnimationsPee1)	
+				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsPee1_IDs))	
 				endif	
 				
 				if cfgqst.ModSLUplus

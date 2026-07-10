@@ -2066,13 +2066,19 @@ Function OnPlayerLoadGameExternal()					;#load  #LoadGame #OnGameLoad #OnLoadGam
 	VersionCheck()
 	CheckFastTravel()
 	
-	;Restart FollowerQuest	
-;	if (folqst.GetStage() < 1000) && !DefeatQuestRunning && !CivilRapeRunning
-;	folqst.EndFollowerQuest()
-;	Utility.Wait(0.5)
-;	folqst.StartFollowerQuest()
-	;Debug.Notification("<font color='#ff0000'>Make sure nobody is missing! (you can check in the MCM/System) </font>")
-;	endif
+	;Refresh followers on load using the SAME sequence as the MCM "Update Followers" menu (selectedIndex == 6).
+	;FollowerNameScan reconciles MCM-named followers (defqst.NakedFollowerNamedFaction vs cfgqst.SavedNames) so
+	;they are KEPT, then the follower quest re-scans so anyone dismissed while away (e.g. via NFF / Nether's
+	;Follower Framework) doesn't linger and get pulled into the next scene as a stale follower.
+	;Guarded so we never refresh mid-defeat/civil-rape (would disrupt an active scene on a save loaded during one).
+	if (folqst.GetStage() < 1000) && !DefeatQuestRunning && !CivilRapeRunning
+	ProximityQuestStart("FollowerNameScan")
+	folqst.SetFollowersCalmed(false)
+	Utility.Wait(1.0)
+	folqst.EndFollowerQuest()
+	Utility.Wait(1.0)
+	folqst.StartFollowerQuest()
+	endif
 
 	;TEST MCM
 	Pages = new string[12]				;MCM pages
@@ -2320,15 +2326,14 @@ Function CheckSoftDependencies()		;#CheckSoftDependencies()	;#soft
 	
 	NymTrace("CheckStart")
 
-	sslBaseAnimation[] AnimationsCheck
-	AnimationsCheck = SexLab.GetAnimationsByTags(2, "NymLogVersion020, ", "", true)
+	String[] AnimationsCheck_IDs = SLPP_GetSceneIDs(2, "NymLogVersion020, ", "", true) 	;#SLPP native - the legacy query could false-negative on the proxy pool
 
 ;	int AnimCountCheck		;sslAnimationSlots
 ;	AnimCountCheck = Sexlab.CountTagUsage("NymLogVersion020, ", true)
-	
-	DebugTrace("AnimCountCheck: "+AnimationsCheck.Length)
-	
-	if AnimationsCheck.Length > 0
+
+	DebugTrace("AnimCountCheck: "+AnimationsCheck_IDs.Length)
+
+	if AnimationsCheck_IDs.Length > 0
 	storqst.NymActionLog = true 
 	else 
 	storqst.NymActionLog = false
@@ -25911,8 +25916,17 @@ Function GetEnemyType(Actor Hitter)			;#GetEnemyType
 	
 Debug.trace("NAKED DEFEAT configquest: GetEnemyType: "+GetActorName(Hitter))
 
+	;#follower: never register a friendly follower/teammate as a defeat enemy.
+	;followers can land stray hits on the Player (friendly fire, AoE spells) - those must NOT
+	;count as an attacker or they wrongly steer the DefeatType (e.g. a follower mage -> "Mages"
+	;-> whole defeat routed down the "Humans" branch even though only a beast actually fought us).
+	if IsFollower(Hitter) || Hitter.IsPlayerTeammate()
+	Debug.trace("NAKED DEFEAT configquest: GetEnemyType: ignoring friendly hit from follower/teammate "+GetActorName(Hitter))
+	return
+	endif
+
 	;GET LAST HITTER TYPE/RaceKey
-	
+
 		if DefeatViaSlavery
 		Debug.trace("NAKED DEFEAT configquest: GetEnemyType: DefeatViaSlavery")
 		;do Nothing --_> DefeatType is hard coded already
@@ -29709,6 +29723,80 @@ Function RestorePlayerState() 	;#unstuck 	;central release/abort restore. Idempo
 	PlayerRef.SetNoBleedoutRecovery(false) 	;set true on every defeat entry, previously never reset after release
 	PlayerDownAlready = false
 
+EndFunction
+
+; >>>>>>>>>>>>>>>>>>>>> SEXLAB P+ NATIVE SCENE ACCESS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ;#SLPP
+;GUIDE: SexLab P+ exposes scenes to old mods through a fixed-size proxy pool (sslAnimationSlots).
+;With many animation packs the pool cannot hold every scene, so GetAnimationsByTags() can return
+;0 animations even though matching scenes exist (log: "Translating N Animations ... Returning 0 Objects").
+;These helpers query the P+ registry natively (scene ID strings) and convert a picked scene to a
+;legacy sslBaseAnimation object only at thread start (GetSetAnimation assigns a proxy slot on demand;
+;that assignment does not survive later legacy queries, so it must be consumed immediately).
+;On classic SexLab the native calls fail gracefully (empty result) and the legacy path is unaffected.
+;Compile-time declarations live in SLPP_CompileInterface\ (import only, never shipped).
+
+String[] Function SLPP_MergeSplitTags(String asTags, String asTagsSuppress, bool abRequireAll) 	;#SLPP
+	;replica of SexLab P+ SexLabUtil.MergeSplitTags() - builds the tag array the native search expects
+	String[] ret1 = PapyrusUtil.ClearEmpty(PapyrusUtil.StringSplit(asTags, ","))
+	String[] ret2 = PapyrusUtil.ClearEmpty(PapyrusUtil.StringSplit(asTagsSuppress, ","))
+	If (ret1.Length + ret2.Length == 0)
+		return Utility.CreateStringArray(0)
+	EndIf
+	If (!abRequireAll)
+		int i = 0
+		While (i < ret1.Length)
+			ret1[i] = "~" + ret1[i]
+			i += 1
+		EndWhile
+	EndIf
+	int n = 0
+	While (n < ret2.Length)
+		ret2[n] = "-" + ret2[n]
+		n += 1
+	EndWhile
+	If (ret1.Length && ret2.Length)
+		return PapyrusUtil.MergeStringArray(ret1, ret2, true)
+	ElseIf (ret1.Length)
+		return ret1
+	Else
+		return ret2
+	EndIf
+EndFunction
+
+String[] Function SLPP_GetSceneIDs(int ActorCount, String Tags, String TagsSuppressed = "", bool RequireAll = true) 	;#SLPP
+	;native P+ registry query - the same search GetAnimationsByTags() runs, minus the lossy legacy proxy translation
+	String[] ids = SexLab.AnimSlots.GetByTagsImpl(ActorCount, SLPP_MergeSplitTags(Tags, TagsSuppressed, RequireAll))
+	if !ids
+	ids = Utility.CreateStringArray(0) 	;classic SexLab: unbound native -> keep the legacy path untouched
+	endif
+	return ids
+EndFunction
+
+String[] Function SLPP_GetCreatureSceneIDs(int ActorCount, String RaceKey, String Tags = "", String TagsSuppressed = "", bool RequireAll = true) 	;#SLPP
+	String[] ids = SexLab.CreatureSlots.GetByRaceKeyTagsImpl(ActorCount, RaceKey, SLPP_MergeSplitTags(Tags, TagsSuppressed, RequireAll))
+	if !ids
+	ids = Utility.CreateStringArray(0)
+	endif
+	return ids
+EndFunction
+
+sslBaseAnimation[] Function SLPP_AnimsFromIDs(String[] SceneIDs) 	;#SLPP
+	;picks one scene and wraps it as a legacy object for Thread.SetAnimations/SetForcedAnimations.
+	;use directly inside the Thread call - the proxy assigned by GetSetAnimation() must be consumed immediately,
+	;it does not survive the next legacy animation query (P+ rebuilds the proxy pool on every translation)
+	if SceneIDs && SceneIDs.Length > 0
+		sslBaseAnimation PickedAnim = SexLab.AnimSlots.GetSetAnimation(SceneIDs[Utility.RandomInt(0, SceneIDs.Length - 1)])
+		if PickedAnim
+		Debug.Trace("NAKED DEFEAT configquest: SLPP_AnimsFromIDs playing scene "+PickedAnim.Registry)
+		sslBaseAnimation[] PickedAnims = new sslBaseAnimation[1]
+		PickedAnims[0] = PickedAnim
+		return PickedAnims
+		endif
+	endif
+	;empty -> P+ ignores the call and the thread falls back to its own native pick
+	sslBaseAnimation[] NoAnims = new sslBaseAnimation[1]
+	NoAnims[0] = none
+	return NoAnims
 EndFunction
 
 ;WIP

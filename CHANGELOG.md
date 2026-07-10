@@ -5,6 +5,26 @@
 Fix pass over the core use case: Acheron defeat → punishment (furniture / whipping) → release.
 All changed scripts recompiled; full project (244 scripts) compiles with 0 errors.
 
+**This patch now requires SexLab P+** (scene selection uses the P+ native registry, see below).
+
+### Changed — animation selection uses the SexLab P+ native registry
+
+Old mods query P+ through a legacy compatibility layer that maps scenes onto a fixed-size proxy pool;
+with a large animation setup the pool cannot hold every scene and queries randomly return **0 animations**
+even though matching scenes exist (Papyrus log: `Translating N Animations ... Returning 0 Objects`,
+in-game: "Nobody there to fuck you this time...").
+
+All defeat/rape scene selection (~60 query sites in `nade_calmquest_qf_scr`, `nade_rapequest_qf_scr`,
+`nade_configquest_scr`) now queries the P+ registry natively (`GetByTagsImpl` / `GetByRaceKeyTagsImpl`
+via new `SLPP_*` helpers in configquest) and stores scene IDs; the picked scene is converted to a legacy
+object only at thread start (`GetSetAnimation`), so the proxy pool no longer limits which animations
+can play. Name-based lookups (`GetAnimationByName` / `FindAnimationByName`, both missing in P+ and dead
+at runtime until now) go through `SexlabRegistry.GetSceneByName`.
+
+Modder note: `SLPP_CompileInterface\` contains compile-time declarations for the P+ API (used as a
+Papyrus import, never compiled or shipped as .pex). The old `sslBaseAnimation[]` properties remain
+declared for save compatibility but are no longer used for selection.
+
 ### Fixed — stuck-state / softlock (release & abort paths)
 
 - **Acheron could stay disabled forever.** `Acheron.DisableProcessing(true)` set at defeat start had exactly one

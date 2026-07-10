@@ -702,13 +702,14 @@ Function ProximityScanCombat()			;"COMBAT SCAN" NobodyAround() uses this
 					
 				else
 				Debug.Trace("NAKED DEFEAT: #ProximityScanCombat ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+"] IsEnemy [Heigth = "+TempHeight+"]")
-					if !(a.GetBaseObject().GetName() == "FEC : Load Screen Detector")						
-						;if a != folqst.Actor_Follower01
+					if !(a.GetBaseObject().GetName() == "FEC : Load Screen Detector")
+						;#distance: only log this actor as one of our defeat enemies if it is within range.
+						;Otherwise a distant NPC (e.g. an unrelated mage across the room) gets recorded as our
+						;attacker and wrongly steers the DefeatType. Registration now sits inside the range gate
+						;(previously GetEnemyType ran regardless of distance).
+						if cfgqst.PlayerRef.GetDistance(a) <= 2000 ;100 units = 1,42 m --> 14 m ca.
 						cfgqst.GetEnemyType(a)
-						
-						;if a.IsInCombat()
-						if cfgqst.PlayerRef.GetDistance(a) <= 2000 ;100 units = 1,42 m --> 14 m ca. 
-						cfgqst.ProxActorDetected += 1.0	
+						cfgqst.ProxActorDetected += 1.0
 						endif
 						
 						int icombatstart = 404

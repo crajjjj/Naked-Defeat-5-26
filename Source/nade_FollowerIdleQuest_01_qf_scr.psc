@@ -426,22 +426,26 @@ else
 Debug.Trace("NAKED DEFEAT: FollowerIdleQuest_01 SetExpression - type: "+type)
 endif 
 
+if !cfgqst.IsHumanoid(a)	;#facedata - creatures/custom races lack face animation data; skip to avoid log spam
+return
+endif
+
 if type == 0
 a.ClearExpressionOverride()
 MfgConsoleFunc.ResetPhonemeModifier(a)
 elseif type == 1
-a.SetExpressionOverride(1, RandomAAAH)	;dialogue fear 	
-MfgConsoleFunc.SetPhonemeModifier(a, 0, 1, RandomAAAH)	
+a.SetExpressionOverride(1, RandomAAAH)	;dialogue fear
+MfgConsoleFunc.SetPhonemeModifier(a, 0, 1, RandomAAAH)
 ;Debug.Notification("NAKED DEFEAT TEST: dialogue fear ")
 elseif type == 2
 a.SetExpressionOverride(16, 100)
-MfgConsoleFunc.SetPhonemeModifier(a, 0, 1, RandomAAAH)	
+MfgConsoleFunc.SetPhonemeModifier(a, 0, 1, RandomAAAH)
 elseif type == 3
 a.SetExpressionOverride(9, 100)
-MfgConsoleFunc.SetPhonemeModifier(a, 0, 1, RandomAAAH)	
+MfgConsoleFunc.SetPhonemeModifier(a, 0, 1, RandomAAAH)
 
 ;Debug.Notification("NAKED DEFEAT TEST: dialogue combat shout ")
-endif	
+endif
 EndFunction
 
 bool SexScene = false
