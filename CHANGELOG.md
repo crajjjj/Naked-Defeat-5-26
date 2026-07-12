@@ -46,11 +46,18 @@ declared for save compatibility but are no longer used for selection.
 
 ### Fixed — gameplay logic
 
-- **Non-combat bleedout no longer auto-kills you.** Entering bleedout while out of combat was resolved as an
-  "Adventure: Deadly Accident" that died whenever `FallingDamageTreshold > 0` (i.e. always) — so a hit from an
-  unrelated mod effect (e.g. a Fill Her Up cum-burst) could down the player and teleport them straight to the
-  Afterlife with no enemies around. It now rolls the MCM **Death Chance** instead; set it to 0 to disable
-  accidental deaths entirely. (`nade_playeralias_scr`)
+- **Accidental death now respects the MCM Death Chance; setting it to 0 hands death off to your death-alternative
+  mod.** The out-of-combat "accident" paths killed the player unconditionally — most notably `PlayerTrackHealth`,
+  which fires on *any* non-combat health drop (a stray jump/fall, or even a single Fill Her Up cum-burst DoT
+  tick) and, with no rapers nearby, downed the player deterministically. Now the accident sources
+  (`PlayerTrackHealth` and `PlayerDown`'s "Adventure: Deadly Accident") **roll** the MCM **Death Chance**
+  (`DefeatDeathChance`) — the same 0–100% roll already used for combat-defeat executions, so the slider means the
+  same thing everywhere: at **0** the roll never passes, so NADE leaves the health drop alone (the player gets up)
+  and Acheron / vanilla can handle any actual death; at higher values the accident turns fatal that fraction of
+  the time; at 100 it always kills. The roll happens *before* the "You had an accident" message, so the outcome
+  and the text always agree. Scripted deaths (traps, fatal falls) and other defeat scenarios are unchanged — they
+  still die/route as before rather than being re-rolled at the transition funnel. (`nade_configquest_scr`,
+  `nade_playeralias_scr`)
 - **Wrong "defeated by" type from friendly fire / bystanders.** A follower's stray hit (friendly fire, AoE) or a
   distant unrelated NPC could land in the enemy list and steer `DefeatType` (e.g. a follower mage turning a bear
   defeat into a "Humans" defeat). `GetEnemyType` now ignores follower/teammate hits, and the combat scan only

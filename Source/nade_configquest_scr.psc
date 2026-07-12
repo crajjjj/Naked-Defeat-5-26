@@ -32792,6 +32792,8 @@ Function PlayerTrackHealth()
 	
 		PlayerHealthLast = 	PlayerHealthCurrent
 		
+		;#death: the accident hijack is rolled against the MCM Death Chance at the AccidentChance check below, so
+		;at 0 the roll never passes and the damage is left alone for a death-alternative mod (e.g. Acheron) / vanilla.
 		if  !PlayerDownAlready && (FallingDamageTreshold > 0) && !PlayerInCombat() ;&& !StartFalling
 			
 			int AccidentChance = Utility.RandomInt(1, FallingDamageTreshold as int)
@@ -32810,8 +32812,8 @@ Function PlayerTrackHealth()
 			DamageReceived = 0
 			endif 
 
-			if AccidentChance < DamageReceived
-			PlayerDownAlready = true 
+			if (AccidentChance < DamageReceived) && D100(DefeatDeathChance)	;#death: roll Death Chance BEFORE any accident side-effect - 0 never triggers (hand off to Acheron/vanilla), 100 always
+			PlayerDownAlready = true
 		;	if (DamageReceived > FallingDamageTreshold) && D100(DamageReceived) && !PlayerDownAlready
 			
 			ScreenMessage("You had an accident")		;#accident1
@@ -33922,16 +33924,20 @@ Event OnNakedDefeatTransition(Form Sender, string sEventName, string sEventType)
 	;NymTrace("eventName" +eventName)
 	while (CalmQuest.GetStage() > 0) && (CalmQuest.GetStage() < 1000) && ModEnabled		;WAIT FOR CALMQUEST TO FINISH ---> IMPORTANT
 	Utility.Wait(1.0)
-	endwhile 
-	
+	endwhile
+
+	;#death: the MCM Death Chance is gated at the ACCIDENT sources (PlayerTrackHealth outer guard + PlayerDown
+	;"Adventure: Deadly Accident"), NOT here. This funnel is a universal bridge that also carries scripted deaths
+	;(traps, fatal falls) and other scenarios, so it must NOT re-roll survival - doing so converted certain-death
+	;messages into wake-ups, skipped the upstream side-effect cleanup, and double-gated already-decided deaths.
 	if sEventType == "Simple Slavery Entry"
 	NymTrace("SSLV Entry CODE 29940 (OnNakedDefeatTransition)")
-	SendModEvent("SSLV Entry")	
-	else 
+	SendModEvent("SSLV Entry")
+	else
 	LocationEvent(sEventType)
-	endif 
-	
-EndEvent 
+	endif
+
+EndEvent
 
 ;ENTRANCE MOD EVENTS:
 ; CreateModEvent("NakedDefeatTransition", "Afterlife")   ---> send to Afterlife 

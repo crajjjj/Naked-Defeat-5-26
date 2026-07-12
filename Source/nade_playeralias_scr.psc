@@ -2116,7 +2116,7 @@ Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 			if cfgqst.RapersNearby()
 			NymTrace("PlayerDown() Adventure: Outcome_PlayerDefeated")
 			Outcome_PlayerDefeated = true
-			elseif D100(cfgqst.DefeatDeathChance)	;#death respect the MCM Death Chance instead of dying on every non-combat bleedout (e.g. an FHU cum-burst hit) - previously gated on FallingDamageTreshold>0 which is always on
+			elseif (cfgqst.FallingDamageTreshold > 0) && D100(cfgqst.DefeatDeathChance)	;#death: accidental death rolls the MCM Death Chance (0 = get up / hand off to Acheron/vanilla, 100 = always die) - only when the falling-damage accident is enabled; a failed roll falls through to the else (recover)
 			NymTrace("PlayerDown() Adventure: Outcome_PlayerDies")
 			Outcome_PlayerDies = true
 			else

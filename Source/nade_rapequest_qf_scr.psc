@@ -2106,7 +2106,7 @@ Debug.Trace("NAKED DEFEAT rapequest: StartRape (Player) START")
 				
 				;if (Game.GetModByName("SexLab UtilityPlus.esp") != 255)
 				if cfgqst.ModSLUplus
-				Thread.DisableFurnitureUse(true)
+				Thread.SetFurnitureStatus(0)	;#P+ SLU+ DisableFurnitureUse(true) has no P+ equivalent; furniture is controlled by SetFurnitureStatus (0 = disabled, same as P+ DisableBedUse(true))
 				endif
 				
 				
@@ -2415,7 +2415,7 @@ Debug.Trace("NAKED DEFEAT rapequest: StartPee START")
 				if cfgqst.ModSLUplus
 ;				(Game.GetModByName("SexLab UtilityPlus.esp") != 255)
 				Thread.DisableAllOrgasms(true)
-				Thread.DisableFurnitureUse(true)
+				Thread.SetFurnitureStatus(0)	;#P+ SLU+ DisableFurnitureUse(true) has no P+ equivalent; furniture is controlled by SetFurnitureStatus (0 = disabled, same as P+ DisableBedUse(true))
 				endif
 				
 				Thread.CenterOnObject(cfgqst.PlayerRef)			
