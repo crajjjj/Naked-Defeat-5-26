@@ -1,6 +1,6 @@
 # Naked Defeat — Changelog
 
-## 6-46 customise (delta over official 6.46) — 2026-07-06
+## 6.46.2 P+ (delta over official 6.46) — 2026-07-12
 
 Fix pass over the core use case: Acheron defeat → punishment (furniture / whipping) → release.
 All changed scripts recompiled; full project (244 scripts) compiles with 0 errors.
