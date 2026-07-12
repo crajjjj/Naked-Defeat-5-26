@@ -2116,13 +2116,13 @@ Function PlayerDown(String DownedFrom)	;#PlayerDown ##Down##
 			if cfgqst.RapersNearby()
 			NymTrace("PlayerDown() Adventure: Outcome_PlayerDefeated")
 			Outcome_PlayerDefeated = true
-			elseif cfgqst.FallingDamageTreshold > 0
+			elseif D100(cfgqst.DefeatDeathChance)	;#death respect the MCM Death Chance instead of dying on every non-combat bleedout (e.g. an FHU cum-burst hit) - previously gated on FallingDamageTreshold>0 which is always on
 			NymTrace("PlayerDown() Adventure: Outcome_PlayerDies")
 			Outcome_PlayerDies = true
-			else 
+			else
 			NymTrace("PlayerDown() Adventure: Outcome_PlayerRecovers")
 			Outcome_PlayerRecovers = true
-			endif 
+			endif
 					
 		elseif DownedFrom == ("Adventure: Accident")		;I think I only need this for bleedout -- technically this is a bit overcomplicated but well... lets go with this for now
 				

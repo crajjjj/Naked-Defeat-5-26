@@ -46,6 +46,18 @@ declared for save compatibility but are no longer used for selection.
 
 ### Fixed — gameplay logic
 
+- **Non-combat bleedout no longer auto-kills you.** Entering bleedout while out of combat was resolved as an
+  "Adventure: Deadly Accident" that died whenever `FallingDamageTreshold > 0` (i.e. always) — so a hit from an
+  unrelated mod effect (e.g. a Fill Her Up cum-burst) could down the player and teleport them straight to the
+  Afterlife with no enemies around. It now rolls the MCM **Death Chance** instead; set it to 0 to disable
+  accidental deaths entirely. (`nade_playeralias_scr`)
+- **Wrong "defeated by" type from friendly fire / bystanders.** A follower's stray hit (friendly fire, AoE) or a
+  distant unrelated NPC could land in the enemy list and steer `DefeatType` (e.g. a follower mage turning a bear
+  defeat into a "Humans" defeat). `GetEnemyType` now ignores follower/teammate hits, and the combat scan only
+  registers enemies within range. (`nade_configquest_scr`, `nade_proximityquest_qf_scr`)
+- **Followers refreshed on game load.** Dismissed followers (incl. via Nether's Follower Framework) no longer
+  linger and get pulled into scenes; the load handler runs the same reconcile+rescan as the "Update Followers"
+  menu, so manually/MCM-named followers are kept. (`nade_configquest_scr`)
 - **Second Acheron assailant is added to the enemy faction correctly** (copy-paste bug added assailant #1
   instead of #2; the six per-assailant blocks are now a single loop). (`nade_configquest_scr`)
 - **Humanoid whippers work.** In `SelectWhipper()` an empty `elseif` branch swallowed exactly the
