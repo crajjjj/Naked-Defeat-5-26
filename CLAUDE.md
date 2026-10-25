@@ -25,6 +25,15 @@ released only once a git tag exists; bump once per release, not per change):
    the new `CHANGELOG.md` section as the release notes. Attach the built `.zip` when available. The tag is the
    "this shipped" marker, so only create it at actual release time.
 
+## Updating to a new official release
+
+Branch `upstream` holds the official files only (one commit per release); `main` merges it. The full
+procedure and the helper scripts are in `tools/upstream/README.md`. Key points: official patches often
+ship no Papyrus sources, so changed scripts are rebuilt from decompiled functions and checked against the
+official `.pex`; merge patch scripts per function (`fmerge.py`), then re-run the P+ query conversion
+(`slpp_convert.py`) and the argument-count check (`arity.py`). Pyro rebuilds all 244 scripts and is slow;
+compiling just the patch scripts with `tools/upstream/pcomp.py` is enough before packaging.
+
 ## Build & compile
 
 The project compiles via the **Pyro** VS Code task (`type: pyro`, `skyrimse.ppj`). Edit `.psc` sources and fix
