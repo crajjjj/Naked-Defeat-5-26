@@ -1029,9 +1029,9 @@ Event ForceMaintenance01(string eventName, string strArg, float numArg, Form sen
 				Utility.Wait(1.0)
 				endif
 				
-				;NymTrace("calmqst.FollowerCaughtRunning(0): "+calmqst.FollowerCaughtRunning(0))
-				;NymTrace("!calmqst.CheckEndOfDefeat(): "+!calmqst.CheckEndOfDefeat())
-				;NymTrace("RunMaintenance01: "+RunMaintenance01)
+				NymTrace("1 - calmqst.FollowerCaughtRunning(0): "+calmqst.FollowerCaughtRunning(0))
+				NymTrace("2 - !calmqst.CheckEndOfDefeat(): "+!calmqst.CheckEndOfDefeat())
+				NymTrace("3 - RunMaintenance01: "+RunMaintenance01)
 
 				if RunMaintenance01 && !calmqst.CheckEndOfDefeat() && calmqst.FollowerCaughtRunning(0); && (cfgqst.DefeatStatePlayer != "Escaping") && (cfgqst.DefeatStatePlayer != "Escaped")	 	;;check if CalmQuest is running to prevent error spam
 					if FollowerIdleScene_02_struggle.IsPlaying()

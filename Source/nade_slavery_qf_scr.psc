@@ -34,6 +34,8 @@ Book Property SlaveTask_FetchSweepStreet Auto
 Book Property SlaveTask_FetchSweepInn Auto
 Book Property SlaveTask_FetchSweepCastle Auto
 Book Property SlaveTask_FetchGarbage Auto
+Book Property SlaveTask_FetchField Auto
+Book Property SlaveTask_FetchFlour Auto
 
 Book Property SlaveTask_FetchIronIngots Auto
 Book Property SlaveTask_FetchLeather Auto
@@ -49,13 +51,13 @@ Book Property Hint_Gloves Auto
 Book Property SlaveTask_FetchIronOre Auto
 Book Property SlaveTask_FetchQuicksilverOre Auto
 
-
-
 ;Sex Tasks 
 Book Property SlaveTask_OrgyInn Auto
 Book Property SlaveTask_OrgyBarracks Auto
 Book Property SlaveTask_OrgyCastle Auto
 Book Property SlaveTask_OrgyStreets Auto
+
+Book Property SlaveTask_DanceJarl Auto
 
 Book Property SlaveTask_ServeHorses Auto
 Book Property SlaveTask_ServeDogs Auto
@@ -65,12 +67,16 @@ Book Property SlaveTask_RuleBoots Auto
 Book Property SlaveTask_RuleBowing Auto
 Book Property SlaveTask_RuleClean Auto
 Book Property SlaveTask_RuleCrawling Auto
+Book Property SlaveTask_RuleWalking Auto
 
 int Property ActiveSlaveTasks Auto
 int Property CompletedDayTasks Auto
 int Property SlaveIsOccupied Auto
 int Property SlaveIsResting Auto
+int Property FlawlessServiceLevel Auto
+Bool Property GoodSlave Auto
 Bool Property Pretending Auto
+Bool Property ImmediatePunishment Auto 
 
 int Property SlaveFetchTaskItemCount Auto
 int Property SlaveSexTaskPartners Auto
@@ -100,6 +106,9 @@ Formlist Property IronOreVeinList Auto
 Formlist Property QuickSilverOreVeinList Auto
 Formlist Property GoldOreVeinList Auto
 Formlist Property Mushroomlist Auto
+Formlist Property FieldList Auto
+
+
 
 Faction Property WhippingFaction Auto
 
@@ -118,8 +127,9 @@ ObjectReference Property PlacedTanningRack Auto
 ObjectReference Property PlacedSmelter Auto
 ObjectReference Property PlacedGrindstone Auto
 ObjectReference Property PlacedChoppingBlock Auto
+ObjectReference Property PlacedMill Auto
 
-
+Actor[] Property MolestersA Auto
 
 int Property CreatureTask Auto
 int Property AreaTaskCounter Auto
@@ -128,6 +138,7 @@ int Property CompletedAreaTasks Auto
 
 String Property SexTaskRaceKey Auto
 String Property SlaveReturnLocation Auto
+String Property EnslavedBy Auto
 
 String Property RequiredStation Auto
 
@@ -151,7 +162,7 @@ Int TotalSlaveTasksCompleted
 ;############################################################################################################################################################################################################
 
 Function Fragment_0()					;############ STAGE 10 ############		#START			
-		DebugTrace("stage 10 (START)")
+		DebugTrace("Slavery Quest stage 10 (START)")
 										
 		SetStage(100)
 
@@ -161,7 +172,7 @@ EndFunction
 															
 Function Fragment_4()				;############ STAGE 1000 ############		#END
 
-	DebugTrace("stage 1000 (END)")
+	DebugTrace("Slavery Quest stage 1000 (END)")
 	
 	Stop()
 
@@ -199,7 +210,75 @@ FetchTaskType = "Flowers"
 
 EndFunction 
 
+Function TrainingStartJogging()
+	
+	NymBox("Jogging Starts Now")
+	;Place Start Marker	
+	storqst.SlaveAtWork = true 	
+	nade_DDint.EquipDDtoActor(cfgqst.PlayerRef, "Random")
+	cfgqst.ChangeHairStyle("Free")
+	int iJoggingTime = 300
+	int iQuality
+	int iExhaustionChance
+	int iBreathingChance = 10
+	int iInfo = 20
+	
+	while (iJoggingTime > 0) && !storqst.IsExhausted() && (iQuality < 300)
+	
+		NymTrace("Jogging Time: "+iJoggingTime) 
+		iJoggingTime -= 1
+		iInfo -= 1
+		Utility.Wait(1.0)
+		
+		iBreathingChance = iBreathingChance + storqst.Exhaustion*10
+		
+		if D100(iBreathingChance)
+		storqst.PlayerSoundToPlay = "Breathing"
+		SendModEvent("Moan")
+		endif 
+		
+		if iInfo == 0
+		iInfo = 10
+		NymMessage("JoggingTime: "+iJoggingTime+" Quality: "+iQuality)
+		endif 
+		
+		if cfgqst.PlayerRef.IsSprinting()
+		iQuality += 2
+		iExhaustionChance = 2
+		elseif cfgqst.PlayerRef.IsRunning()
+		iQuality += 1
+		iExhaustionChance = 1
+		else 
+			if D100(50)
+			cfgqst.StartPunishmentEffect("Shock")
+			iQuality -= 2
+			iExhaustionChance = 0
+			endif 
+		
+		 if D100(10)
+		 storqst.ExhaustionChange(-1)
+		 endif 
+		endif 
+		
+		if D100(iExhaustionChance)
+		storqst.ExhaustionChange(1)
+		endif 
+		
+	endwhile 
+	
+	NymBox("JoggingTime: "+iJoggingTime+" Quality: "+iQuality)
+	
+	cfgqst.RemoveAllDDevices(false, "empty01", "empty02", "empty03", "empty04", "empty05")	
+	;Need to Reach Start Marker again
+	
+	storqst.SlaveAtWork = false 	
+
+EndFunction 
+
+
+
 Function ResetTasks()		;#ResetTasks
+DebugTrace("ResetTasks()")
 
 if !cfgqst.PlayerRef.IsInInterior()
 	
@@ -352,32 +431,41 @@ Function UpdateModEvents_LocalSlavery(bool register)		;#RegisterForModEvents
 	RegisterForModEvent("StartShortWhipping", "OnStartShortWhipping")
 	RegisterForModEvent("StartResting", "OnStartResting")
 	RegisterForModEvent("StartMining", "OnStartMining")
+	RegisterForModEvent("StartWorkingField", "OnStartWorkingField")
 	RegisterForModEvent("StartSweeping", "OnStartSweeping")
 	RegisterForModEvent("StartOrgy", "OnStartOrgy")
 	RegisterForModEvent("StartRequestMaster", "OnStartRequestMaster")
 	RegisterForModEvent("StartSeduction", "OnStartSeduction")
 	RegisterForModEvent("StartBodySearch", "OnStartBodySearch")
+	RegisterForModEvent("StartWorkingMill", "OnStartWorkingMill")
+	RegisterForModEvent("StartBegging", "OnStartBegging")
 	;RegisterForModEvent("StartResting", "OnStartResting")
 	else 
 	UnregisterForModEvent("StartShortWhipping")
 	UnregisterForModEvent("StartResting")
 	UnregisterForModEvent("StartMining")
+	UnregisterForModEvent("StartWorkingField")
 	UnregisterForModEvent("StartSweeping")
 	UnregisterForModEvent("StartOrgy")
 	UnregisterForModEvent("StartRequestMaster")
 	UnregisterForModEvent("StartSeduction")
 	UnregisterForModEvent("StartBodySearch")
+	UnregisterForModEvent("StartWorkingMill")
+	UnregisterForModEvent("StartBegging")
 	;UnregisterForModEvent("StartShortWhipping")	
 	endif 
 	
 EndFunction 
 
 
-Function OnStartSeduction(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Resting
+Function OnStartBegging(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Resting
 
 		DebugTrace("OnStartSeduction(START)")
 		SlaveIsOccupied = 1
-		GoodMessage("You try to seduce your target")
+		GoodMessage("You are begging")
+		
+		;Billy Horse Doggy 2 - Stage 1 is also NICE for this pose
+		
 		if TempMaster
 		NymTrace("Set Look At MASTER")
 		cfgqst.PlayerRef.SetLookAt(TempMaster)
@@ -459,7 +547,13 @@ Function OnStartSeduction(String EventName, String ArgString, Float ArgNum, Form
 			cfgqst.PublicExposure += Utility.RandomInt(4,8)
 			elseif Seduced 
 				cfgqst.DefeatStateChapter = "Fast Slave Sex"
-				GoodMessage("You manage to seduce your Target")
+				
+				if storqst.IsBlackSmith(TempMaster) || storqst.TargetActorProfession == "Blacksmith"
+				storqst.TargetActorProfession = "Blacksmith"
+				GoodMessage("You seduced the Blacksmith")
+				else 
+				GoodMessage("You seduced your Target")
+				endif 
 				
 				cfgqst.DefeatEntranceVia = "Service"
 				
@@ -475,56 +569,308 @@ Function OnStartSeduction(String EventName, String ArgString, Float ArgNum, Form
 				endwhile 
 				
 				NymTrace("defqst.SexDuration: "+defqst.SexDuration)
+				NymTrace("storqst.TargetActorProfession: "+storqst.TargetActorProfession)		
+						
+				int SexTimerTEMP = storqst.SexTimerSlave as int
+				int SexTimerTEMPhard = SexTimerTEMP + SexTimerTEMP
+				int SexTimerTEMPmedium = SexTimerTEMP + SexTimerTEMP/2
+				
+				NymTrace("SexTimerTEMP "+storqst.SexTimerSlave)	;fucked up, prolly MCM....
+				NymTrace("SexTimerTEMP "+SexTimerTEMP)				
+				NymTrace("SexTimerTEMPhard "+SexTimerTEMPhard)
+				NymTrace("SexTimerTEMPmedium "+SexTimerTEMPmedium)
 				
 				if playscr.GetCurrentLocationName() == "Inn" && storqst.DarkNight
+						
+					if defqst.SexDuration < SexTimerTEMPmedium
 					
-					if defqst.SexDuration < 120
-					defqst.SexDuration = 0
-					BadMessage("Your abuser came too fast, useless Slave!")
+					BadMessage("Your abuser came too fast, useless Slave! ["+defqst.SexDuration+"/"+SexTimerTEMPmedium+"]")
 					playscr.CalculateSlaveGold("Increase", 0)
-					else 
 					defqst.SexDuration = 0
-				
+					else 
+
 					ServicesCompleted += 1
 					
 						if D100(75)
-						GoodMessage("Your abuser is happy! Its now "+storqst.GetGameHour())
+						GoodMessage("Your abuser is happy! ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
 						else 
-						GoodMessage("Barely good enough.")
+						GoodMessage("Barely good enough. ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
 						endif 
+					defqst.SexDuration = 0
 					storqst.GracePeriodSlave += 2	
 					playscr.CalculateSlaveGold("Whoring Reduce", 0)
 					endif 
+					
 				else 
-					if defqst.SexDuration < 80
-					defqst.SexDuration = 0
-					BadMessage("Your raper came too fast, useless Slave!")
-					playscr.CalculateSlaveGold("Increase", 0)
-					cfgqst.PublicExposure += Utility.RandomInt(6,12)
+					;Hard Rapers
+					if 	storqst.TargetActorProfession == "BlackSmith" 
+	
+						if defqst.SexDuration > SexTimerTEMPhard
+						
+						ServicesCompleted += 1
+						storqst.GracePeriodSlave += 3
+						GoodMessage("The Blacksmith likes you! ["+defqst.SexDuration+"/"+SexTimerTEMPhard+"]")
+						defqst.SexDuration = 0
+						Utility.Wait(2.0)
+						
+							if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage") ;TO DO - ONLY REMOVE HEAVY BONDAGE
+							;nade_DDint.RemoveAll_DDs_FromActor(cfgqst.PlayerRef, true, "none", "none", "none", "none", "none")
+							nade_DDint.RemoveHeavyBondage_DD()
+							endif 
+						
+							;if SlaveFetchTaskItemCount == 0 
+							;Utility.Wait(2.0)
+							;GiveSlaveTasks("GrindStone")
+							;endif 
+						
+						playscr.CalculateSlaveGold("Reduce", 0)
+						
+						else 
+						BadMessage("The Blacksmith came too fast, useless Slave! ["+defqst.SexDuration+"/"+SexTimerTEMPhard+"]")
+						defqst.SexDuration = 0
+						playscr.CalculateSlaveGold("Increase", 0)	
+						cfgqst.PublicExposure += Utility.RandomInt(6,12)
+						
+						endif 
+					;Normal Rapers
+					else 
+						if defqst.SexDuration < SexTimerTEMP
+						
+						BadMessage("Your raper came too fast, useless Slave! ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
+						defqst.SexDuration = 0
+						playscr.CalculateSlaveGold("Increase", 0)
+						cfgqst.PublicExposure += Utility.RandomInt(6,12)
+						
+						else 
+						
+						ServicesCompleted += 1
+						GoodMessage("Your raper is happy! ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
+						defqst.SexDuration = 0
+						storqst.GracePeriodSlave += 2
+						playscr.CalculateSlaveGold("Reduce", 0)
+						endif 
+					endif 
+				endif 
+		
+				if ServicesCompleted > iTempServices
+					;if we completed the Task we save the ACtor
+					int SaveActor =	ServicesCompleted - 1
 					
-					elseif storqst.TargetActorProfession == "BlackSmith" && defqst.SexDuration > 160
-					defqst.SexDuration = 0
-					ServicesCompleted += 1
-					storqst.GracePeriodSlave += 3
-					GoodMessage("The Blacksmith likes you!")
-					
-					Utility.Wait(2.0)
-					 if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage")
-					nade_DDint.RemoveAll_DDs_FromActor(cfgqst.PlayerRef, true, "none", "none", "none", "none", "none")
-					 endif 
-					
-					if SlaveFetchTaskItemCount == 0 
-					Utility.Wait(2.0)
-					GiveSlaveTasks("GrindStone")
+					if !ServedActors[SaveActor]
+					ServedActors[SaveActor] = TempMaster
 					endif 
 					
-					playscr.CalculateSlaveGold("Reduce", 0)
-					else 
+					if !ServedActors[SaveActor]
+						if nym()
+						Debug.MessageBox("No Served Actor Saved!")
+						endif
+					endif 
+				endif 
+				TempMaster = none
+				 cfgqst.DefeatStateChapter = "Free"
+				
+			else
+			BadMessage("You failed to seduce your target")
+			cfgqst.PublicExposure += Utility.RandomInt(8,16)
+	
+			endif 
+			SlaveIsOccupied = 0
+			storqst.SlaveAtWork = false
+			storqst.PlayerPosingVehicle(false)
+			cfgqst.Immobilize(false)	
+		
+		cfgqst.PlayerRef.ClearLookAt()
+		DebugTrace("OnStartSeduction(END)")
+
+EndFunction 
+
+
+Function OnStartSeduction(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Resting
+
+		DebugTrace("OnStartSeduction(START)")
+		SlaveIsOccupied = 1
+		GoodMessage("You try to seduce your target")
+		
+		;Billy Horse Doggy 2 - Stage 1 is also NICE for this pose
+		
+		if TempMaster
+		NymTrace("Set Look At MASTER")
+		cfgqst.PlayerRef.SetLookAt(TempMaster)
+		else 
+		NymTrace("Set Look At NO MASTER")
+		endif 
+		
+		cfgqst.ProxActorDetected = 0
+		storqst.SlaveAtWork = true	
+			storqst.PlayerPosingVehicle(true)
+			cfgqst.Immobilize(True)
+			calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)
+			
+			Utility.Wait(7.0)
+			
+			Bool Seduced = false
+			int SeductionChance = 0
+			float fDirtiness = cfgqst.GetDirtiness()
+			int ifDirtiness = fDirtiness as int
+			NymTrace("#Slavery: Dirtiness:" +ifDirtiness)
+			
+			;Creature Seduction is reversed
+			if CreatureTask
+			SeductionChance = 10	
+				if  cfgqst.IsPlayerCumsoaked() 
+					if D100(20)
+					SeductionChance = 0
+					else
+					SeductionChance +50
+					endif
+				endif 
+				SeductionChance += ifDirtiness
+				
+			else 
+			SeductionChance = 90
+				if cfgqst.IsPlayerCumsoaked() 
+					if D100(80)
+					SeductionChance -= 25
+					else
+					SeductionChance = 100
+					endif
+				endif 
+				SeductionChance -= ifDirtiness
+			endif 
+			
+			if D100(SeductionChance)
+			Seduced = true 
+			else 
+			SeductionChance	+= 10
+			Utility.Wait(7.0)
+			endif 
+			
+			if D100(SeductionChance)
+			Seduced = true 
+			endif 
+			
+			cfgqst.ResetIdle(cfgqst.PlayerRef)
+			
+			
+			;Check if we already served this actor (we count based on the services already completed? maybe bad
+			bool AlreadyServed = false
+			int iTempServices = ServicesCompleted ;BEFORE 
+			if TempMaster
+				
+				;we search the already saved actors
+				while (iTempServices > 0) && !AlreadyServed
+				iTempServices -= 1
+					if TempMaster == ServedActors[iTempServices]
+					AlreadyServed = true 
+					endif 
+				endwhile 
+			endif 
+			
+			;TRy to seduce s
+			
+			if AlreadyServed
+			AlreadyServed = false
+			BadMessage("You already served this actor, try another or try later")
+			cfgqst.PublicExposure += Utility.RandomInt(4,8)
+			elseif Seduced 
+				cfgqst.DefeatStateChapter = "Fast Slave Sex"
+				
+				if storqst.IsBlackSmith(TempMaster) || storqst.TargetActorProfession == "Blacksmith"
+				storqst.TargetActorProfession = "Blacksmith"
+				GoodMessage("You seduced the Blacksmith")
+				else 
+				GoodMessage("You seduced your Target")
+				endif 
+				
+				cfgqst.DefeatEntranceVia = "Service"
+				
+				if CreatureTask && !storqst.IsHuman(TempMaster)
+				calmqst.StartSexFast("FastSlaveRape", SexTaskRaceKey , TempMaster, none,  cfgqst.PlayerRef)
+				else 
+				calmqst.StartSexFast("FastSlaveRape", "Human", TempMaster, none, cfgqst.PlayerRef)
+				endif 
+				
+				while  cfgqst.SexScene &&  cfgqst.ModEnabled
+				Utility.Wait(3.0)
+				;defqst.SexDuration +=2
+				endwhile 
+				
+				NymTrace("defqst.SexDuration: "+defqst.SexDuration)
+				NymTrace("storqst.TargetActorProfession: "+storqst.TargetActorProfession)		
+						
+				int SexTimerTEMP = storqst.SexTimerSlave as int
+				int SexTimerTEMPhard = SexTimerTEMP + SexTimerTEMP
+				int SexTimerTEMPmedium = SexTimerTEMP + SexTimerTEMP/2
+				
+				if playscr.GetCurrentLocationName() == "Inn" && storqst.DarkNight
+						
+					if defqst.SexDuration < SexTimerTEMPmedium
+					
+					BadMessage("Your abuser came too fast, useless Slave! ["+defqst.SexDuration+"/"+SexTimerTEMPmedium+"]")
+					playscr.CalculateSlaveGold("Increase", 0)
 					defqst.SexDuration = 0
+					else 
+
 					ServicesCompleted += 1
-					GoodMessage("Your raper is happy!")
-					storqst.GracePeriodSlave += 2
-					playscr.CalculateSlaveGold("Reduce", 0)
+					
+						if D100(75)
+						GoodMessage("Your abuser is happy! ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
+						else 
+						GoodMessage("Barely good enough. ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
+						endif 
+					defqst.SexDuration = 0
+					storqst.GracePeriodSlave += 2	
+					playscr.CalculateSlaveGold("Whoring Reduce", 0)
+					endif 
+					
+				else 
+					;Hard Rapers
+					if 	storqst.TargetActorProfession == "BlackSmith" 
+	
+						if defqst.SexDuration > SexTimerTEMPhard
+						
+						ServicesCompleted += 1
+						storqst.GracePeriodSlave += 3
+						GoodMessage("The Blacksmith likes you! ["+defqst.SexDuration+"/"+SexTimerTEMPhard+"]")
+						defqst.SexDuration = 0
+						Utility.Wait(2.0)
+						
+							if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage") ;TO DO - ONLY REMOVE HEAVY BONDAGE
+							;nade_DDint.RemoveAll_DDs_FromActor(cfgqst.PlayerRef, true, "none", "none", "none", "none", "none")
+							nade_DDint.RemoveHeavyBondage_DD()
+							endif 
+						
+							;if SlaveFetchTaskItemCount == 0 
+							;Utility.Wait(2.0)
+							;GiveSlaveTasks("GrindStone")
+							;endif 
+						
+						playscr.CalculateSlaveGold("Reduce", 0)
+						
+						else 
+						BadMessage("The Blacksmith came too fast, useless Slave! ["+defqst.SexDuration+"/"+SexTimerTEMPhard+"]")
+						defqst.SexDuration = 0
+						playscr.CalculateSlaveGold("Increase", 0)	
+						cfgqst.PublicExposure += Utility.RandomInt(6,12)
+						
+						endif 
+					;Normal Rapers
+					else 
+						if defqst.SexDuration < SexTimerTEMP
+						
+						BadMessage("Your raper came too fast, useless Slave! ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
+						defqst.SexDuration = 0
+						playscr.CalculateSlaveGold("Increase", 0)
+						cfgqst.PublicExposure += Utility.RandomInt(6,12)
+						
+						else 
+						
+						ServicesCompleted += 1
+						GoodMessage("Your raper is happy! ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
+						defqst.SexDuration = 0
+						storqst.GracePeriodSlave += 2
+						playscr.CalculateSlaveGold("Reduce", 0)
+						endif 
 					endif 
 				endif 
 		
@@ -560,6 +906,40 @@ Function OnStartSeduction(String EventName, String ArgString, Float ArgNum, Form
 
 EndFunction 
 
+
+Function OnStartWorkingMill(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Resting
+
+		DebugTrace("#ERROR (OLD) OnStartWorkingMill(START)")
+		
+		;This gets called all 3 Seconds as long as we work on the Slave Mill
+		;WIP this will also be a Punishment Method.
+		
+		;/
+		
+		If D100(25)
+		Potion FlourSack = game.GetFormFromFile(0x0002F44C, "Hearthfires.esm") as Potion 	;Sack of Flour
+			if FlourSack
+			cfgqst.PlayerRef.AddItem(FlourSack, 1, true)
+			else 
+				NymTrace("FLOUR NONE POTION")
+				
+				Ingredient FlourSackIngr = game.GetFormFromFile(0x0002F44C, "Hearthfires.esm") as Ingredient 	;Sack of Flour
+				if FlourSackIngr
+				cfgqst.PlayerRef.AddItem(FlourSack, 1, true)
+				else 
+				NymTrace("FLOUR NONE INGREDIENT")
+				endif 		
+			endif 
+		endif 
+
+		
+		if Nym() && D100(15)
+		storqst.ExhaustionChange(1)
+		endif 
+		
+		
+		/;
+EndFunction 
 
 Function OnStartBodySearch(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Resting
 
@@ -613,9 +993,131 @@ Function OnStartBodySearch(String EventName, String ArgString, Float ArgNum, For
 EndFunction 
 
 
+Function AddExtraSlaveryLocations()
+
+		Location TempLocation 
+
+		if CurrentSlaveryLocationName == "Markarth"
+		;MARKARTH - Left Hand Mine 
+		TempLocation = (Game.GetFormFromFile(0x00018E3A, "Skyrim.esm") As Location)
+		storqst.SlaveryLocations.AddForm(TempLocation)
+
+		;MARKARTH - Salvius Farm
+		TempLocation = (Game.GetFormFromFile(0x00018E40, "Skyrim.esm") As Location)
+		storqst.SlaveryLocations.AddForm(TempLocation)		
+		
+		elseif CurrentSlaveryLocationName == "Windhelm"
+
+		;WINHDELM - Brandy-Mug Farm
+		TempLocation = (Game.GetFormFromFile(0x00018C8F, "Skyrim.esm") As Location)
+		storqst.SlaveryLocations.AddForm(TempLocation)
+
+		;WINHDELM - Hollyfrost Farm
+		TempLocation = (Game.GetFormFromFile(0x00018E36, "Skyrim.esm") As Location)
+		storqst.SlaveryLocations.AddForm(TempLocation)
+		
+		;WINHDELM - HlaaluFarmLocation
+		TempLocation = (Game.GetFormFromFile(0x00018E35, "Skyrim.esm") As Location)
+		storqst.SlaveryLocations.AddForm(TempLocation)
+
+		;WINHDELM - Stables
+		TempLocation = (Game.GetFormFromFile(0x000209F5, "Skyrim.esm") As Location)
+		storqst.SlaveryLocations.AddForm(TempLocation)			
+		endif 
+
+EndFunction 
+
+
 Function OnStartRequestMaster(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Request
 
 		int GracePeriod_SAVE = 0
+		
+		;JARL REQUEST 
+		if (SexTaskType == "Dance for the Jarl") && (storqst.ProxMasterDetected == 100) 
+		DebugTrace("OnStartRequestMaster(JARL START)")
+				
+				;cfgqst.ProxGuardDetected = 0
+				SlaveIsOccupied = 1
+				storqst.SlaveAtWork = true
+				GoodMessage("You show respect to the Jarl")
+				cfgqst.Immobilize(True)
+				storqst.PlayerPosingVehicle(true)
+				calmqst.PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)
+				
+				Utility.Wait(3.0)
+				
+				;DANCE 1 
+				
+				;Random Duration. Change later.
+				;Arrow Up to change Dance 
+				;Arrow Down to Start Masturbating
+				
+				;if Jarl Happy, all good. Maybe Sex
+				;Jarl not happy, get DDs, dance more
+				;get whipped 
+				;get orgied, all random, maybe depends on Hold too
+				
+				
+				;GoodMessage("You show respect to the Jarl")
+				;DANCE 
+				
+			;	if !storqst.DarkNight
+			;	NymTrace("OnStartRequestMaster(A)")
+			;	UpdateSlaveReportingTasks()
+			;	endif 
+				
+				Utility.Wait(5.0)
+				
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				
+				if storqst.DarkNight || D100(10)
+				
+					cfgqst.DefeatStateChapter = "Fast Slave Sex"
+					
+					if storqst.DarkNight
+					BadMessage("Aren't you supposed to sleep?")
+					else 
+					BadMessage("The Master wants you now")
+						if storqst.GracePeriodSlave > 0
+						GracePeriod_SAVE = storqst.GracePeriodSlave
+						endif 
+					endif 
+					
+					calmqst.StartSexFast("FastSlaveRape", "Human", TempMaster, none, cfgqst.PlayerRef)
+						
+					while cfgqst.SexScene && cfgqst.ModEnabled
+					Utility.Wait(3.0)
+					;defqst.SexDuration+=2
+					endwhile 
+					
+					if defqst.SexDuration < 80
+					defqst.SexDuration = 0
+					BadMessage("The Master came too fast, useless Slave!")
+					playscr.CalculateSlaveGold("Increase", 0)
+					else 
+					defqst.SexDuration = 0
+					GoodMessage("The Master is happy!")
+					playscr.CalculateSlaveGold("Reduce", 0)
+					
+						if GracePeriod_SAVE > 0
+						storqst.GracePeriodSlave = GracePeriod_SAVE
+						endif 
+					
+					endif 
+					
+					TempMaster = none
+					cfgqst.DefeatStateChapter = "Free"
+					
+				endif 
+				storqst.SlaveAtWork = false
+				storqst.PlayerPosingVehicle(false)
+
+				cfgqst.Immobilize(false)
+				SlaveIsOccupied = 0
+				storqst.ProxMasterDetected = 0
+		
+		;GUARD REQUEST 
+		elseif storqst.ProxMasterDetected == 1
 		
 		DebugTrace("OnStartRequestMaster(START)")
 				
@@ -633,6 +1135,7 @@ Function OnStartRequestMaster(String EventName, String ArgString, Float ArgNum, 
 				NymTrace("OnStartRequestMaster(A)")
 				UpdateSlaveReportingTasks()
 				endif 
+				
 				Utility.Wait(5.0)
 				
 				cfgqst.ResetIdle(cfgqst.PlayerRef)
@@ -683,11 +1186,26 @@ Function OnStartRequestMaster(String EventName, String ArgString, Float ArgNum, 
 				SlaveIsOccupied = 0
 				storqst.ProxMasterDetected = 0
 				
+		endif 		
 		DebugTrace("OnStartRequestMaster(END)")
 
 EndFunction 
 
+Bool Function WantsToWorkField()
 
+	if FetchTaskType == "Work Field"
+		
+		if IsWorkingOnStation("Field")
+		return true 
+		else 
+		return false 
+		endif 
+		
+	else 
+	return false 
+	endif 
+
+EndFunction
 
 Function OnStartOrgy(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Orgy
 
@@ -727,6 +1245,26 @@ Function OnStartSweeping(String EventName, String ArgString, Float ArgNum, Form 
 		DebugTrace("OnStartSweeping(END)")
 
 EndFunction 
+
+Function OnStartWorkingField(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Sweeping
+
+		DebugTrace("OnStartWorkingField(START)")
+		
+		storqst.SlaveAtWork = true
+		cfgqst.Immobilize(true)
+		storqst.PlayerPosingVehicle(true) 
+				
+		Idle TempIdle = (Game.GetFormFromFile(0x00075CB4, "Skyrim.esm") as Idle)	;idleHOE 
+		if TempIdle
+		cfgqst.PlayerRef.PlayIdle(TempIdle)
+		endif 
+
+		BroomCleanMarker()
+
+		DebugTrace("OnStartWorkingField(END)")
+
+EndFunction 
+
 
 Function OnStartMining(String EventName, String ArgString, Float ArgNum, Form Sender)	;#Mining
 
@@ -819,14 +1357,35 @@ Function OnStartResting(String EventName, String ArgString, Float ArgNum, Form S
 	while storqst.Resting && storqst.Exhaustion > 0 && cfgqst.ModEnabled
 	;This Loop lasts until we are interrupted OR Exhausiton is Zero.
 	NymTrace("OnStartResting(LOOP)(Exhaustion:"+storqst.Exhaustion+")")
-	int iWaitTime = Utility.RandomInt(10,15)
+	float iWaitTime = 20
 	int iMoanTimer = 0
+	float Discomfort = 1.0
+	NymTrace("OnStartResting(LOOP)(Discomfort A:"+Discomfort+")(iWaitTime A:"+iWaitTime+")")
+	
+	;DIRT 
+	Discomfort += (cfgqst.GetDirtiness()*0.001)
+	
+		;CUM
+		if cfgqst.IsPlayerCumsoaked()
+		Discomfort += 0.5
+		endif 
+		
+		Discomfort = Discomfort - storqst.GetWarmth() - storqst.GetComfort()
+		iWaitTime = iWaitTime*Discomfort
+		
+		if iWaitTime < 5.0
+		iWaitTime = 5
+		endif 
+	
+	NymTrace("OnStartResting(LOOP)(Discomfort B:"+Discomfort+")(iWaitTime B:"+iWaitTime+")")
 	
 		while iWaitTime > 0 && storqst.Resting && cfgqst.ModEnabled
 		;This loop is just the time taken for Exhaustion to go down. Stops when Interrupted
 		iWaitTime -= 1
 		iMoanTimer += 1
 		Utility.Wait(1.0)
+		NymTrace("iWaitTime A:"+iWaitTime)
+		
 			if iMoanTimer > 2
 			iMoanTimer == 0
 			storqst.PlayerSoundToPlay = "Breathing"
@@ -841,8 +1400,9 @@ Function OnStartResting(String EventName, String ArgString, Float ArgNum, Form S
 		storqst.PlayerSoundToPlay = "Breathing"
 		SendModEvent("Moan")
 		endif 
-		
-		if iWaitTime == 0
+		NymTrace("iWaitTime B:"+iWaitTime)
+		if iWaitTime < 1
+		NymTrace("iWaitTime C:"+iWaitTime)
 		storqst.ExhaustionChange(-1)
 		endif 
 		
@@ -901,12 +1461,17 @@ Function OnStartShortWhipping(String EventName, String ArgString, Float ArgNum, 
 	
 EndFunction 
 
-Function LocalSlaverySetup()
+
+Function LocalSlaverySetup()		;#Setup ##Start
+
+	DebugTrace("LocalSlaverySetup()")
 	
 	if storqst.LocalSlavery
 	FetchTaskType = "Completed"
 	SexTaskType = "Completed"
 	RuleTaskType = "Completed"
+	storqst.IsLocalSlave = 1
+	storqst.Exhaustion = 0
 	TotalSlaveTasksCompleted = 0
 	float SlaveGold = Utility.RandomFloat(storqst.PriceOfFreedomMin, storqst.PriceOfFreedomMax)
 	SPE_actor.SetActorCalmed(cfgqst.PlayerRef, true)
@@ -919,7 +1484,7 @@ Function LocalSlaverySetup()
 	StartingMessage()
 	cfgqst.PlayerRef.AddItem(SlaveLaw_Basic, 1, true)
 	
-	NymTrace("Slavegold: "+SlaveGold+" Slavery Location: "+storqst.CurrentSlaveryLocationName)
+	DebugTrace("Slavegold: "+SlaveGold+" Slavery Location: "+storqst.CurrentSlaveryLocationName)
 	;Debug.Messagebox("NAKED DEFEAT Local Slavery: You are a local slave now. You have a letter with slave laws in your inventory")
 ;	GoodMessage("You have a letter with slave laws in your inventory")
 	endif 
@@ -980,6 +1545,19 @@ Bool Function HasSweepStreetsTask()
 
 EndFunction 
 
+
+
+Bool Function WantsToFarm()
+	
+	;if FetchTaskType == "Mine Iron Ore" && playscr.GetCurrentLocationName() == "Mine" && IsWorkingOnStation("Iron Ore Vein")	;EXPAND
+	if playscr.GetCurrentLocationName() == "Mine" && IsWorkingOnStation("Ore Vein")	;EXPAND
+	return true
+	else 
+	return false 
+	endif 
+
+EndFunction 
+
 Bool Function WantsToMine()
 	
 	;if FetchTaskType == "Mine Iron Ore" && playscr.GetCurrentLocationName() == "Mine" && IsWorkingOnStation("Iron Ore Vein")	;EXPAND
@@ -1022,7 +1600,7 @@ Bool Function HasSweepTask()
 
 EndFunction 
 
-Function EndLocalSlavery()	;##End
+Function EndLocalSlavery()	;##End		;#FREE
 
 	if storqst.IsLocalSlave()
 		DebugTrace("EndLocalSlavery()")
@@ -1036,7 +1614,10 @@ Function EndLocalSlavery()	;##End
 		cfgqst.PlayerRef.RemoveFromFaction(cfgqst.CrawlFaction)
 		endif
 		
-		storqst.SlaveryLocations.RemoveAddedForm(CurrentLocalSlaveryLoc)		
+			
+		storqst.SlaveryLocations.Revert() ;NEW: we remove ALL Locations since currently we assume we have alway only ONE Location saved.
+		;we will add the possibility to save locations for slavery in an extra List so you can be returned to those. 
+	;	storqst.SlaveryLocations.RemoveAddedForm(CurrentLocalSlaveryLoc)		
 		CurrentLocalSlaveryLoc = none
 		CurrentSlaveryLocationName = "None"
 		
@@ -1075,6 +1656,12 @@ Function EndLocalSlavery()	;##End
 		PlacedGrindstone.Delete()
 		PlacedGrindstone = none 
 		endif		
+		
+		if PlacedMill
+		PlacedMill.DisableNoWait()
+		PlacedMill.Delete()
+		PlacedMill = none 
+		endif	
 		
 		storqst.IsLocalSlave = 0
 		cfgqst.PublicExposure = 0
@@ -1149,6 +1736,10 @@ Function UpdateSlaveReportingTasks()		;#Update
 				
 			elseif FetchTaskType == "Flowers"
 					
+					int ItemsTemp1
+					int ItemsTemp2
+					
+					;Gift Flowers (Gifts by KWD)
 					Form[] FlowerList = new Form[10]
 					Keyword[] KWDList = new Keyword[1]
 					KWDList[0] = KWD_GiftFlower
@@ -1156,8 +1747,19 @@ Function UpdateSlaveReportingTasks()		;#Update
 					;Snowberries, Lavender, Blue, Red, Purple, Yellow Mountain Flower, Dragon's Tongue
 					;
 					Flowerlist = SPE_ObjectRef.GetItemsByKeyword(cfgqst.PlayerRef, KWDList, false) 
-					DeliveredItemsCount = SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, FlowerList, none) 
-					
+					ItemsTemp1 = SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, FlowerList, none) 
+	
+	
+					;Special Flowers (by Form)
+					Form Nightshade = game.GetFormFromFile(0x0002F44C, "Skyrim.esm") 
+					Form Deathbell = game.GetFormFromFile(0x000516C8, "Skyrim.esm")
+
+					Form[] ItemListFLOWER = new Form[2]
+					ItemListFLOWER[0] = Nightshade
+					ItemListFLOWER[1] = Deathbell
+					ItemsTemp2 = SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, ItemListFLOWER, none) 			
+
+					DeliveredItemsCount = ItemsTemp1 + ItemsTemp2
 					;Formlist added Flowers are removed here and then added
 					;TempInt  SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, FlowerList, none) 
 					;DeliveredItemsCount += TempInt
@@ -1167,7 +1769,25 @@ Function UpdateSlaveReportingTasks()		;#Update
 					;NightShade, Deathbell (To DO!)
 					
 			;elseif FetchTaskType == "Shroomz!"		
-		
+			
+			elseif FetchTaskType == "Flour"	;#collect2
+			
+					int ItemsTempFlour
+			
+
+					Form FlourSack = game.GetFormFromFile(0x02003538, "Hearthfires.esm") 	;Sack of Flour
+				;	TempObject = (Game.GetFormFromFile(0x02003538, "HearthFires.esm") as Form)	;Sack of Flour
+
+					Form[] ItemListFLOUR = new Form[1]
+					ItemListFLOUR[0] = FlourSack
+					ItemsTempFlour = SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, ItemListFLOUR, none) 			
+
+					DeliveredItemsCount = ItemsTempFlour
+					;Formlist added Flowers are removed here and then added
+					;TempInt  SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, FlowerList, none) 
+					;DeliveredItemsCount += TempInt
+					
+					cfgqst.PlayerRef.RemoveItem(SlaveTask_FetchFlour, 1) ;remove Task Briefing
 		
 			elseif FetchTaskType == "Collect Garbage"	;#collect2
 	
@@ -1257,6 +1877,27 @@ Function UpdateSlaveReportingTasks()		;#Update
 				cfgqst.PlayerRef.RemoveItem(SlaveTask_FetchQuicksilverOre, 1) ;remove Task Briefing
 				NymTrace("Items Removed = "+TTestInt)	
 				
+			elseif FetchTaskType == "Flour"	
+
+				Form FlourSack = Game.GetFormFromFile(0x0002F44C, "Hearthfires.esm") 	;Sack of Flour
+
+				int TTestInt
+				Form[] FlourList = new Form[1]
+				FlourList[0] = FlourSack
+				
+				DeliveredItemsCount = SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, FlourList, none) 
+				cfgqst.PlayerRef.RemoveItem(SlaveTask_FetchQuicksilverOre, 1) ;remove Task Briefing
+				
+				NymTrace("Items Removed ("+FetchTaskType+") = "+TTestInt)		
+				
+				
+			elseif FetchTaskType == "Work Field"	
+
+					DeliveredItemsCount = CompletedAreaTasks
+					CompletedAreaTasks = 0		
+					
+					cfgqst.PlayerRef.RemoveItem(SlaveTask_FetchField, 1) ;remove Task Briefing
+				
 			elseif FetchTaskType == "Sweeping the Streets"
 					
 					DeliveredItemsCount = CompletedAreaTasks
@@ -1298,7 +1939,8 @@ Function UpdateSlaveReportingTasks()		;#Update
 			if CompareWithTaskCount < SlaveFetchTaskItemCount
 				BadMessage("You were caught cheating!")
 				playscr.CalculateSlaveGold("Massive Increase", 0)
-				cfgqst.PublicExposure += 20
+				ImmediatePunishment = true
+				cfgqst.PublicExposure += 100
 				GoodSlaveGetsInfo = false
 				WorkingTaskFailed = true
 				
@@ -1415,7 +2057,20 @@ Function UpdateSlaveReportingTasks()		;#Update
 		;	endif 
 		endif 
 		
-		if GoodSlaveGetsInfo && storqst.IsLocalSlave()
+		if GoodSlave
+		GoodMessage("You have been a good slave")
+		FlawlessServiceLevel += 1
+		playscr.CalculateSlaveGold("Variable Reduce", FlawlessServiceLevel)
+		else 
+			if FlawlessServiceLevel > 0
+			FlawlessServiceLevel -= 1
+			endif 
+			;GoodSlaveGetsInfo = false
+		endif 
+		
+		if GoodSlaveGetsInfo && GoodSlave && storqst.IsLocalSlave()
+		ImmediatePunishment = false
+		cfgqst.PublicExposure = 0	
 		playscr.CalculateSlaveGold("Info", 0)
 		endif 
 		
@@ -1493,128 +2148,235 @@ Bool Function IsSlaveCurrentlyWorking()
 
 EndFunction 
 
-Bool Function IsWorkingOnStation(String Station)
 
-		NymTrace("IsWorkingOnStation("+Station+")")
-		ObjectReference ClosestFurniture
-		int SitStatePlayer
-		int Mode = 1
+String sCurrentStation
 
-		CraftingStationListTemp.Revert()
-		
-		if Station == "Smelter"
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(0))
-		
-		elseif Station == "Tanning Rack"
-		
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(11))
-		
-		elseif Station == "Workbench"
-		
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(16))
-		
-		elseif Station == "Grindstone"
-		
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(12))
+Bool Function IsWorkingOnStation(String Station)		;#IsWorkingOnStation()
 
-		elseif Station == "Alchemy Lab"
-		
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(8))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(9))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(10))
-		
-		elseif Station == "Forge"
-		
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(13))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(14))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(15))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(17))
+
+	if storqst.Resting || cfgqst.SexScene
+	NymTrace("IsWorkingOnStation("+Station+") FALSE START - fix one day")
+	
+	else 
+			NymTrace("IsWorkingOnStation("+Station+") START")
+
+			ObjectReference ClosestFurniture
+			int SitStatePlayer
+			int Mode = 1
+
+			CraftingStationListTemp.Revert()
 			
-		elseif Station == "Cooking Pot"
-		
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(3))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(4))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(5))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(6))
-		CraftingStationListTemp.AddForm(CraftingStationList.GetAt(7))
-		
-		elseif Station == "Ore Vein"
-		Mode = 2
+			if Station == "Smelter"
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(0))
 			
-		endif 
+			elseif Station == "Tanning Rack"
+			
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(11))
+			
+			elseif Station == "Workbench"
+			
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(16))
+			
+			elseif Station == "Grindstone"
+			
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(12))
 
-		if mode == 1
-		
-		SitStatePlayer = cfgqst.PlayerRef.GetSitState()
-		NymTrace("SitStatePlayer: "+SitStatePlayer)
+			elseif Station == "Alchemy Lab"
+			
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(8))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(9))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(10))
+			
+			
+			elseif Station == "Mill"
+			;Mode = 1
+			Form TempForm 
+			TempForm = Game.GetFormFromFile(0x0009C6DF , "Skyrim.esm") as Form 	;Skyrim MillWR FURN9
+			CraftingStationListTemp.AddForm(TempForm)
+			
+			elseif Station == "Forge"
+			
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(13))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(14))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(15))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(17))
+				
+			elseif Station == "Cooking Pot"
+			
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(3))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(4))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(5))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(6))
+			CraftingStationListTemp.AddForm(CraftingStationList.GetAt(7))
+			
+			
+			elseif Station == "Field"
+			Mode = 3
+			
+			elseif Station == "Ore Vein"
+			Mode = 2
+				
+			endif 
+
+			if mode == 1
+			
+			SitStatePlayer = cfgqst.PlayerRef.GetSitState()
+			NymTrace("SitStatePlayer: "+SitStatePlayer)
 
 
-			if SitStatePlayer == 3
+				if SitStatePlayer == 3
 
-				ClosestFurniture = Game.FindClosestReferenceOfAnyTypeInListFromRef(CraftingStationListTemp, cfgqst.PlayerRef, 50.0) 
+					ClosestFurniture = Game.FindClosestReferenceOfAnyTypeInListFromRef(CraftingStationListTemp, cfgqst.PlayerRef, 50.0) 
 
-				if ClosestFurniture
-				NymTrace("IsWorkingOnStation("+Station+" 50)")
-				else 
-				NymTrace("IsWorkingOnStation("+Station+" 100)")
-				ClosestFurniture = Game.FindClosestReferenceOfAnyTypeInListFromRef(CraftingStationListTemp, cfgqst.PlayerRef, 100.0) 
-					if !ClosestFurniture
-					NymTrace("IsWorkingOnStation("+Station+" 150)")
-					ClosestFurniture = Game.FindClosestReferenceOfAnyTypeInListFromRef(CraftingStationListTemp, cfgqst.PlayerRef, 150.0) 
+					if ClosestFurniture
+					NymTrace("IsWorkingOnStation("+Station+" 50)")
+					else 
+					NymTrace("IsWorkingOnStation("+Station+" 100)")
+					ClosestFurniture = Game.FindClosestReferenceOfAnyTypeInListFromRef(CraftingStationListTemp, cfgqst.PlayerRef, 100.0) 
+						if !ClosestFurniture
+						NymTrace("IsWorkingOnStation("+Station+" 150)")
+						ClosestFurniture = Game.FindClosestReferenceOfAnyTypeInListFromRef(CraftingStationListTemp, cfgqst.PlayerRef, 150.0) 
+						endif 
 					endif 
-				endif 
+					
+				;	ClosestFurniture = Game.FindClosestReferenceOfTypeFromRef(WoodChoppingBlockCheck, cfgqst.PlayerRef, 100.0)
+					
+				;	if !ClosestFurniture
+				;	ClosestFurniture = Game.FindClosestReferenceOfTypeFromRef(WoodChoppingBlockSnowCheck, cfgqst.PlayerRef, 100.0)
+				;	endif 
+					
+					if ClosestFurniture
+					NymTrace("IsWorkingOnStation("+Station+" FOUND)")
+					sCurrentStation = Station
+					return true
+					else
+					NymTrace("IsWorkingOnStation("+Station+" NOT FOUND)")
+					return false
+					sCurrentStation = "No Station"
+					endif
+				else
+				NymTrace("IsWorkingOnStation(NOT SITTING)")
+				return false 
+				sCurrentStation = "No Station"	
+				endif
 				
-			;	ClosestFurniture = Game.FindClosestReferenceOfTypeFromRef(WoodChoppingBlockCheck, cfgqst.PlayerRef, 100.0)
+		elseif mode == 2 
+
+			ClosestFurniture = GetClosestVein()	;Veins are placed, so any work.
+
+			if ClosestFurniture
+			float MineDistance = ClosestFurniture.GetDistance(cfgqst.PlayerRef)
 				
-			;	if !ClosestFurniture
-			;	ClosestFurniture = Game.FindClosestReferenceOfTypeFromRef(WoodChoppingBlockSnowCheck, cfgqst.PlayerRef, 100.0)
-			;	endif 
+				;if ClosestFurniture.HasKeyword(KWD_NakedGarbage)
+				if MiningMarker("Check")
+				BadMessage("You were orded to work elsewhere")
+				playscr.CalculateSlaveGold("Increase", 0)
+				return false
+				elseif MineDistance < 50
+				BadMessage("You are too close to the Ore Vein")
+				;NymBox("Too Close")
+				return false
+				elseif MineDistance > 180
+				BadMessage("You are too far away from the Ore Vein")
+				;NymBox("Too Far")
+				return false
+				elseif CheckLOSonObject(ClosestFurniture, "Vein")
+				NymTrace("IsWorkingOnStation("+Station+" FOUND) MineDistance: "+MineDistance)
+				return true
+				else 
 				
+				BadMessage("You are not facing the Ore Vein")
+				return false
+				endif
+			else
+			;NymBox("IsWorkingOnStation("+Station+" NOT FOUND B)")
+			NymTrace("IsWorkingOnStation("+Station+" NOT FOUND)")
+			return false
+			endif
+		
+		elseif mode == 3 	
+				
+				;Working Field - Distance should be greater: 
+				
+				ClosestFurniture = Game.FindClosestReferenceOfAnyTypeInListFromRef(FieldList, cfgqst.PlayerRef, 500.0)
+
 				if ClosestFurniture
 				NymTrace("IsWorkingOnStation("+Station+" FOUND)")
+				sCurrentStation = Station
 				return true
 				else
 				NymTrace("IsWorkingOnStation("+Station+" NOT FOUND)")
 				return false
+				sCurrentStation = "No Station"
 				endif
-			else
-			NymTrace("IsWorkingOnStation(NOT SITTING)")
-			return false 
 				
-			endif
-			
-	elseif mode == 2 
-
-		ClosestFurniture = GetClosestVein()	;Veins are placed, so any work.
-
-		if ClosestFurniture
-		float MineDistance = ClosestFurniture.GetDistance(cfgqst.PlayerRef)
-			
-			if ClosestFurniture.HasKeyword(KWD_NakedGarbage)
-			BadMessage("You were orded to work elsewhere")
-			playscr.CalculateSlaveGold("Increase", 0)
-			elseif MineDistance < 50
-			BadMessage("You are too close to the Ore Vein")
-			;NymBox("Too Close")
-			return false
-			elseif MineDistance > 180
-			BadMessage("You are too far away from the Ore Vein")
-			;NymBox("Too Far")
-			return false
-			elseif CheckLOSonObject(ClosestFurniture, "Vein")
-			NymTrace("IsWorkingOnStation("+Station+" FOUND) MineDistance: "+MineDistance)
-			return true
-			else 
-			
-			BadMessage("You are not facingEvent the Ore Vein")
-			endif
-		else
-		;NymBox("IsWorkingOnStation("+Station+" NOT FOUND B)")
-		NymTrace("IsWorkingOnStation("+Station+" NOT FOUND)")
-		return false
 		endif
-		
 	endif
+
+EndFunction 
+
+
+Function PlaceSlaveMolesters(string sType, int iCount)	;#PlaceSlaveMolesters
+
+	MolestersA = new Actor[4]					
+	MolestersA[0] = None						 
+	MolestersA[1] = None						 
+	MolestersA[2] = None						 
+	MolestersA[3] = None	
+	;RapersACount = 0
+
+
+	;ActorBase TempRobberyBandit
+	ObjectReference TempAnActor
+	Actor SpawnedActor
+		
+		int iActor = 0
+
+
+			iActor = Utility.RandomInt(1,4)
+		;	iActor = 4
+			if iActor == 1
+			TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(0x0001750C, "Skyrim.esm"), 1) ;Prisoner NordMalePreset01
+			elseif iActor == 2
+			TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(0x0001750D, "Skyrim.esm"), 1) ;Prisoner NordMalePreset02
+			elseif iActor == 3
+			TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(0x0001750E, "Skyrim.esm"), 1) ;Prisoner NordMalePreset03
+			elseif iActor == 4
+			TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(0x0001750F, "Skyrim.esm"), 1) ;Prisoner NordMalePreset04
+			endif 
+			
+			SpawnedActor = TempAnActor as actor
+			MolestersA[0] = SpawnedActor
+			SpawnedActor.Moveto(cfgqst.PlayerRef, -125 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), -125 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = false)
+			;endif 
+			
+			if Nym()
+				if SpawnedActor
+			;	NymMessage("#Robber Name: "+SpawnedRobber.GetBaseObject().GetName())
+				else 
+				Debug.Messagebox("#ERRROR SpawnedActor = NONE") 
+				endif 
+				
+				if !MolestersA[0]
+				else 
+				Debug.Messagebox("#ERRROR MolestersA[0] = NONE") 
+				endif 
+				
+			endif 
+			
+		
+			SPE_Actor.SetActorCalmed(SpawnedActor, true)
+			SpawnedActor.StopCombat()		
+			SpawnedActor.StopCombatAlarm()	
+			SpawnedActor.RemoveFromAllFactions()
+			;SpawnedRobber.AddToFaction(nade_DefeatFaction)
+			SpawnedActor.AddToFaction(storqst.NakedMolesterFaction)
+			SpawnedActor.AddToFaction(WhippingFaction)
+			storqst.WhipperFound = true
+			;SpawnedRobber.AddToFaction(CalmFaction)
+			;SpawnedRobber.AddToFaction(AllegianceFaction)
+			SpawnedActor.IsAlerted()
+			SpawnedActor.SetAlert(False)	
 
 EndFunction 
 
@@ -1650,7 +2412,8 @@ Function Mining(string Ore)		;#mining
 			
 			if Depletion == 0
 			ScreenMessage("You are ordered to work on another vein!")
-			MarkVeinAsBlocked()
+		;	MarkVeinAsBlocked()
+			MiningMarker("Place")
 			storqst.WhippingDuration = 0
 			cfgqst.ResetIdle(cfgqst.PlayerRef)
 			cfgqst.Immobilize(false)
@@ -1711,8 +2474,12 @@ Bool Function GlovesProtect()
 EndFunction 
 
 Function MarkVeinAsBlocked()
+
+	
 	NymTrace("MarkVeinAsBlocked()")
 	PO3_SKSEFunctions.AddKeywordToRef(GetClosestVein(), KWD_NakedGarbage)
+	
+	;NymMessage("Vein Blocked ["+PlacedVeins[i].GetDistance(cfgqst.PlayerRef)+"]" 
 	
 	;we get the PLACED veins and add the Keyword!!! 
 	
@@ -1732,12 +2499,16 @@ EndFunction
 ObjectReference Function GetClosestVein()
 	NymTrace("GetClosestVein()")
 	int i = 5
+	bool VeinFound = false
 	
-	while i > 0 
+	while i > 0 && !VeinFound
 	i -= 1
 		if PlacedVeins[i] && PlacedVeins[i].GetDistance(cfgqst.PlayerRef) < 181
-		return PlacedVeins[i]
-		NymTrace("Vein ["+i+"] closest. Distance ["+PlacedVeins[i].GetDistance(cfgqst.PlayerRef)+"]")
+		Float fVeinDistance = PlacedVeins[i].GetDistance(cfgqst.PlayerRef)
+		NymTrace("Vein ["+i+"] closest. Distance ["+fVeinDistance+"]")
+		sCurrentStation = "Vein ["+i+"] Distance ["+fVeinDistance+"]"
+		VeinFound = true 
+		return PlacedVeins[i]	
 		endif 
 	endwhile
 
@@ -1809,6 +2580,12 @@ Function RemoveOreVeins(string Type)
 		j += 1
 		endif 
 	endwhile
+	
+	if MolestersA[0]
+	MolestersA[0].DisableNoWait()
+	MolestersA[0].Delete()
+	MolestersA[0] = none
+	endif 
 	
 	NymBox("Veins Removed: "+j)
 
@@ -1915,12 +2692,23 @@ EndFunction
 
 Bool AllowTask_Mushrooms
 Bool AllowTask_Flowers
+
+;Mines 
 Bool AllowTask_MineIron
 Bool AllowTask_MineQuicksilver 
+Bool AllowTask_MineMoonstone
+
+;Farms 
+Bool AllowTask_WorkField 
+Bool AllowTask_WorkSlaveWheel
+
+;Crafting 
+Bool AllowTask_Smelter 
+Bool AllowTask_Forge
 
 ;StationTasks are always allowed since we can place them!
 
-Function CheckLocationForTasks()
+Function CheckLocationForTasks()				;#AllowTask
 
 	NymTrace("CheckLocationForTasks()")
 	Bool returnvalue = false 
@@ -1935,9 +2723,65 @@ Function CheckLocationForTasks()
 	;--- Iron Ore ---;
 	ObjectReference[] IronVeinArray  = PO3_SKSEFunctions.FindAllReferencesOfType(cfgqst.PlayerRef, IronOreVeinList, 50000)
 	if IronVeinArray.Length > 0
-	AllowTask_MineIron = true 
+	AllowTask_MineIron = true
 	endif	
 	
+	;CITYBASED 			;CUM 		;CS2Particles15SOS - 2A01F7DE
+	;--- Farm ---;
+	
+	if CurrentSlaveryLocationName == "Dawnstar"
+	AllowTask_MineIron = true 
+	AllowTask_MineQuicksilver = true
+	AllowTask_Flowers = false
+	AllowTask_Mushrooms = false
+	AllowTask_WorkField = false
+	
+	elseif CurrentSlaveryLocationName == "Winterhold"
+	AllowTask_Flowers = false
+	AllowTask_Mushrooms = false
+	AllowTask_WorkField = false
+	AllowTask_Smelter = false 
+	AllowTask_Forge = false 
+	endif 
+	
+	;/
+	if TempName == "Riften"
+	CurrentSlaveryLocationName = "Riften"
+	CurrentLocalSlaveryLoc = playscr.LocationRiften
+	storqst.SlaveryLocations.AddForm(playscr.LocationRiften)
+	elseif TempName == "Whiterun"
+	CurrentSlaveryLocationName = "Whiterun"
+	CurrentLocalSlaveryLoc = playscr.LocationWhiterun
+	storqst.SlaveryLocations.AddForm(playscr.LocationWhiterun)
+	elseif TempName == "Markarth"
+	CurrentSlaveryLocationName = "Markarth"
+	CurrentLocalSlaveryLoc = playscr.LocationMarkarth
+	storqst.SlaveryLocations.AddForm(playscr.LocationMarkarth)
+	elseif TempName == "Morthal"
+	CurrentSlaveryLocationName = "Morthal"
+	CurrentLocalSlaveryLoc = playscr.LocationMorthal
+	storqst.SlaveryLocations.AddForm(playscr.LocationMorthal)	
+	elseif TempName == "Falkreath"
+	CurrentSlaveryLocationName = "Falkreath"
+	CurrentLocalSlaveryLoc = playscr.LocationFalkreath
+	storqst.SlaveryLocations.AddForm(playscr.LocationFalkreath)
+	elseif TempName == "Dawnstar"
+	CurrentSlaveryLocationName = "Dawnstar"
+	CurrentLocalSlaveryLoc = playscr.LocationDawnstar
+	storqst.SlaveryLocations.AddForm(playscr.LocationDawnstar)	
+	elseif TempName == "Windhelm"
+	CurrentSlaveryLocationName = "Windhelm"
+	CurrentLocalSlaveryLoc = playscr.LocationWindhelm
+	storqst.SlaveryLocations.AddForm(playscr.LocationWindhelm)	
+	elseif TempName == "Winterhold"
+	CurrentSlaveryLocationName = "Winterhold"
+	CurrentLocalSlaveryLoc = playscr.LocationWinterhold
+	storqst.SlaveryLocations.AddForm(playscr.LocationWinterhold)
+	elseif TempName == "Solitude"
+	CurrentSlaveryLocationName = "Solitude"
+	CurrentLocalSlaveryLoc = playscr.LocationSolitude
+	storqst.SlaveryLocations.AddForm(playscr.LocationSolitude)
+	/;
 
 EndFunction 
 
@@ -2152,6 +2996,7 @@ int DroppedItemsDeleted = 0
 		
 EndFunction 
 
+
 Function DropRandomGarbage(actor akActor)		;#Drop1 #Garbage
 			
 		if D100(5)	
@@ -2333,6 +3178,51 @@ Bool DoneSweeping = false
 Bool CleanRunning = false
 bool FixStuffOnce = true
 
+
+
+
+Bool Function MiningMarker(string sMode)			;#Broom #sweep2
+	NymTrace("MiningDoneMarker(1.0)")
+;	Nymtrace("storqst.SlaveAtWork: "+storqst.SlaveAtWork)
+;	Nymtrace("CleanRunning: "+CleanRunning)
+;	Nymtrace("SlaveFetchTaskItemCount: "+SlaveFetchTaskItemCount)
+;	Nymtrace("CompletedAreaTasks: "+CompletedAreaTasks)
+;	Nymtrace("FixStuffOnce: "+FixStuffOnce)
+
+	if sMode == "Place"
+	storqst.AreaScanXMarkers[CompletedAreaTasks] = cfgqst.PlayerRef.PlaceAtMe(storqst.XMarkerHeading_Area)					
+	storqst.AreaScanXMarkers[CompletedAreaTasks].SetAngle(15.0, 15.0, 15.0)
+	AreaScanXMarkersPlaced += 1
+	return true 
+	elseif sMode == "Check"
+		
+		if storqst.IsAreaMarkerNearby("Mining")
+		BadMessage("You were orded to mine elsewhere")
+		playscr.CalculateSlaveGold("Increase", 0)
+		return true 
+		else 
+		return false 
+		endif 
+		
+	elseif sMode == "Remove"
+	int DeleteMarker = 31
+		
+				while DeleteMarker > 0 
+					DeleteMarker -= 1
+					if storqst.AreaScanXMarkers[DeleteMarker]
+					storqst.AreaScanXMarkers[DeleteMarker].DisableNoWait()
+					storqst.AreaScanXMarkers[DeleteMarker].Delete()
+					storqst.AreaScanXMarkers[DeleteMarker] = None 
+					endif 
+				endwhile
+	AreaScanXMarkersPlaced = 0
+	return true 		
+	endif 	
+	
+EndFunction
+
+int AreaScanXMarkersPlaced
+
 Function BroomCleanMarker()			;#Broom #sweep2
 	NymTrace("BroomCleanMarker(6.4)")
 	Nymtrace("storqst.SlaveAtWork: "+storqst.SlaveAtWork)
@@ -2340,6 +3230,22 @@ Function BroomCleanMarker()			;#Broom #sweep2
 	Nymtrace("SlaveFetchTaskItemCount: "+SlaveFetchTaskItemCount)
 	Nymtrace("CompletedAreaTasks: "+CompletedAreaTasks)
 ;	Nymtrace("FixStuffOnce: "+FixStuffOnce)
+
+	
+	Bool SweepStreet = false
+	Bool WorkField = false
+	Bool PlaceMarker = false
+	String sWorkType 
+
+	if (FetchTaskType == "Sweeping the Streets")
+	SweepStreet = true
+	PlaceMarker = true
+	sWorkType = "Cleaning"
+	elseif (FetchTaskType == "Work Field")
+	WorkField = true
+	PlaceMarker = true
+	sWorkType = "Farming"
+	endif 
 
 	if !storqst.SlaveAtWork && CleanRunning
 	CleanRunning = false 
@@ -2350,11 +3256,22 @@ Function BroomCleanMarker()			;#Broom #sweep2
 	CleanRunning = false 
 	endif 
 	
-	if storqst.IsAreaMarkerNearby()
-	BadMessage("This Spot is already clean")
+	if PlaceMarker && storqst.IsAreaMarkerNearby(sWorkType)
+	
+		if SweepStreet
+		BadMessage("This spot is already clean")
+		cfgqst.PublicExposure += Utility.RandomInt(1,5)
+		elseif WorkField
+		BadMessage("You worked this spot already")
+		cfgqst.PublicExposure += Utility.RandomInt(1,5)
+		endif 
+	
+	cfgqst.PublicExposure += 5
+	
 	else
-
-		if (FetchTaskType == "Sweeping the Streets") && !CleanRunning && ((CompletedAreaTasks < SlaveFetchTaskItemCount) || (CompletedAreaTasks == SlaveFetchTaskItemCount))
+	
+		if PlaceMarker && !CleanRunning && ((CompletedAreaTasks < SlaveFetchTaskItemCount) || (CompletedAreaTasks == SlaveFetchTaskItemCount))
+		;if (FetchTaskType == "Sweeping the Streets") && !CleanRunning && ((CompletedAreaTasks < SlaveFetchTaskItemCount) || (CompletedAreaTasks == SlaveFetchTaskItemCount))
 		CleanRunning = true
 		
 			NymTrace("BroomCleanMarker(CleanRunning = true)")
@@ -2369,6 +3286,7 @@ Function BroomCleanMarker()			;#Broom #sweep2
 			i -= 1
 			Utility.Wait(1)
 			endwhile 
+			NymMessage("Timer hit Zero")
 			
 			if cfgqst.IsDefeatRunning()
 			storqst.SlaveAtWork = false 
@@ -2379,7 +3297,10 @@ Function BroomCleanMarker()			;#Broom #sweep2
 				cfgqst.IncreaseDirtiness(0.01)
 			
 			elseif storqst.SlaveAtWork
-			NymTrace("BroomCleanMarker(storqst.SlaveAtWork)")
+			;timer is down to 0
+			;pressing Slave Action will make "SlaveAtWork" = False so we should not land here
+			
+			NymTrace("BroomCleanMarker PLACED (storqst.SlaveAtWork)")
 				storqst.AreaScanXMarkers[CompletedAreaTasks] = cfgqst.PlayerRef.PlaceAtMe(storqst.XMarkerHeading_Area)					
 				storqst.AreaScanXMarkers[CompletedAreaTasks].SetAngle(25.0, 25.0, 25.0)
 
@@ -2392,8 +3313,26 @@ Function BroomCleanMarker()			;#Broom #sweep2
 				CompletedAreaTasks += 1
 					
 					if (CompletedAreaTasks < SlaveFetchTaskItemCount)
-					GoodMessage("This Spot is cleaned")
 					
+						if SweepStreet
+
+							if Nym()
+							GoodMessage("This spot is cleaned ["+CompletedAreaTasks+"/"+SlaveFetchTaskItemCount+"]")
+							else 
+							GoodMessage("This spot is cleaned")
+							endif 
+						
+						elseif WorkField
+
+							if Nym()
+							GoodMessage("This spot is done ["+CompletedAreaTasks+"/"+SlaveFetchTaskItemCount+"]")
+							else 
+							GoodMessage("This spot is done")
+							endif 
+						endif 
+					
+					
+					AreaScanXMarkersPlaced += 1 
 						if D100(33) 
 						storqst.ExhaustionChange(1) ;---> Nym()
 						endif 
@@ -2404,27 +3343,54 @@ Function BroomCleanMarker()			;#Broom #sweep2
 					
 					storqst.PlayerSoundToPlay = "Breathing"
 					SendModEvent("Moan")
-					GoodMessage("You are done sweeping the Streets")
+					
+										
+						if SweepStreet
+						GoodMessage("You are done sweeping the streets")
+						elseif WorkField
+						GoodMessage("You are done working the field")
+						endif 
+					
 					cfgqst.IncreaseDirtiness(0.05)
 					
 					cfgqst.PlayerRef.PlayIdle(cfgqst.IdlesBathingStanding[0]) ;wipe head
 					
 						int DeleteMarker = 31
-				
+						int MarkersDeleted = 0
+						
 						while DeleteMarker > 0 
 							DeleteMarker -= 1
 							if storqst.AreaScanXMarkers[DeleteMarker]
+							MarkersDeleted += 1
 							storqst.AreaScanXMarkers[DeleteMarker].DisableNoWait()
 							storqst.AreaScanXMarkers[DeleteMarker].Delete()
 							storqst.AreaScanXMarkers[DeleteMarker] = None 
 							endif 
-						endwhile
+
+						endwhile	
+						NymBox("MarkersDeleted A: "+MarkersDeleted+" MarkersPlaced: "+AreaScanXMarkersPlaced)
+						AreaScanXMarkersPlaced = 0 
+						
+					else
+					NymBox("No Spot Message WHY?")
+						
 					endif 
 				endif 
 				
+			elseif i > 0 
+			
+				if SweepStreet
+				BadMessage("You stop sweeping the spot.")
+				elseif WorkField
+				BadMessage("You stop working the field.")
+				endif 
 			else 
-			BadMessage("You are not finished cleaning yet!")				
+			
+			NymBox("We Are Here - slavequest #2923")
+		
+		
 			endif 	
+			
 			NymTrace("BroomCleanMarker(CleanRunning = false)")
 			CleanRunning = false
 			
@@ -2464,7 +3430,7 @@ Function BroomCleanMarker()			;#Broom #sweep2
 				SendModEvent("Moan")
 				
 				GoodMessage("This Spot is cleaned")
-				
+				AreaScanXMarkersPlaced += 1 
 				cfgqst.IncreaseDirtiness(0.05)
 				CompletedAreaTasks += 1
 				
@@ -2474,25 +3440,28 @@ Function BroomCleanMarker()			;#Broom #sweep2
 				storqst.PlayerSoundToPlay = "Breathing"
 				SendModEvent("Moan")
 				
-				if FetchTaskType == "Sweeping the Castle"
-				GoodMessage("You are done sweeping the Castle")
-				elseif FetchTaskType == "Sweeping the Inn"
-				GoodMessage("You are done sweeping the Inn")
-				endif 
+				
+					if FetchTaskType == "Sweeping the Castle"
+					GoodMessage("You are done sweeping the Castle")
+					elseif FetchTaskType == "Sweeping the Inn"
+					GoodMessage("You are done sweeping the Inn")
+					endif 
 				
 				cfgqst.IncreaseDirtiness(0.05)
 				
 					int DeleteMarker = 31
-			
+					int MarkersDeleted = 0
 					while DeleteMarker > 0 
 						DeleteMarker -= 1
+						MarkersDeleted += 1
 						if storqst.AreaScanXMarkers[DeleteMarker]
 						storqst.AreaScanXMarkers[DeleteMarker].DisableNoWait()
 						storqst.AreaScanXMarkers[DeleteMarker].Delete()
 						storqst.AreaScanXMarkers[DeleteMarker] = None 
 						endif 
 					endwhile
-		
+					NymBox("MarkersDeleted B: "+MarkersDeleted+" MarkersPlaced: "+AreaScanXMarkersPlaced)
+					AreaScanXMarkersPlaced = 0 
 				endif 
 			else 
 			BadMessage("You are not finished cleaning yet!")				
@@ -2530,14 +3499,14 @@ Function PlaceRequiredStation()
 			PlacedSmelter.Moveto(cfgqst.PlayerRef, 150.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 150.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
 			PlacedSmelter.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+90.0)
 		
-		elseif RequiredStation == "TanningRack"
+		elseif RequiredStation == "Tanning Rack"
 		
 			if !PlacedTanningRack
 			NymTrace("PlaceRequiredStation(CREATE NEW TanningRack)")
 			PlacedTanningRack = cfgqst.PlayerRef.PlaceAtMe(storqst.Station_TanningRack) ;as OBJECTREFERENCE
 			endif 
 			PlacedTanningRack.Moveto(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
-			PlacedTanningRack.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+90.0)		
+			PlacedTanningRack.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+0.0)		
 		
 		elseif RequiredStation == "Grindstone"
 		
@@ -2552,10 +3521,81 @@ Function PlaceRequiredStation()
 		
 			if !PlacedChoppingBlock
 			NymTrace("PlaceRequiredStation(CREATE NEW Chopping Block)")
-			PlacedChoppingBlock = cfgqst.PlayerRef.PlaceAtMe(storqst.Station_ChoppingBlock) ;as OBJECTREFERENCE
+			Furniture TempBlock
+			TempBlock = Game.GetFormFromFile(0x0007022E , "Skyrim.esm") as Furniture 		
+			PlacedChoppingBlock = cfgqst.PlayerRef.PlaceAtMe(TempBlock) ;as OBJECTREFERENCE
 			endif 
+			
+			if !PlacedChoppingBlock
+			NymBox("ERROR - NO CHHOPPING BLOCK")
+			else 
 			PlacedChoppingBlock.Moveto(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
 			PlacedChoppingBlock.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+0.0)	
+			endif
+		
+		;MILL BUGGED NEMESIS :(((((
+	
+		elseif RequiredStation == "Mill"
+
+			NymTrace("PlaceRequiredStation(CREATE NEW Chopping Block)")
+							;/
+			TempMill = Game.GetFormFromFile(0x02056973 , "ZazAnimationPack.esm") as Furniture 	;SLaveMill	
+			
+			PlacedMill = cfgqst.PlayerRef.PlaceAtMe(TempMill) ;as OBJECTREFERENCE
+			PlacedMill.Moveto(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
+			PlacedMill.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+90.0)	
+			
+			Utility.Wait(20.0)
+			PlacedMill.DisableNoWait()
+			PlacedMill.Delete()
+			PlacedMill = none
+			
+			TempMill = Game.GetFormFromFile(0x02056977 , "ZazAnimationPack.esm") as Furniture 	;SLaveMill	with Stone
+			PlacedMill = cfgqst.PlayerRef.PlaceAtMe(TempMill) ;as OBJECTREFERENCE
+			PlacedMill.Moveto(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
+			PlacedMill.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+90.0)	
+
+			Utility.Wait(20.0)
+			PlacedMill.DisableNoWait()
+			PlacedMill.Delete()
+			PlacedMill = none
+			
+			TempMill = Game.GetFormFromFile(0x02056979 , "ZazAnimationPack.esm") as Furniture 	;SLaveMill	with Gibbet
+			PlacedMill = cfgqst.PlayerRef.PlaceAtMe(TempMill) ;as OBJECTREFERENCE
+			PlacedMill.Moveto(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
+			PlacedMill.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+90.0)			
+			
+			Utility.Wait(30.0)
+			PlacedMill.DisableNoWait()
+			PlacedMill.Delete()
+			PlacedMill = none
+			/;
+			
+			
+			;IDEAS: 
+			;for other Slave Locations we can require the MillStone to be placed outside? or maybe its just not important...
+			
+		;	if playscr.GetCurrentLocationName() == "Farm"
+			
+				if !PlacedMill
+				Furniture TempMill ;WORKS!
+				NymTrace("PlaceRequiredStation(CREATE NEW Mill)")
+				TempMill = Game.GetFormFromFile(0x0009C6DF , "Skyrim.esm") as Furniture 	;Skyrim MillWR FURN9
+				PlacedMill = cfgqst.PlayerRef.PlaceAtMe(TempMill) ;as OBJECTREFERENCE
+				endif 
+
+				PlacedMill.Moveto(cfgqst.PlayerRef, 200.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 200.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
+				PlacedMill.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+90.0)	
+			
+		;	else 
+		;	Debug.Messagebox("You cannot place the Millstone here. Go to a farm to place it!")
+			
+		;	endif
+
+		elseif RequiredStation == "Field"
+		
+		Debug.Messagebox("Cannot place a Field, find one on a Farm. The farms outside the cities are registered as Slavery Locations :)")
+		
 		
 		elseif RequiredStation == "Anvil"
 		
@@ -2563,6 +3603,7 @@ Function PlaceRequiredStation()
 			NymTrace("PlaceRequiredStation(CREATE NEW Anvil)")
 			PlacedAnvil = cfgqst.PlayerRef.PlaceAtMe(storqst.Station_Anvil) ;as OBJECTREFERENCE
 			endif 
+			
 			PlacedAnvil.Moveto(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), 0.0, abMatchRotation = True)
 			PlacedAnvil.SetAngle(0.0,0.0,cfgqst.PlayerRef.GetAngleZ()+90.0)	
 		endif 
@@ -2575,12 +3616,23 @@ EndFunction
 String LastFetchTaskType
 String LastSexTaskType
 
-Function GiveSlaveTasks(String TaskType)	;#Give
+;NEW TASK, work Field HOE 
 
+
+
+
+Function GiveSlaveTasks(String TaskType)	;#GiveSlaveTasks
+		
+	;GUIDE: Slave receives their Slave Tasks here universaly.
+	;Step 2 is doing the deed (Mostly Action Key in the right area or workstation)
+	;Step 3 - go to a Master (usually Guards in Cities, dedicated Masters in other Situations).
+	;---> UpdateSlaveReportingTasks()
 
 	Bool TaskFound = false
 	Bool DDHeavyBondage = false
 	int i
+	
+	GoodSlave = true
 
 	NymTrace("GiveSlaveTasks")
 
@@ -2599,7 +3651,7 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 	;do nothing, Slavery ends
 	DebugTrace("Slavery End conditions met while requesting from Master")
 	
-	elseif Gold > 0	
+	elseif Gold > 100		;NEW, Slaves are allowed SOME money
 	BadMessage("They take "+Gold+" gold from you.")
 	cfgqst.PlayerRef.RemoveItem(cfgqst.Gold001, Gold, false, none)
 	playscr.CalculateSlaveGold("Take Gold", Gold)
@@ -2613,14 +3665,14 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 
 		if SlaveFetchTaskItemCount == 0
 			
-			i = Utility.RandomInt(1,35)	
+			i = Utility.RandomInt(1,41)	
 
 			;Task based on previous Task
-			if LastFetchTaskType == "Mine Iron Ore"
-			i = 16
-			elseif LastFetchTaskType == "Collecting Garbage"
-			i = 6
-			endif 
+		;	if (LastFetchTaskType == "Mine Iron Ore") || (LastFetchTaskType == "Mine Quicksilver Ore")
+		;	i = 16
+		;	elseif LastFetchTaskType == "Collecting Garbage"
+		;	i = 6
+		;	endif 
 			
 			;Task based on Bondage 
 			if DDHeavyBondage
@@ -2638,7 +3690,8 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 			endif 
 			
 			if nym()
-			;i = 34
+		;	NymBox("TEST TASK: MILL FLOUR")
+			;i = 41 ;FIELD 
 			endif 
 			
 			;for cold cities make firewood more often?
@@ -2650,10 +3703,9 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 			cfgqst.PlayerRef.AddItem(SlaveTask_FetchItemCounter, SlaveFetchTaskItemCount, true)
 			ActiveSlaveTasks += 1
 			GlovesJob = true
-			
 			RequiredStation = "Chopping Block"
 			
-			elseif i == 4
+			elseif i == 4 && (CurrentSlaveryLocationName != "Dawnstar" && CurrentSlaveryLocationName != "Windhelm")
 			FetchTaskType = "Flowers"
 			SlaveFetchTaskItemCount = Utility.RandomInt(11,24)
 			cfgqst.PlayerRef.AddItem(SlaveTask_FetchFlowers, 1, true)
@@ -2750,7 +3802,25 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 			cfgqst.PlayerRef.AddItem(SlaveTask_FetchQuicksilverOre, 1, true)
 			cfgqst.PlayerRef.AddItem(SlaveTask_FetchItemCounter, SlaveFetchTaskItemCount, true)
 			ActiveSlaveTasks += 1	
-			GlovesJob = true			
+			GlovesJob = true		
+
+			elseif (i == 36 || i == 37 || i == 38) && (CurrentSlaveryLocationName != "Dawnstar" &&	 CurrentSlaveryLocationName != "Windhelm")
+			FetchTaskType = "Work Field"	
+			SlaveFetchTaskItemCount = Utility.RandomInt(11,25)
+			cfgqst.PlayerRef.AddItem(SlaveTask_FetchField, 1, true)
+			cfgqst.PlayerRef.AddItem(SlaveTask_FetchItemCounter, SlaveFetchTaskItemCount, true)
+			ActiveSlaveTasks += 1	
+			RequiredStation = "Field"			
+			
+		;	Wheat 000BB953
+		
+			elseif (i == 39 || i == 40 || i == 41)		
+			FetchTaskType = "Flour"	
+			SlaveFetchTaskItemCount = Utility.RandomInt(11,25)
+			cfgqst.PlayerRef.AddItem(SlaveTask_FetchFlour, 1, true)
+			cfgqst.PlayerRef.AddItem(SlaveTask_FetchItemCounter, SlaveFetchTaskItemCount, true)
+			ActiveSlaveTasks += 1	
+			RequiredStation = "Mill"					
 			
 			elseif i == 404		
 			FetchTaskType = "Completed"
@@ -2774,8 +3844,7 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 			;1st Roll ---> Whoring Tasks  66% chance (2/3rds) 
 			if D100(66)
 			;Creatue Sex Tasks
-			
-			
+
 				if cfgqst.AllowCreatures && (D100(33) || (LastSexTaskType == "Serve the People"))
 				
 				i = Utility.RandomInt(1,2)	
@@ -2800,7 +3869,6 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 					cfgqst.PlayerRef.AddItem(SlaveTask_ServiceCounter, j, true)
 					TaskFound = true
 					endif 
-				
 				;Human Sex Task 
 				else 	
 				
@@ -2816,6 +3884,16 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 	
 				endif 
 			endif 
+			
+			;/ WIP
+			if Nym() && !TaskFound && D100(20)
+			cfgqst.PlayerRef.AddItem(SlaveTask_DanceJarl, 1, true)
+			SexTaskType = "Dance for the Jarl"
+			SlaveSexTaskPartners = 100 
+			
+			endif 
+			/;
+			
 			
 			;2nd Roll ---> Orgies
 			if !TaskFound
@@ -2846,7 +3924,7 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 		
 		if SlaveRule == 0
 				
-				i = Utility.RandomInt(1,6) 
+				i = Utility.RandomInt(1,7) 
 				
 				if i == 1 		;Bow
 				cfgqst.PlayerRef.AddItem(SlaveTask_RuleBowing, 1, true)
@@ -2876,8 +3954,13 @@ Function GiveSlaveTasks(String TaskType)	;#Give
 					else 
 					NymTrace("Equip Gag")
 					nade_DDint.EquipDDtoActor(cfgqst.PlayerRef, "Random Gag")
-				
 					endif 
+				
+				elseif i == 6
+				cfgqst.PlayerRef.AddItem(SlaveTask_RuleWalking, 1, true)
+				RuleTaskType = "Walking"
+				SlaveRule = 3 				
+				SlaveTask_RuleWalking
 				
 				else 
 				;no Rule today
@@ -3001,37 +4084,57 @@ EndFunction
 Function CompleteSlaveRule()
 		NymTrace("CompleteSlaveRule("+SlaveRule+")")
 		Bool RuleCompleted = false
-
-				if SlaveRule == 2 		;Bow
-				cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleBowing, 1)
-				RuleTaskType = "Completed"
-				RuleCompleted = true 
-				elseif SlaveRule == 1	;Crawl
-				cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleCrawling, 1)
-				RuleTaskType = "Completed"
-				RuleCompleted = true 
-				elseif SlaveRule == 10	;Stay Clean 
-				cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleClean, 1)
-				RuleTaskType = "Completed"
-				RuleCompleted = true 
-				elseif SlaveRule == 20	;Wear Boots
-				cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleBoots, 1)
-				RuleTaskType = "Completed"
-				RuleCompleted = true 
-				
-				elseif SlaveRule == 40	;Wear Gag
-				cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleGag, 1)
-				RuleTaskType = "Completed"
-				RuleCompleted = true 
-				
-				endif 
+		int RulesCompletedCount = 0
+		
 	
-				if RuleCompleted
-				playscr.CalculateSlaveGold("Reduce", 1)
-				endif  
+				if Nym()
+				Form[] RulesList = new Form[5]
+				RulesList[0] = SlaveTask_RuleBowing
+				RulesList[1] = SlaveTask_RuleCrawling
+				RulesList[2] = SlaveTask_RuleClean
+				RulesList[3] = SlaveTask_RuleBoots
+				RulesList[4] = SlaveTask_RuleGag
+				;RulesList[5] = SlaveTask_RuleCrawling
+				RulesCompletedCount = SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, RulesList, none) 			
+	
+					if RulesCompletedCount > 0
+					SlaveRule = 0
+					playscr.CalculateSlaveGold("Reduce", RulesCompletedCount)
+					
+					NymBox("Slave Rules Completed: "+RulesCompletedCount)
+					endif 
+				else 
 
-				SlaveRule = 0
+					if SlaveRule == 2 		;Bow
+					cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleBowing, 1)
+					RuleTaskType = "Completed"
+					RuleCompleted = true 
+					elseif SlaveRule == 1	;Crawl
+					cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleCrawling, 1)
+					RuleTaskType = "Completed"
+					RuleCompleted = true 
+					elseif SlaveRule == 10	;Stay Clean 
+					cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleClean, 1)
+					RuleTaskType = "Completed"
+					RuleCompleted = true 
+					elseif SlaveRule == 20	;Wear Boots
+					cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleBoots, 1)
+					RuleTaskType = "Completed"
+					RuleCompleted = true 
+					
+					elseif SlaveRule == 40	;Wear Gag
+					cfgqst.PlayerRef.RemoveItem(SlaveTask_RuleGag, 1)
+					RuleTaskType = "Completed"
+					RuleCompleted = true 
+					
+					endif 
+		
+					if RuleCompleted
+					playscr.CalculateSlaveGold("Reduce", 1)
+					endif  
 
+					SlaveRule = 0
+				endif 
 
 EndFunction 
 
@@ -3144,7 +4247,23 @@ EndFunction
 ;RemoveableTorch01 (00091f1F (ACTI)
 ;Campfire01Burning (00035F49 (MSST) Moveable Static 
 ;FXFireWithEmberyHeavy 00033DA4 Moveable Stratic MSST
+;FirePlaceWood01Burning	00035F4A
+;Campfire01LandBurning_Heavy_SN 	000A9230
+;Campfire01LandBurning  00035F47
+;FXfireWithEmbersOut 0003BD2E
+;FXFireWithEmbersLight 	00033DA9
 
+
+
+;DwePipeBroken01 (steam) 0005FBC7 (Static)
+
+;RESTING 
+;Haymound01 Static 00031038
+;HayScatter05 00019B19
+
+	;NEW MINIMAL COMFORT:
+	;WRRugSmall03 000B9674
+	;WRRugHallofDead01Mid
 
 ;FLORA
 ;WhiteCap FLORA 0004DA06	 --> empty, try regen

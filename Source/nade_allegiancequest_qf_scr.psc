@@ -243,7 +243,7 @@ Debug.Trace("NAKED DEFEAT #allegiancequest: stage 10 (START)")
 	elseif cfgqst.AllegianceScanType == "DuplicateEnemyScan_Forced" 
 	cfgqst.AllegianceScanType = "empty"
 	IgnoreCombat = true 
-	AreaScanDuplicateEnemies()
+	AreaScanDuplicateEnemies()		;#AreaScanDuplicateEnemies()1
 
 	elseif cfgqst.AllegianceScanType == "MarkDuplicantsScan"	;WIP - we want to duplicate enemies the more the merrier 
 	cfgqst.AllegianceScanType = "empty"
@@ -516,14 +516,14 @@ Function AreaScanWhipper()
 	
 	int j = 0
 	
-	Bool WhipperFound = false
+	storqst.WhipperFound = false
 	int sTempGender = 0
 	Float sTempDistance = 0.0
 	
 	String sTempName
 	String sTempRaceKey
 		
-	while (j < i) && !WhipperFound	
+	while (j < i) && !storqst.WhipperFound	
 	;i -= 1
 	a = NPC[j].GetReference() as Actor		
 	j += 1
@@ -536,7 +536,7 @@ Function AreaScanWhipper()
 		
 			if a.IsInFaction(slaveqst.WhippingFaction)
 			a.RemoveFromFaction(slaveqst.WhippingFaction)
-			NymMessage("Actor "+sTempName+" WAS IN WHIPPINGFACTION")
+			NymTrace("#WHIPPING Actor "+sTempName+" WAS IN WHIPPINGFACTION")
 			endif 
 			
 			Debug.Trace("NAKED DEFEAT: #AreaScanWhipper ACTOR["+j+"]["+sTempName+"] [Distance = "+sTempDistance+"]")
@@ -549,7 +549,9 @@ Function AreaScanWhipper()
 			;this is the main check for the whipper.
 			
 			a.AddToFaction(slaveqst.WhippingFaction)
-			WhipperFound = true
+			storqst.ProtectActor(a, true)
+			
+			storqst.WhipperFound = true
 			;this ends the loop, we only need ONE whipper 
 			
 			a.MoveTo(cfgqst.PlayerRef, -100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), -100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 115.0, abMatchRotation = false)
@@ -562,6 +564,12 @@ Function AreaScanWhipper()
 		endif	
 		
 	endwhile	
+	
+	if storqst.WhipperFound 
+;	NymMessage("WHIPPER FOUND")
+	else 
+;	NymMessage("NO WHIPPER FOUND!!!!")
+	endif 
 
 	NymTrace("i:"+i+" j:"+j)
 
@@ -625,17 +633,318 @@ EndFunction
 
 ;------------------------------------------------------------------------------------------------------------------------------------------------------
 
-
+int Rotation
 Bool DuplicationRunning = false
 
-
+Armor LootLeatherArmor
 
 Keyword DemonicCreature
 
+
 Function AreaScanDuplicateEnemies()
+    actor a
+    Race SkeletonRace
+    bool Enable
+    DuplicationRunning = true
+    NymTrace("AreaScanDuplicateEnemies(Start)")
+    int i = NPC.Length
+    int j = NPC.Length
+    int EnemyCount = 0
+    int SpawnCount = 0
+    bool Spawned = false
+    bool DemonicCreatureFound = false
+    int NakedGhostsDeleted = 0
+    int DemonicCreaturesDeleted = 0
+    bool WeAreInDungeon = false
+    bool Abort = false
+    string sTempName = "NoName"
+    int iTempLevel = 0
+    int ActorsToSpawn = 0
+    bool IsDuplicant = false
+    bool DoSpawn = false
+    float sTempDistance = 0.0
+    string SpawnGroup = "No Spawn"
+    bool AddLootArmorLight = false
+    RaceKey = "None"
+    if cfgqst.Nym()
+        if cfgqst.TempDefeatShortProb == 100.0
+            Enable = false
+            NymTrace("AreaScanDuplicateEnemies() QUEST MODE ABORT")
+        else
+            Enable = true
+        endif
+    endif
+    if Enable && Nym()
+        if storqst.IsLocationClearable() && cfgqst.IsPlayerInDungeon() && storqst.IsPlayerIndoors()
+            NymTrace("AreaScanDuplicateEnemies(in Interior & Clearable -> Start)")
+            DoSpawn = true
+            WeAreInDungeon = true
+        elseif storqst.CurrentLocationName == "Wilderness"
+            NymTrace("AreaScanDuplicateEnemies(in Wilderness -> Abort and Restart Rotation)")
+            Rotation = 0
+        else
+            NymTrace("AreaScanDuplicateEnemies(in Exterior -> Abort)")
+        endif
+        if DoSpawn
+            if defqst.DuplosACount > 0
+                if defqst.DuplosALocation == storqst.CurrentLocationName && defqst.Room == defqst.DuplosARoom
+                    NymTrace("AreaScanDuplicateEnemies(DuplosA already spawned -> Abort)")
+                    DoSpawn = false
+                else
+                    DoSpawn = true
+                endif
+            elseif defqst.DuplosBCount > 0
+                if defqst.DuplosBLocation == storqst.CurrentLocationName && defqst.Room == defqst.DuplosBRoom
+                    NymTrace("AreaScanDuplicateEnemies(DuplosB already spawned -> Abort)")
+                    DoSpawn = false
+                else
+                    DoSpawn = true
+                endif
+            elseif defqst.DuplosCCount > 0
+                if defqst.DuplosCLocation == storqst.CurrentLocationName && defqst.Room == defqst.DuplosCRoom
+                    NymTrace("AreaScanDuplicateEnemies(DuplosC already spawned -> Abort)")
+                    DoSpawn = false
+                else
+                    DoSpawn = true
+                endif
+            endif
+        endif
+        if DoSpawn
+            if defqst.DuplosACount == 0
+                defqst.Duplo_CreateActors("DuplosA")
+                SpawnGroup = "DuplosA"
+                defqst.DuplosALocation = storqst.CurrentLocationName
+                defqst.DuplosARoom = defqst.Room
+            elseif defqst.DuplosBCount == 0
+                defqst.Duplo_CreateActors("DuplosB")
+                SpawnGroup = "DuplosB"
+                defqst.DuplosBLocation = storqst.CurrentLocationName
+                defqst.DuplosBRoom = defqst.Room
+            elseif defqst.DuplosCCount == 0
+                defqst.Duplo_CreateActors("DuplosC")
+                SpawnGroup = "DuplosC"
+                defqst.DuplosCLocation = storqst.CurrentLocationName
+                defqst.DuplosCRoom = defqst.Room
+            else
+                Rotation = 1
+            endif
+            if Rotation > 0
+                if Rotation == 1 && defqst.DuplosACount > 0
+                    defqst.Duplo_CleanUpActors("DuplosA")
+                    defqst.Duplo_CreateActors("DuplosA")
+                    SpawnGroup = "DuplosA"
+                    Rotation = 2
+                elseif Rotation == 2 && defqst.DuplosBCount > 0
+                    defqst.Duplo_CleanUpActors("DuplosB")
+                    defqst.Duplo_CreateActors("DuplosB")
+                    SpawnGroup = "DuplosB"
+                    Rotation = 3
+                elseif Rotation == 3 && defqst.DuplosCCount > 0
+                    defqst.Duplo_CleanUpActors("DuplosC")
+                    defqst.Duplo_CreateActors("DuplosC")
+                    SpawnGroup = "DuplosC"
+                    Rotation = 1
+                endif
+            endif
+        endif
+        NymTrace("AreaScanDuplicateEnemies() NPC.Length: " + i)
+        if cfgqst.ModDEM
+            if !DemonicCreature
+                DemonicCreature = (game.GetFormFromFile(8517504, "DemonicCreatures.esp") as keyword)
+            elseif DemonicCreature
+            endif
+        endif
+        if DoSpawn
+            while j > 0
+                j = j - 1
+                a = (NPC[j].GetReference() as actor)
+                if a
+                    sTempName = cfgqst.GetActorName(a)
+                    if a.IsInFaction(cfgqst.NakedGhostFaction)
+                        a.DisableNoWait(false)
+                        a.Delete()
+                        NakedGhostsDeleted = NakedGhostsDeleted + 1
+                    elseif cfgqst.ModDEM && (a.HasKeyword(DemonicCreature) || storqst.IsDemonicCreature(a, sTempName))
+                        if a.IsHostileToActor(cfgqst.PlayerRef)
+                            NymTrace("AreaScanDuplicateEnemies " + sTempName + " -> Demonic Creature (Hostile")
+                            EnemyCount = EnemyCount + 1
+                        else
+                            a.SetAV("Aggression", 1.0)
+                            a.SetAV("Aggression", 2.0)
+                        endif
+                    elseif a.IsHostileToActor(cfgqst.PlayerRef)
+                        NymTrace("AreaScanDuplicateEnemies " + sTempName + " -> Hostile Actor")
+                        EnemyCount = EnemyCount + 1
+                    endif
+                endif
+            endwhile
+            if NakedGhostsDeleted > 0 || DemonicCreaturesDeleted > 0
+                NymTrace("DemonicCreaturesDetected: " + DemonicCreaturesDeleted + ", NakedGhostsDeleted: " + NakedGhostsDeleted)
+                NymBox("DemonicCreaturesDetected: " + DemonicCreaturesDeleted + ", NakedGhostsDeleted: " + NakedGhostsDeleted)
+            endif
+            NymTrace("AreaScanDuplicateEnemies() EnemyCount: " + EnemyCount)
+            while i > 0
+                i = i - 1
+                a = (NPC[i].GetReference() as actor)
+                DemonicCreatureFound = false
+                ActorsToSpawn = 0
+                if a && !a.IsDead()
+                    sTempName = cfgqst.GetActorName(a)
+                    sTempDistance = cfgqst.PlayerRef.GetDistance(a)
+                    NymTrace("AreaScanDuplicateEnemies() NAME: " + sTempName)
+                    if sTempName == "Mudcrab" || sTempName == "Slaughterfish"
+                        ActorsToSpawn = 0
+                    elseif cfgqst.ModDEM && a.HasKeyword(DemonicCreature)
+                        DemonicCreatureFound = true
+                        NymTrace("AreaScanDuplicateEnemies() DemonicCreatureFound")
+                        ActorsToSpawn = utility.RandomInt(2, 3)
+                    else
+                        RaceKey = storqst.GetRaceKeyFast(a)
+                        if RaceKey == "Canines" || RaceKey == "Wolves" || RaceKey == "Skeevers"
+                            ActorsToSpawn = utility.RandomInt(2, 4)
+                        elseif RaceKey == "Giants"
+                            ActorsToSpawn = utility.RandomInt(0, 1)
+                            AddLootArmorLight = true
+                        elseif RaceKey == "Bears" || RaceKey == "Sabrecats"
+                            ActorsToSpawn = utility.RandomInt(1, 2)
+                        elseif RaceKey == "Rieklings"
+                            ActorsToSpawn = utility.RandomInt(1, 2)
+                            AddLootArmorLight = true
+                        elseif RaceKey == "Falmers"
+                            ActorsToSpawn = utility.RandomInt(1, 100)
+                            AddLootArmorLight = true
+                        elseif RaceKey == "Draugrs"
+                            if !SkeletonRace
+                                SkeletonRace = (game.GetFormFromFile(752024, "Skyrim.esm") as Race)
+                            endif
+                            if a.GetRace() == SkeletonRace
+                                if DemonicCreatureFound
+                                    a.DisableNoWait(false)
+                                    a.Delete()
+                                else
+                                    NymTrace("AreaScanDuplicateEnemies() SkeletonFound")
+                                    if EnemyCount < 10
+                                        ActorsToSpawn = utility.RandomInt(6, 10)
+                                        EnemyCount = EnemyCount + 10
+                                    else
+                                        AddLootArmorLight = true
+                                        ActorsToSpawn = utility.RandomInt(1, 2)
+                                    endif
+                                endif
+                            endif
+                        elseif RaceKey == "Trolls"
+                            float HealrateBefore = a.GetAV("HealRate")
+                            NymTrace("HealRate TROLL Before: " + HealrateBefore)
+                            a.SetAV("HealRate", 5.0)
+                            float HealrateAfter = a.GetAV("HealRate")
+                            NymTrace("HealRate TROLL After : " + HealrateAfter)
+                            ActorsToSpawn = utility.RandomInt(0, 1)
+                            NymBox("Healrate of Troll increased from " + HealrateBefore + " to " + HealrateAfter)
+                        else
+                            ActorsToSpawn = 1
+                        endif
+                    endif
+                endif
+                if ActorsToSpawn > 0
+                    ActorsToSpawn = 1
+                endif
+                if a && ActorsToSpawn > 0
+                    iTempLevel = a.GetLevel()
+                    if a.IsHostileToActor(cfgqst.PlayerRef) && !a.IsInFaction(cfgqst.RobberFaction)
+                        actorbase TempActorBase = a.GetActorBase()
+                        actor SpawnedActor = None
+                        if TempActorBase
+                            while ActorsToSpawn > 0 && cfgqst.ModEnabled
+                                ActorsToSpawn = ActorsToSpawn - 1
+                                SpawnCount = SpawnCount + 1
+                                SpawnedActor = a.PlaceActorAtMe(TempActorBase, 2)
+                                int safetyCounter = 0
+                                while SpawnedActor == None && safetyCounter < 10
+                                    utility.Wait(0.1)
+                                    safetyCounter = safetyCounter + 1
+                                endwhile
+                                NymTrace("AreaScanDuplicateEnemies() safetyCounter = " + safetyCounter)
+                                if !(SpawnedActor == None)
+                                    if SpawnedActor.Is3DLoaded()
+                                        NymTrace("AreaScanDuplicateEnemies() 3DLoaded()")
+                                        SpawnedActor.EvaluatePackage()
+                                    endif
+                                endif
+                                SpawnedActor.MoveTo(a, 20.0 * math.Sin(a.GetAngleZ()), 20.0 * math.Cos(a.GetAngleZ()), a.GetHeight() + 20.0, false)
+                                if SpawnedActor
+                                    if SpawnedActor.GetAV("Aggression") < 2.0
+                                        SpawnedActor.SetAV("Aggression", 1.0)
+                                        SpawnedActor.SetAV("Aggression", 2.0)
+                                    endif
+                                    if Nym()
+                                        form WornArmor = SpawnedActor.GetWornForm(4)
+                                        if WornArmor && cfgqst.IsItem("Armor Type Heavy", WornArmor)
+                                            float ActorHealth = SpawnedActor.GetAV("Health")
+                                            NymTrace("AreaScanDuplicateEnemies() Actor in Heavy Armor (Copy of " + sTempName + ") Health Test BEFORE" + ActorHealth)
+                                            SpawnedActor.ModActorValue("Health", ActorHealth + ActorHealth)
+                                            NymTrace("AreaScanDuplicateEnemies() Actor in Heavy Armor (Copy of" + sTempName + ") Health Test AFTER" + SpawnedActor.GetAV("Health"))
+                                        endif
+                                        WornArmor = a.GetWornForm(4)
+                                        if WornArmor && cfgqst.IsItem("Armor Type Heavy", WornArmor)
+                                            float mangled_actorhealth_0 = a.GetAV("Health")
+                                            NymTrace("AreaScanDuplicateEnemies() Actor in Heavy Armor (Orig Actor " + sTempName + ") Health Test BEFORE" + mangled_actorhealth_0)
+                                            SpawnedActor.ModActorValue("Health", mangled_actorhealth_0 + mangled_actorhealth_0)
+                                            NymTrace("AreaScanDuplicateEnemies() Actor in Heavy Armor (Orig Actor " + sTempName + ") Health Test AFTER" + SpawnedActor.GetAV("Health"))
+                                        endif
+                                    endif
+                                    if AddLootArmorLight
+                                        if !LootLeatherArmor
+                                            LootLeatherArmor = (game.GetFormFromFile(221598, "Skyrim.esm") as Armor)
+                                        endif
+                                        SpawnedActor.AddItem(LootLeatherArmor, 1, false)
+                                    endif
+                                    SpawnedActor.AddToFaction(cfgqst.NakedDuplicantFaction)
+                                    if !SpawnedActor.IsInFaction(cfgqst.NakedDuplicantFaction)
+                                        debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies #ERROR - NOT in NakedDuplicantFaction", 0)
+                                    endif
+                                endif
+                                debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR[" + SpawnCount + "] [" + sTempName + "] [Level:" + iTempLevel + "] = #DUPLICATED [" + SpawnCount + "]", 0)
+                            endwhile
+                            if SpawnGroup == "DuplosA"
+                                defqst.DuplosA[defqst.DuplosACount] = SpawnedActor
+                                NymTrace("#AreaScanDuplicateEnemies > DuplosA < Original: " + sTempName + " (Location: " + defqst.DuplosALocation + ") (Distance: " + sTempDistance + ") -> Duplicant:  " + cfgqst.GetActorName(defqst.DuplosA[defqst.DuplosACount]))
+                                defqst.DuplosACount = defqst.DuplosACount + 1
+                            elseif SpawnGroup == "DuplosB"
+                                defqst.DuplosB[defqst.DuplosBCount] = SpawnedActor
+                                NymTrace("#AreaScanDuplicateEnemies > DuplosB < Original: " + sTempName + " (Location: " + defqst.DuplosBLocation + ") (Distance: " + sTempDistance + ") -> Duplicant:  " + cfgqst.GetActorName(defqst.DuplosB[defqst.DuplosBCount]))
+                                defqst.DuplosBCount = defqst.DuplosBCount + 1
+                            elseif SpawnGroup == "DuplosC"
+                                defqst.DuplosC[defqst.DuplosCCount] = SpawnedActor
+                                NymTrace("#AreaScanDuplicateEnemies > DuplosC < Original: " + sTempName + " (Location: " + defqst.DuplosCLocation + ") (Distance: " + sTempDistance + ") -> Duplicant:  " + cfgqst.GetActorName(defqst.DuplosC[defqst.DuplosCCount]))
+                                defqst.DuplosCCount = defqst.DuplosCCount + 1
+                            endif
+                            SpawnedActor = None
+                        else
+                            debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR[NO ACTOR BASE!", 0)
+                        endif
+                    else
+                        debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies NON HOSTILE", 0)
+                    endif
+                endif
+            endwhile
+        endif
+        NymMessage("Actors Spawned: " + SpawnCount + " SpawnGroup: " + SpawnGroup)
+        if SpawnCount > 0
+            defqst.DuplicationWasDone = true
+        else
+            defqst.DuplicationWasDone = false
+        endif
+        DuplicationRunning = false
+        SetStage(1000)
+    endif
+EndFunction
+			
+;ORIGINAL FUNCTION ---- KEEP . We made a new one that works with the Spawned Location and DuplosACount as measure.
+;/
+Function AreaScanDuplicateEnemies()		;#Duplicate
 	
 	DuplicationRunning = true
-	Debug.Trace("NAKED DEFEAT: allegiancequest AreaScanDuplicateEnemies()")
+	NymTrace("AreaScanDuplicateEnemies(Start)")
 
 	Actor a		
 	Actor aTempActor 
@@ -649,6 +958,8 @@ Function AreaScanDuplicateEnemies()
 	int SpawnCount = 0
 	bool Spawned = false
 	bool DemonicCreatureFound = false
+	int NakedGhostsDeleted = 0
+	int DemonicCreaturesDeleted = 0
 	
 	float ActorAggression
 	bool WeAreInDungeon = false 
@@ -657,6 +968,10 @@ Function AreaScanDuplicateEnemies()
 	int iTempLevel = 0
 	int ActorsToSpawn = 0
 	bool IsDuplicant = false
+	Bool DoSpawn = false
+	float sTempDistance = 0.0
+	
+	bool AddLootArmorLight = false
 	
 	RaceKey = "none"
 	
@@ -665,9 +980,36 @@ Function AreaScanDuplicateEnemies()
 	NymTrace("AreaScanDuplicateEnemies() QUEST MODE ABORT") 
 	endif 
 	
-	if Enable
+	Enable = true 
 	
-		if cfgqst.IsPlayerInDungeon() && cfgqst.PlayerRef.IsInInterior() 
+	if storqst.IsLocationClearable()
+	;if storqst.IsPlayerIndoors() && !storqst.InCity
+	NymTrace("AreaScanDuplicateEnemies(in Interior & Clearable -> Start)") 
+	DoSpawn = true 	
+	
+	else 
+	NymTrace("AreaScanDuplicateEnemies(in Exterior -> Abort)") 
+	;DoSpawn = true 
+	endif 
+	
+	;Enable = false 
+	;DoSpawn = false
+	
+	if defqst.DuplosACount > 0
+	Enable = false 
+	endif 
+	
+	if Enable
+		
+		if defqst.DuplosACount == 0 
+		defqst.Duplo_CreateActors("DuplosA")
+		defqst.DuplosALocation = storqst.CurrentLocationName
+		
+		;elseif 
+		
+		endif 
+
+		if cfgqst.IsPlayerInDungeon() && storqst.IsPlayerIndoors()
 		NymTrace("AreaScanDuplicateEnemies() WeAreInDungeon TRUE")
 		WeAreInDungeon = true 
 		else 
@@ -676,50 +1018,68 @@ Function AreaScanDuplicateEnemies()
 		endif
 		
 		NymTrace("AreaScanDuplicateEnemies() NPC.Length: "+i)
-		
-		
+				
 		if cfgqst.ModDEM
+		NymTrace("AreaScanDuplicateEnemies(cfgqst.ModDEM)")
 			if !DemonicCreature 
 				DemonicCreature = (Game.GetFormFromFile(0x0081F780, "DemonicCreatures.esp") As Keyword)
-			
+			elseif DemonicCreature
+			NymTrace("AreaScanDuplicateEnemies(KWD found DemonicCreature)")
 			endif 
 		endif 
 	
 		while (j > 0) && !Abort
 		j -= 1	
 		a = NPC[j].GetReference() as Actor	
-		
 
-			if a && !a.IsInFaction(cfgqst.NakedDuplicantFaction)
+			if a
 			
-		
-				ActorAggression = a.GetAV("Aggression")
-
+				sTempDistance = cfgqst.PlayerRef.GetDistance(a)
+				sTempName = cfgqst.GetActorName(a)
 				
-					if a.IsInFaction(cfgqst.NakedGhostFaction)
-					a.disable()
-					a.delete()
-					else
-					
-					if a.IsHostileToActor(cfgqst.PlayerRef) ;superfluos, only hostiles get HERE
-					EnemyCount += 1
+				if cfgqst.ModDEM && (a.HasKeyword(DemonicCreature) || storqst.IsDemonicCreature(a, sTempName))
+				
+					if a.IsHostileToActor(cfgqst.PlayerRef) 
+						NymTrace("AreaScanDuplicateEnemies "+sTempName+" -> Demonic Creature (Hostile")
+						EnemyCount += 1
+					else 	
+						NymTrace("AreaScanDuplicateEnemies "+sTempName+" -> Demonic Creature (ERROR NON Hostile - Set Berserk!)")
+						a.SetAV("Aggression", 1)
+						a.SetAV("Aggression", 2)
+					;	EnemyCount += 1	
 					endif 
-			
-					
+				
+			;	a.DisableNoWait()
+			;	a.Delete()			
+				DemonicCreaturesDeleted += 1					
+				elseif a.IsInFaction(cfgqst.NakedGhostFaction)
+				a.DisableNoWait()
+				a.Delete()
+				NakedGhostsDeleted += 1
+				elseif a.IsHostileToActor(cfgqst.PlayerRef) 
+				NymTrace("AreaScanDuplicateEnemies "+sTempName+" -> Hostile Actor")
+				EnemyCount += 1
 				endif 
-
-
+				
+			;	if a && Nym()
+			;	NymTrace("AreaScanDuplicateEnemies "+sTempName+" Distance: "+sTempDistance+" Attempt AGGRO ")
+			;	a.SetAV("Aggression", 1)
+			;	a.SetAV("Aggression", 2)
+			;	endif 
+			
 			endif 
 		endwhile 
 		
-		
+		if NakedGhostsDeleted > 0 || DemonicCreaturesDeleted > 0
+		NymTrace("DemonicCreaturesDetected: "+DemonicCreaturesDeleted+", NakedGhostsDeleted: "+NakedGhostsDeleted) 
+		endif 
 		NymTrace("AreaScanDuplicateEnemies() EnemyCount: "+EnemyCount)
 	;	NymMessage("EnemyCount: "+EnemyCount)
 		;if EnemyCount < 3
 		;SpawnExtra = true 
 		;endif 
 		
-		if !Abort
+		if !Abort && DoSpawn
 			while i > 0					
 	
 			;	NymTrace("AreaScanDuplicateEnemies(A) "+i)
@@ -731,19 +1091,23 @@ Function AreaScanDuplicateEnemies()
 				DemonicCreatureFound = false 
 				ActorsToSpawn = 0	
 
-				
-					if cfgqst.ModDEM
-				;	NymTrace("AreaScanDuplicateEnemies(B) "+i)
-						if !DemonicCreature 
-					;	NymTrace("AreaScanDuplicateEnemies(C) "+i)
-						DemonicCreature = (Game.GetFormFromFile(0x0081F780, "DemonicCreatures.esp") As Keyword)
+								
+					if a && !a.IsInFaction(cfgqst.NakedDuplicantFaction) && !a.IsDead()
+					sTempName = cfgqst.GetActorName(a)	
+					NymTrace("AreaScanDuplicateEnemies() NAME: "+sTempName)
+					
+					if Nym()
+						if sTempName == "Rolff Stone-Fist"
+						NymTrace("Rolff FOUND and FUCKED CALMED")
+						SPE_Actor.SetActorCalmed(a, true)
+						;a.DisableNoWait()
+						;a.Delete()
 						endif 
 					endif 
 					
-					if a && !a.IsInFaction(cfgqst.NakedDuplicantFaction)
 					;	NymTrace("AreaScanDuplicateEnemies(D) "+i)
 						;if !sTempName
-						sTempName = cfgqst.GetActorName(a)	
+						
 						;endif 
 						
 						;if Nym() && a.IsInFaction(cfgqst.NakedDuplicantFaction) 
@@ -787,10 +1151,19 @@ Function AreaScanDuplicateEnemies()
 							elseif (RaceKey == "Giants")
 						
 							ActorsToSpawn = Utility.RandomInt(0,1) 
+							AddLootArmorLight = true
 							
 							elseif (RaceKey == "Bears") || (RaceKey == "Sabrecats") 
 							
 							ActorsToSpawn = Utility.RandomInt(1,2) 
+							
+							elseif (RaceKey == "Rieklings")
+							ActorsToSpawn = Utility.RandomInt(1,2) 
+							AddLootArmorLight = true
+							
+							elseif (RaceKey == "Falmers")
+							ActorsToSpawn = Utility.RandomInt(1) 
+							AddLootArmorLight = true							
 							
 							elseif (RaceKey == "Draugrs")
 								
@@ -800,8 +1173,8 @@ Function AreaScanDuplicateEnemies()
 								if a.GetRace() == SkeletonRace
 								
 									if DemonicCreatureFound
-									a.disable()
-									a.delete()
+									a.DisableNoWait()
+									a.Delete()
 									;NymTrace("AreaScanDuplicateEnemies() DEM_SkeletonFound")
 									;ActorsToSpawn = Utility.RandomInt(1,2) 
 									else 
@@ -810,14 +1183,15 @@ Function AreaScanDuplicateEnemies()
 										ActorsToSpawn = Utility.RandomInt(6,10) 
 										EnemyCount += 10
 										else 
-										ActorsToSpawn = Utility.RandomInt(3,5) 
+										AddLootArmorLight = true
+										ActorsToSpawn = Utility.RandomInt(1,2) 
 										endif 
 									endif 
 								endif 
 							elseif (RaceKey == "Trolls")
 							NymTrace("HealRate TROLL A: "+a.GetAV("HealRate"))
 							
-							a.SetAV("HealRate", 3.0)
+							a.SetAV("HealRate", 5.0)
 							NymTrace("HealRate TROLL B: "+a.GetAV("HealRate"))
 							
 							ActorsToSpawn = Utility.RandomInt(0,1) 
@@ -839,7 +1213,7 @@ Function AreaScanDuplicateEnemies()
 						
 						if a.IsInFaction(cfgqst.NakedGhostFaction)
 					;	NymTrace("AreaScanDuplicateEnemies(G) "+i)	
-						a.disable()
+						a.DisableNoWait()
 						a.delete()
 					
 						;elseif a == folqst.Actor_Follower01	|| a == folqst.Actor_Follower02	|| (a.GetBaseObject().GetName() == "FEC : Load Screen Detector")
@@ -854,28 +1228,68 @@ Function AreaScanDuplicateEnemies()
 						;elseif a.IsInFaction(cfgqst.NakedDuplicantFaction) ;&& a.IsHostileToActor(cfgqst.PlayerRef) && !a.IsInCombat() && !a.IsInFaction(cfgqst.RobberFaction)	
 						;	ActorsToSpawn = 1
 							bool TestSystem = true 
-							;Actorbase TempActorBase = a.GetActorBase() 
-							Actorbase TempActorBase = a.GetLeveledActorBase() 
+							Actorbase TempActorBase = a.GetActorBase() ;use this! 
+							;Actorbase TempActorBase = a.GetLeveledActorBase() ;can lead to CTD.... do NOT use.. sigh
+					
 							Actor SpawnedActor
 
 							if TestSystem 	
-				;NymTrace("AreaScanDuplicateEnemies(I) "+i)	
+							;NymTrace("AreaScanDuplicateEnemies(I) "+i)	
 								if TempActorBase
 								;NymTrace("AreaScanDuplicateEnemies(J) "+i)														
 								a.AddToFaction(cfgqst.NakedDuplicantFaction)
-								Spawned = true
+								a.AddToFaction(storqst.NakedOriginalFaction)
 								
+									if DemonicCreatureFound
+									a.SetAV("Aggression", 1)
+									a.SetAV("Aggression", 2)
+									endif 
+									
+									Spawned = true
+									
+									if SpawnCount < 20
+									ActorsToSpawn = 1 ;WE NEED TO CHANGE MULTIPLE SPAWN MAYBE. But first test this.
+									endif 
+									
 									while (ActorsToSpawn > 0) && cfgqst.ModEnabled
 									;NymTrace("AreaScanDuplicateEnemies(K) "+i)	
 									ActorsToSpawn -=1 
-									SpawnedActor = a.PlaceActorAtMe(TempActorBase, 2)
-									SpawnedActor.Moveto(a, -100.0 * Math.Sin(a.GetAngleZ()), -100.0 * Math.Cos(a.GetAngleZ()), a.GetHeight() - 150.0, abMatchRotation = false)
-									;cfgqst.PlayerRef.PushActorAway(SpawnedActor, 0.5)
+												
+												
+									Float ZPosa	= a.GetPositionZ()
+									;SpawnedActor = a.PlaceActorAtMe(TempActorBase, 2)
+									defqst.DuplosA[SpawnCount] = a.PlaceActorAtMe(TempActorBase, 2)
+									
+									    Int safetyCounter = 0
+										While (defqst.DuplosA[SpawnCount] == None && safetyCounter < 10)
+											Utility.Wait(0.1) ; Wait 100ms
+											safetyCounter += 1
+										EndWhile
+										NymTrace("AreaScanDuplicateEnemies() safetyCounter = "+safetyCounter)
+
+										; 3. Explicit "None" validation check before doing operations
+										If (defqst.DuplosA[SpawnCount] != None)
+											; Ensure the NPC's 3D environment is ready if manipulating 3D properties
+											If (defqst.DuplosA[SpawnCount].Is3DLoaded())
+											NymTrace("AreaScanDuplicateEnemies() 3DLoaded()")
+												defqst.DuplosA[SpawnCount].EvaluatePackage()
+											EndIf
+										endif 
+
+									NymTrace("AreaScanDuplicateEnemies() a.Height = "+a.GetHeight())
+									NymTrace("AreaScanDuplicateEnemies() a.Zpos = "+ZPosa)
 									
 
-										if SpawnedActor
-											
-											
+									defqst.DuplosA[SpawnCount].Moveto(a, 20.0 * Math.Sin(a.GetAngleZ()), 20.0 * Math.Cos(a.GetAngleZ()), a.GetHeight() +20.0, abMatchRotation = false)
+									;SpawnedActor.Moveto(a, -100.0 * Math.Sin(a.GetAngleZ()), -100.0 * Math.Cos(a.GetAngleZ()), a.GetHeight() - 150.0, abMatchRotation = false)
+									;cfgqst.PlayerRef.PushActorAway(SpawnedActor, 0.5)
+									NymTrace("AreaScanDuplicateEnemies() SpawnedActor.Zpos A = "+defqst.DuplosA[SpawnCount].GetPositionZ())	
+
+										if defqst.DuplosA[SpawnCount]
+	
+											;#CTD DEBUGGING1 
+										
+											;---- DISABLE FOR TESTING :
 											
 											Faction[] FactionListDebug ;= new Faction[30]
 											
@@ -895,24 +1309,56 @@ Function AreaScanDuplicateEnemies()
 												endif 
 												
 											endwhile 
-										SpawnedActor.EvaluatePackage()
-										SpawnedActor.AddToFaction(cfgqst.NakedDuplicantFaction)
-										SpawnedActor.EvaluatePackage()
-										SpawnedActor.StartCombat(cfgqst.PlayerRef)
-										
-										Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies [IsHostile: "+SpawnedActor.IsHostileToActor(cfgqst.PlayerRef)+" IsInCombat: "+SpawnedActor.IsInCombat()+" Aggression: "+SpawnedActor.GetAV("Aggression")+"]")
-										
-									;	SpawnedActor.SetAV("Aggression", 1)
-									;	SpawnedActor.SetAV("Aggression", 2)
-										
-											if !SpawnedActor.IsInFaction(cfgqst.NakedDuplicantFaction)
+											
+								
+												
+											if AddLootArmorLight
+												if !LootLeatherArmor
+												LootLeatherArmor = (game.GetFormFromFile(0x0003619E, "Skyrim.esm") as Armor)	
+												endif
+												
+												defqst.DuplosA[SpawnCount].AddItem(LootLeatherArmor)
+												
+											endif 
+		
+										;	SpawnedActor.EvaluatePackage()
+											defqst.DuplosA[SpawnCount].AddToFaction(cfgqst.NakedDuplicantFaction)
+										;	SpawnedActor.EvaluatePackage()
+										;	SpawnedActor.StartCombat(cfgqst.PlayerRef)
+											
+											Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies [IsHostile: "+defqst.DuplosA[SpawnCount].IsHostileToActor(cfgqst.PlayerRef)+" IsInCombat: "+defqst.DuplosA[SpawnCount].IsInCombat()+" Aggression: "+defqst.DuplosA[SpawnCount].GetAV("Aggression")+"]")
+											
+											defqst.DuplosA[SpawnCount].SetAV("Aggression", 1)
+											defqst.DuplosA[SpawnCount].SetAV("Aggression", 2)
+												
+											;#CTD DEBUGGING1	
+						
+											Float ZPosPlayer = cfgqst.PlayerRef.GetPositionZ()
+											Float ZPos1 = SpawnedActor.GetPositionZ()
+											Float ZPos2
+											Float ZPos3
+											
+											
+											ZPos1
+											NymTrace("AreaScanDuplicateEnemies() Player.Zpos B = "+ZPosPlayer)
+											NymTrace("AreaScanDuplicateEnemies() SpawnedActor.#Zpos B = "+ZPos1)
+											Utility.Wait(1.0)
+											ZPos2 = SpawnedActor.GetPositionZ()
+											NymTrace("AreaScanDuplicateEnemies() SpawnedActor.#Zpos C = "+ZPos2)
+											Utility.Wait(1.0)
+											ZPos3 = SpawnedActor.GetPositionZ()
+											NymTrace("AreaScanDuplicateEnemies() SpawnedActor.#Zpos FINAL = "+ZPos3+" / "+ZPos1+" PlayerPos "+ZPosPlayer+" aPos "+ZPosa)
+					
+												
+											if !defqst.DuplosA[SpawnCount].IsInFaction(cfgqst.NakedDuplicantFaction)
 											Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies #ERROR - NOT in NakedDuplicantFaction")
 											endif 
 										
 										endif 
 										
+									defqst.DuplosACount += 1	
 									SpawnCount += 1
-									Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR["+SpawnCount+"] ["+sTempName+"] [Level:"+iTempLevel+"] = %DUPLICATED ["+SpawnCount+"]")
+									Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies ACTOR["+SpawnCount+"] ["+sTempName+"] [Level:"+iTempLevel+"] = #DUPLICATED ["+SpawnCount+"]")
 									endwhile 
 								else 
 						
@@ -922,7 +1368,7 @@ Function AreaScanDuplicateEnemies()
 							
 							
 							;-------------------------
-								;/
+				
 								if TempActor
 								
 								a.AddToFaction(cfgqst.NakedDuplicantFaction)
@@ -940,9 +1386,9 @@ Function AreaScanDuplicateEnemies()
 										
 										if SpawnedDuplicant
 										SpawnCount += 1
-										Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies (TEST) ACTOR["+i+"] ["+sTempName+"] [Level:"+iTempLevel+"] = %DUPLICATED ["+SpawnCount+"]")
+										Debug.Trace("NAKED DEFEAT: AreaScanDuplicateEnemies (TEST) ACTOR["+i+"] ["+sTempName+"] [Level:"+iTempLevel+"] = %DUPLICATED ["+SpawnCount+"]")
 										else 
-										Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies (TEST) ACTOR["+i+"] ["+sTempName+"] = NO DUPLICANT!")
+										Debug.Trace("NAKED DEFEAT: reaScanDuplicateEnemies (TEST) ACTOR["+i+"] ["+sTempName+"] = NO DUPLICANT!")
 										
 										endif 
 									endwhile 
@@ -952,14 +1398,14 @@ Function AreaScanDuplicateEnemies()
 								Debug.Trace("NAKED DEFEAT: #AreaScanDuplicateEnemies (TEST) ACTOR["+i+"] ["+sTempName+"] = NO ACTORBASE!")
 								
 								endif
-								/;	
+						
 								
 							;-------------------
 							
 							else 
 							
 								
-							;/
+			
 								if TempActorBase
 								
 								a.AddToFaction(cfgqst.NakedDuplicantFaction)
@@ -979,7 +1425,7 @@ Function AreaScanDuplicateEnemies()
 								
 								endif	
 							
-							/;
+		
 								
 							endif 
 						endif 	
@@ -1003,9 +1449,9 @@ Function AreaScanDuplicateEnemies()
 	DuplicationRunning = false
 	
 	SetStage(1000)
-
-EndFunction
-
+	
+EndFunction	
+/;
 
 ;Bool Property defqst.DuplicationWasDone Auto 
 
@@ -1384,6 +1830,14 @@ Function NymTrace(String Text2)		;#NymTrace
 	;Debug.Notification("<font color='#0048ba'>"+Text2+"</font>")
 	Debug.trace("NAKED DEFEAT allegiancequest: (#trace NYM) "+Text2)
 	endif
+EndFunction
+
+Function NymBox(String Text2)		;#NymBox
+	if Nym()
+	Debug.MessageBox("allegiancequest: "+Text2)
+	endif 
+	Debug.trace("NAKED DEFEAT allegiancequest["+storqst.Defeat_ID+"]: BOX (#Box NYM) "+Text2)
+
 EndFunction
 
 Bool Function Nym()

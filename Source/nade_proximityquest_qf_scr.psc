@@ -195,7 +195,7 @@ ProximityScanRapers()
 
 elseif cfgqst.ProximityScanType == "DetectMasterScan" 		;scans if a Master is in Front and looking at and closeby
 cfgqst.ProximityScanType = "empty" 
-ProximityScanDetectMaster()
+DetectMasterScan()
 
 
 ;elseif cfgqst.ProximityScanType == "DuplicateEnemyScan"	;NO LONGER IN USE!!!!
@@ -229,6 +229,10 @@ ProximityScanCityFight()
 elseif cfgqst.ProximityScanType == "DefeatScenarioScan"	;GET DEFEAT TYPE ---> scans ONLY hostiles 
 cfgqst.ProximityScanType = "empty" 
 DefeatScenarioScan()
+
+elseif cfgqst.ProximityScanType == "DefeatTypeScan"	;GET DEFEAT TYPE ---> scans ONLY with Faction EnemyFaction 
+cfgqst.ProximityScanType = "empty" 
+DefeatTypeScan()
 
 elseif cfgqst.ProximityScanType == "FollowerNameScan"	
 cfgqst.ProximityScanType = "empty" 
@@ -353,7 +357,6 @@ Function ProximityScanFollowerName()
 				if a.IsInFaction(cfgqst.PlayerFollowerFaction)
 				a.RemoveFromFaction (cfgqst.PlayerFollowerFaction)
 				
-				
 				Utility.Wait(0.5)
 				;if folqst.GetStage() < 1000
 				folqst.EndFollowerQuest()
@@ -391,6 +394,79 @@ Function ProximityScanFollowerName()
 
 EndFunction
 
+Function DefeatTypeScan()
+
+	Debug.Trace("NAKED DEFEAT: #proximityquest DefeatTypeScan()")
+	;when player is downed, we Scan the vicinity for hostile actors and redetermine the Defeat Scenario. AllegianceQuest could do this....
+
+	;/PLANS
+	We want to use this in combat ONCE after the first hit to scan for enemies early
+	We also want to use this to check for enemies after defeat and if we can get back up (because nobody is nearby)	
+	/;
+	cfgqst.ProxActorDetected = 0.0	;<<<- useful to judge if we have any enemy in the vicinity to determine if we are "save"
+	cfgqst.ProxGuardDetected = 0.0	;<<<- useful to judge if we fight guards
+	
+	Actor a										
+
+	int i = NPC.Length 					
+		
+	while i							
+	i -= 1	
+	a = NPC[i].GetReference() as Actor		
+		
+		if a
+			;TempGender = SexLab.GetGender(a)
+			
+			TempGender = storqst.GetGender(a)
+			
+			TempDistance = cfgqst.PlayerRef.GetDistance(a)
+			TempHeight = a.GetPositionZ()
+			
+			TempName = cfgqst.GetActorName(a)
+			if !TempName
+			TempName = "No Name!"
+			endif 
+
+			;IS ENEMY - in combat, hostile	
+			if a.IsInFaction(cfgqst.EnemyFaction)
+			Debug.Trace("NAKED DEFEAT: #DefeatTypeScan ACTOR["+i+"]["+TempName+"] [Distance = "+TempDistance+"] [Heigth = "+TempHeight+"] IsEnemy")
+				if cfgqst.PlayerRef.GetDistance(a) <= 2000 ;100 units = 1,42 m --> 14 m ca. 
+				cfgqst.GetEnemyType(a)	;this fills Enemies up but does NOT delete them 
+				cfgqst.ProxActorDetected += 1
+				endif
+				
+				if !a.IsInFaction(cfgqst.EnemyFaction)
+				a.AddToFaction(cfgqst.EnemyFaction) ;<<---- we use this to identify our enemies from combat
+				endif 
+			else 
+			Debug.Trace("NAKED DEFEAT: #DefeatTypeScan ACTOR["+i+"]["+TempName+"] [Distance = "+TempDistance+"] IsNeutral")
+			endif	
+
+		else 
+		Debug.Trace("NAKED DEFEAT: #DefeatTypeScan ACTOR["+i+"] = NONE")
+			
+		endif	
+	endwhile	
+	
+	Debug.trace("NAKED DEFEAT DefeatTypeScan: Enemy[0]: "+cfgqst.Enemy[0])
+	Debug.trace("NAKED DEFEAT DefeatTypeScan: Enemy[1]: "+cfgqst.Enemy[1])
+	Debug.trace("NAKED DEFEAT DefeatTypeScan: Enemy[2]: "+cfgqst.Enemy[2])
+	Debug.trace("NAKED DEFEAT DefeatTypeScan: Enemy[3]: "+cfgqst.Enemy[3])
+	Debug.trace("NAKED DEFEAT DefeatTypeScan: Enemy[4]: "+cfgqst.Enemy[4])
+	Debug.trace("NAKED DEFEAT DefeatTypeScan: Enemy[5]: "+cfgqst.Enemy[5])
+	Debug.trace("NAKED DEFEAT DefeatTypeScan: Enemy[6]: "+cfgqst.Enemy[6])
+	Debug.trace("NAKED DEFEAT DefeatTypeScan: Enemy[10] - Last Hitter: "+cfgqst.Enemy[10])
+	
+	if Nym()
+;	ScreenMessage("Enemies for Defeat: "+cfgqst.Enemy[0]+" "+cfgqst.Enemy[1]+" "+cfgqst.Enemy[2]+" "+cfgqst.Enemy[3]+" "+cfgqst.Enemy[4]+"  "+cfgqst.Enemy[5]+"  "+cfgqst.Enemy[6])
+;	ScreenMessage("Enemies for Defeat Count: "+cfgqst.ProxActorDetected)
+	;Debug.Notification("NAKED DEFEAT proximity: Actors: "+cfgqst.ProxActorDetected)
+	;Debug.Notification("NAKED DEFEAT proximity: Guards: "+cfgqst.ProxGuardDetected)
+	endif 
+	SetStage(1000)
+
+EndFunction
+
 
 Float TempHeight
 Float PlayerHeight
@@ -418,7 +494,10 @@ Function DefeatScenarioScan()
 	a = NPC[i].GetReference() as Actor		
 		
 		if a
-			TempGender = SexLab.GetGender(a)
+			;TempGender = SexLab.GetGender(a)
+			
+			TempGender = storqst.GetGender(a)
+			
 			TempDistance = cfgqst.PlayerRef.GetDistance(a)
 			TempHeight = a.GetPositionZ()
 			
@@ -482,7 +561,8 @@ Function ProximityScanCageMaintenance()
 	
 		if a
 		
-			TempGender = SexLab.GetGender(a)
+			;TempGender = SexLab.GetGender(a)
+			TempGender = storqst.GetGender(a)
 			TempDistance = cfgqst.PlayerRef.GetDistance(a)
 			TempName = cfgqst.GetActorName(a)
 			if !TempName
@@ -534,7 +614,9 @@ Function ProximityScanCityFight()
 	
 		if a
 		
-			TempGender = SexLab.GetGender(a)
+			;TempGender = SexLab.GetGender(a)
+			
+			TempGender = storqst.GetGender(a)
 			TempDistance = cfgqst.PlayerRef.GetDistance(a)
 			TempName = cfgqst.GetActorName(a)
 			if !TempName
@@ -624,7 +706,7 @@ Function ProximityScanCombat()			;"COMBAT SCAN" NobodyAround() uses this
 	;1 - scans the vicinity (2000 units) for nearby enemies
 	;2 - it also tries to enforce combat between NPC and Followers 
 
-	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanCombat()")
+	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanCombat(Enemy[10] = "+cfgqst.Enemy[10]+")")
 
 	Bool IsFollowerFighting = true
 	Bool StartCombat0 = false
@@ -642,6 +724,13 @@ Function ProximityScanCombat()			;"COMBAT SCAN" NobodyAround() uses this
 	int i = NPC.Length 						
 
 	PlayerHeight = cfgqst.PlayerRef.GetPositionZ()
+
+	Bool GetEnemies = false 
+	
+	if cfgqst.Enemy[10] == "none"
+	GetEnemies = true
+	endif 
+
 
 	while i							
 	i -= 1	
@@ -704,7 +793,10 @@ Function ProximityScanCombat()			;"COMBAT SCAN" NobodyAround() uses this
 				Debug.Trace("NAKED DEFEAT: #ProximityScanCombat ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+"] IsEnemy [Heigth = "+TempHeight+"]")
 					if !(a.GetBaseObject().GetName() == "FEC : Load Screen Detector")						
 						;if a != folqst.Actor_Follower01
+						
+						if GetEnemies
 						cfgqst.GetEnemyType(a)
+						endif 
 						
 						;if a.IsInCombat()
 						if cfgqst.PlayerRef.GetDistance(a) <= 2000 ;100 units = 1,42 m --> 14 m ca. 
@@ -791,8 +883,7 @@ Function ProximityScanCombat()			;"COMBAT SCAN" NobodyAround() uses this
 		
 		endif	
 	endwhile	
-	
-	
+
 	if !IsFollowerFighting
 	cfgqst.ProxActorDetected = 0 
 	endif 
@@ -871,54 +962,37 @@ EndFunction
 
 
 Function ProximityScanPushRapersAway()
-
-	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanPushRapersAway()")
-	;WE SCAN I VALID RAPERS ARE IN THE vicinity
-	;when checking for misshaps (Traps/Struggling/Potions etc.)
-	
-	
-	Actor a										
-	cfgqst.ProxActorDetected = 0
-	int i = NPC.Length 							;############ I think this is wrong. Index needs to reduce AggressourCount directly not NPC Lenght ###########
-
-	while i							
-	i -= 1	
-	a = NPC[i].GetReference() as Actor		
-;	Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ACTOR#"+i+": "+cfgqst.GetActorInfo(a))	;check actor alias slots (15)
-	
-		if a
-			
-			if folqst.IsPresentFollower(a) || (a.GetBaseObject().GetName() == "FEC : Load Screen Detector")
-			;sort out followers
-			elseif folqst.IsWithUs_Follower(0) && a.GetDistance(folqst.NakedFollower[0]) < 200
-			NymTrace("Actor Pushed away from "+folqst.NakedFollower[0])
-			folqst.NakedFollower[0].PushActorAway(a, 2.0)
-			elseif folqst.IsWithUs_Follower(1) && a.GetDistance(folqst.NakedFollower[1]) < 200
-			NymTrace("Actor Pushed away from "+folqst.NakedFollower[1])
-			folqst.NakedFollower[1].PushActorAway(a, 2.0)
-			elseif a.GetDistance(cfgqst.PlayerRef) < 200
-			NymTrace("Actor Pushed away from Player")
-			cfgqst.PlayerRef.PushActorAway(a, 2.0)
-			endif	
-			
-	;	else 
-	;	Debug.Trace("NAKED DEFEAT: #ProximityScanRapers ACTOR["+i+"] = NONE")
-		endif	
-	endwhile	
-
-;	if cfgqst.ProxActorDetected > 0
-;	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanRapers(Potential Rapers Nearby)")
-;	else 
-;	Debug.Trace("NAKED DEFEAT: proximityquest ProximityScanRapers(NO Potential Rapers Nearby)")
-;	endif 
-	
-;	NymTrace("Rapers Found: "+cfgqst.Enemy[0]+" "+cfgqst.Enemy[1]+" "+cfgqst.Enemy[2]+" "+cfgqst.Enemy[3]+" "+cfgqst.Enemy[4]+"  "+cfgqst.Enemy[5]+"  "+cfgqst.Enemy[6])
-;	NymTrace("Rapers Found Count: "+cfgqst.ProxActorDetected)
-	
-	;cfgqst.ProxGuardDetected = 0
-	
-	SetStage(1000)
-
+    debug.Trace("NAKED DEFEAT: proximityquest ProximityScanPushRapersAway()", 0)
+    cfgqst.ProxActorDetected = 0.0
+    int i = NPC.Length
+    while i
+        i = i - 1
+        actor a = (NPC[i].GetReference() as actor)
+        if a
+            float fTempDistance = a.GetDistance(cfgqst.PlayerRef)
+            string sTempName = cfgqst.GetActorName(a)
+            if cfgqst.SexScene
+                NymTrace("ProximityScanPushRapersAway(SEXSCENE " + sTempName + ")")
+                if folqst.IsPresentFollower(a) || cfgqst.IsFucking(a) || fTempDistance > 200.0 || a.IsInFaction(slaveqst.WhippingFaction)
+                elseif fTempDistance < 200.0
+                    NymTrace("ProximityScanPushRapersAway(SEXSCENE " + sTempName + ")")
+                    cfgqst.PlayerRef.PushActorAway(a, 3.0)
+                    NymTrace("Actor " + sTempName + " Distance: " + fTempDistance + " Pushed away from Player")
+                endif
+            elseif folqst.IsPresentFollower(a) || a.GetBaseObject().GetName() == "FEC : Load Screen Detector"
+            elseif folqst.IsWithUs_Follower(0) && a.GetDistance(folqst.NakedFollower[0]) < 200.0
+                NymTrace("Actor Pushed away from " + folqst.NakedFollower[0])
+                folqst.NakedFollower[0].PushActorAway(a, 2.0)
+            elseif folqst.IsWithUs_Follower(1) && a.GetDistance(folqst.NakedFollower[1]) < 200.0
+                NymTrace("Actor Pushed away from " + folqst.NakedFollower[1])
+                folqst.NakedFollower[1].PushActorAway(a, 2.0)
+            elseif a.GetDistance(cfgqst.PlayerRef) < 200.0
+                NymTrace("Actor Pushed away from Player")
+                cfgqst.PlayerRef.PushActorAway(a, 2.0)
+            endif
+        endif
+    endwhile
+    SetStage(1000)
 EndFunction
 
 
@@ -939,15 +1013,25 @@ Function ProximityScanFixNudists()
 ;	Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ACTOR#"+i+": "+cfgqst.GetActorInfo(a))	;check actor alias slots (15)
 	
 		if a
-			
-					
+
+			if a.IsInFaction(cfgqst.NakedDuplicantFaction)
+			a.disable()
+			a.delete()
+			endif 	
+
+			storqst.FixPee(a)
+				
 			String sTempName = cfgqst.GetActorName(a)
-			int sTempGender = SexLab.GetGender(a)
+			;int sTempGender = SexLab.GetGender(a)
+			
+			int sTempGender = storqst.GetGender(a)
+			
 			float fDistance	= a.GetDistance(cfgqst.PlayerRef)		
 			
 			
 			if Nym() && (sTempGender < 2)
 				Form fBody = a.GetWornForm(0x00000004)
+				
 				if fBody
 				NymTrace("ProximityScanFixNudists: "+TempName+" Clothed")
 				else
@@ -1110,7 +1194,7 @@ Function ProximityScanMarkDuplicants()	;OLD DELETE
 	TempDistance = cfgqst.PlayerRef.GetDistance(a)
 	
 	String sTempName = "NoActor"
-;	Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ACTOR#"+i+": "+cfgqst.GetActorInfo(a))	;check actor alias slots (15)
+;	Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ACTOR#"+i+": "+cfgqst.GetActorInfo(a))	;check actor alias slots (15)delete
 	
 		if a
 			sTempName = a.GetActorBase().GetName() 
@@ -1259,15 +1343,25 @@ Bool Function CheckLOS(actor akactor, String sTempName)
 	if akactor.HasLOS(cfgqst.PlayerRef)
 	DebugTracing("#ProximityScan ["+sTempName+"] has LOS to Player")
 	return true
-	elseif (TempGender < 2) && (TempDistance <= NearDistance) ;CHECK FOV only when close  
+	elseif (TempGender < 2) && (TempDistance <= NearDistance) && !storqst.Resting ;CHECK FOV only when close  ;When Resting, we dont use Tracing (for fairness), maybe also NOT when indoors
 		zOffset = akactor.GetHeadingAngle(cfgqst.PlayerRef)
 		akactorName = akactor.GetBaseObject().GetName()
 
 		
 		if (zOffset < 60) && (zOffset > -60)
 		DebugTracing("#ProximityScan ["+sTempName+"] has Player inside of FOV (120°)")
-		
-		return true 	
+			
+			if Nym() ;check height/level difference
+				if Difference > 150
+				DebugTracing("#ProximityScan ["+sTempName+"] is too low/high ["+Difference+"]")
+				return false 
+				else 
+				DebugTracing("#ProximityScan ["+sTempName+"] is same level ["+Difference+"]")
+				return true 
+				endif 
+			else 	
+			return true 	
+			endif 
 		else
 
 		DebugTracing("#ProximityScan ["+sTempName+"] no LOS, no FOV")
@@ -1287,12 +1381,13 @@ EndFunction
 ; https://ck.uesp.net/wiki/Condition_Functions
 	
 		
-Function ProximityScanDetectMaster()			;#ProximityScanDetectMaster() 
+Function DetectMasterScan()			;#DetectMasterScan()() 
 
-Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
+Debug.Trace("NAKED DEFEAT: DetectMasterScan() START")
 	
 	cfgqst.ProxActorDetected = 0.0
-	cfgqst.ProxGuardDetected = 0.0	
+	;cfgqst.ProxGuardDetected = 0.0	
+	storqst.ProxMasterDetected = 0
 	bool MasterSees = false
 	bool CivilianSees = false
 	bool ActorAllowed = true
@@ -1305,7 +1400,7 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 
 	int i = NPC.Length 		
 
-	while i && (cfgqst.ProxGuardDetected == 0) && (cfgqst.ProxActorDetected == 0) ;&& (cfgqst.ProxActorDetected < 3) && !GuardSees	;if a Guard sees you we have the "worst" outcome already, civilians will be continued to check because we can still get a guard					
+	while i && ((storqst.ProxMasterDetected == 0) || (cfgqst.ProxActorDetected == 1)) ;&& (cfgqst.ProxActorDetected == 0) &&  ;&& (cfgqst.ProxActorDetected < 3) && !GuardSees	;if a Guard sees you we have the "worst" outcome already, civilians will be continued to check because we can still get a guard					
 	i -= 1	
 	ActorAllowed = true
 	a = NPC[i].GetReference() as Actor	
@@ -1325,12 +1420,16 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 	
 		if a	
 	
-			sTempGender = SexLab.GetGender(a)
+			;sTempGender = SexLab.GetGender(a)	storqst.GetGender(a)
+			sTempGender = storqst.GetGender(a)
 			sTempDistance = cfgqst.PlayerRef.GetDistance(a)
 			sTempName = cfgqst.GetActorName(a) 
 			if !sTempName
 			sTempName = "No Name!"
 			endif 
+			
+			
+			Debug.Trace("NAKED DEFEAT: #DetectMasterScan ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+"][Gender = "+sTempGender+"]")
 			
 			if a.IsInFaction(cfgqst.NakedGhostFaction)
 			a.disable()
@@ -1339,7 +1438,7 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 								
 				;CLOSE BY 
 				if (sTempDistance <= 350) ;Actor nearby (8,4 metres)
-				Debug.Trace("NAKED DEFEAT: #ProximityScanDetectMaster ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+"]")
+				
 				ActorAllowed = true 
 				;elseif  (sTempDistance <= 1200) && D100(50)
 				;ActorAllowed = true 
@@ -1352,28 +1451,28 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 				
 				if ActorAllowed && (sTempName == "FEC : Load Screen Detector")
 				ActorAllowed = false
-				NymTrace("#ProximityScanDetectMaster ["+sTempName+"] is FEC : Load Screen Detector")
+				NymTrace("#DetectMasterScan ["+sTempName+"] is FEC : Load Screen Detector")
 				endif 
 				
 				if ActorAllowed && !a.Is3DLoaded()
-				NymTrace("#ProximityScanDetectMaster ["+sTempName+"] no 3D")
+				NymTrace("#DetectMasterScan ["+sTempName+"] no 3D")
 				ActorAllowed = false
 				endif 
 				
 				if ActorAllowed && a.IsInCombat()
-				NymTrace("#ProximityScanDetectMaster ["+sTempName+"] in Combat")
+				NymTrace("#DetectMasterScan ["+sTempName+"] in Combat")
 				ActorAllowed = false
 				endif 
 				
 				if ActorAllowed && folqst.IsPresentFollower(a) ;allowed if NOT a Follower
-				NymTrace("#ProximityScanDetectMaster ["+sTempName+"] is Follower")
+				NymTrace("#DetectMasterScan ["+sTempName+"] is Follower")
 				ActorAllowed = false							
 				endif 
 				
 				; 0 - Not sleeping    2 - Not sleeping, wants to sleep  3 - Sleeping   4 - Sleeping, wants to wake
 			
 				if ActorAllowed && (a.GetSleepState() > 2)
-				NymTrace("#ProximityScanDetectMaster ["+sTempName+"] is Sleeping:"+a.GetSleepState())
+				NymTrace("#DetectMasterScan ["+sTempName+"] is Sleeping:"+a.GetSleepState())
 				ActorAllowed = false 
 				endif 
 				
@@ -1388,21 +1487,30 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 				;-------------------------------------------------------------------------------------------------------------------------------------------------- 
 			
 				if ActorAllowed	
-				NymTrace("#ProximityScanDetectMaster ["+sTempName+"] is Allowed")
+				NymTrace("#DetectMasterScan ["+sTempName+"] is Allowed")
 
 					if (sTempGender < 2) ;|| (SexLab.GetGender(a) == 0)
-					NymTrace("#ProximityScanDetectMaster ["+sTempName+"] is Human and Allowed")
-						if IsIdleMaster(a) && (sTempDistance <= 130) && CheckMasterLOS(a, sTempName, sTempDistance) && CheckPlayerLOS(a, sTempName) 
+					NymTrace("#DetectMasterScan ["+sTempName+"] is Human and Allowed")
+					
+						if (slaveqst.SexTaskType == "Dance for the Jarl") && IsJarl(a) && (sTempDistance <= 300) && CheckMasterLOS(a, sTempName, sTempDistance) && CheckPlayerLOS(a, sTempName) 
+							
+							slaveqst.TempMaster = a	
+							storqst.ProxMasterDetected = 100
+							MasterName01 = sTempName
+							NymTrace(MasterName01+" is the Jarl") 
+					
+						elseif IsIdleMaster(a) && (sTempDistance <= 130) && CheckMasterLOS(a, sTempName, sTempDistance) && CheckPlayerLOS(a, sTempName) 
 					;	IsMaster = true
 							;if 
 							;storqst.TargetActorProfession = "Guard"
 							slaveqst.TempMaster = a			
 							;cfgqst.ProxGuardDetected += 1
-							storqst.ProxMasterDetected += 1
-
+							storqst.ProxMasterDetected = 1
+												
 							MasterName01 = sTempName
 							NymTrace(MasterName01+" is the Master") 
 							;endif 
+
 						else	
 						
 							NymTrace("Try Seducing Target")
@@ -1412,11 +1520,13 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 								if IsBlackSmith(a) && CheckPlayerLOS(a, sTempName) && !IsTooClose(a)
 								storqst.TargetActorProfession = "Blacksmith"
 								cfgqst.ProxActorDetected += 1
+								;storqst.ProxMasterDetected = 1	(MASTERS GIVE TASKS DUH!)
 								MasterName01 = sTempName
 								slaveqst.TempMaster = a	
 								NymTrace(MasterName01+" is Blacksmith") 							
 								elseif CheckPlayerLOS(a, sTempName) && !IsTooClose(a)
 								cfgqst.ProxActorDetected += 1
+								;storqst.ProxMasterDetected = 1	(MASTERS GIVE TASKS DUH!)
 								MasterName01 = sTempName
 								slaveqst.TempMaster = a	
 								NymTrace(MasterName01+" is the Seduced") 
@@ -1430,6 +1540,7 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 						;Seduce Target
 						if CheckPlayerLOS(a, sTempName) && !IsTooClose(a)
 						cfgqst.ProxActorDetected += 1
+						;storqst.ProxMasterDetected = 1	(MASTERS GIVE TASKS DUH!)
 						MasterName01 = sTempName
 						slaveqst.TempMaster = a	
 						NymTrace(MasterName01+" is the Master") 
@@ -1439,14 +1550,17 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 		
 			else 
 
-			Debug.Trace("NAKED DEFEAT: #ProximityScanDetectMaster ACTOR["+i+"] = NONE")
+			Debug.Trace("NAKED DEFEAT: #DetectMasterScan ACTOR["+i+"] = NONE")
 			endif	
 		
 		sTempGender = 5
 		
 	endwhile	
-
-	if storqst.ProxMasterDetected > 1
+	
+	if storqst.ProxMasterDetected == 100
+	InfoMessage(MasterName01+" (the Jarl) sees you")
+	
+	elseif storqst.ProxMasterDetected > 1
 	storqst.ProxMasterDetected = 1
 	
 		if Nym()
@@ -1454,8 +1568,8 @@ Debug.Trace("NAKED DEFEAT: ProximityScanDetectMaster() START")
 		else
 		InfoMessage(MasterName01+" (a Master) sees you") 
 		endif 
-	else 	
-	storqst.ProxMasterDetected = 0
+;	else 	
+;	storqst.ProxMasterDetected = 0
 	endif 
 
 
@@ -1475,241 +1589,170 @@ Bool Function IsTooClose(actor akactor)
 	endif 
 EndFunction 
 	
-Function ProximityScan()			;#proximity 
-
-Debug.Trace("NAKED DEFEAT: ProximityScan() START")
-	
-	;GUIDE: This is the Main Proximity Scan for Public Punishment and Local Slavery that loops with the PlayerAliasQuest based Update Loop (variable Time based on MCM)
-
-	if slaveqst.StartDroppingGarbage
-	slaveqst.StartDroppingGarbage = false
-	NymTrace("StartDroppingGarbage THIS WORKED A")
-	;cfgqst.AllegianceScanType = "DropGarbageScan"
-	;SendModEvent("StartAllegianceQuest") 	
-	SendModEvent("StartDropQuest")
-
-	NymTrace("StartDroppingGarbage THIS WORKED B")
-	endif 
-	
-	cfgqst.ProxActorDetected = 0.0
-	cfgqst.ProxGuardDetected = 0.0	
-	bool GuardSees = false
-	bool CivilianSees = false
-	bool ActorAllowed = true
-	Actor a		
-
-	String CivilianName01 = "Nobody"
-	String CivilianName02 = "Nobody"
-	String CivilianName03 = "Nobody"
-	String GuardName01 = "Nobody"
-
-	int i = NPC.Length 		
-
-	while i ;&& (cfgqst.ProxActorDetected < 3) && !GuardSees	;if a Guard sees you we have the "worst" outcome already, civilians will be continued to check because we can still get a guard					
-	i -= 1	
-	ActorAllowed = true
-	a = NPC[i].GetReference() as Actor	
-	Bool ValidCreature = false 
-	
-	;cfgqst.ProxActorDetected = 0
-	
-	int sTempGender = 0
-	Float sTempDistance = 0.0
-	String sTempName
-	;Game.FindClosestActor(0.0, 0.0, 0.0, 5.0)	;check Creationkit
-		
-		if a	
-
-
-			sTempGender = SexLab.GetGender(a)
-			sTempDistance = cfgqst.PlayerRef.GetDistance(a)
-			sTempName = cfgqst.GetActorName(a)
-			if !sTempName
-			sTempName = "No Name!"
-			endif 
-			
-			if Nym() && IsJarl(a)
-			NymTrace("Jarl Distance: "+sTempDistance)
-			endif 
-			
-			if a.IsInFaction(cfgqst.NakedGhostFaction)
-			Debug.Trace("NAKED DEFEAT: #ProximityScan ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+"] deleted NakedGhost")
-			a.disable()
-			a.delete()
-			a = none
-			endif 	
-
-			
-		;	if D100(5)	;MOved to AllegianceQuest
-		;	slaveqst.DropRandomGarbage(a)
-		;	endif 
-			
-		;	if Nym() && !storqst.InCity && !storqst.InVillage && (storqst.IsLocalSlave == 0)
-		;		if a.IsInFaction(cfgqst.NakedDuplicantFaction) ;&& !a.IsHostileToActor(cfgqst.PlayerRef)
-		;		Debug.Trace("NAKED DEFEAT: #ProximityScan ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+"] ATTEMPT AGGRO")				
-		;		a.SetAV("Aggression", 1)
-		;		a.SetAV("Aggression", 2)
-		;		endif 	
-		;	endif 
-			
-			
-			;Debug.Trace("NAKED DEFEAT: #ProximityScan ("+i+") ["+TempName+"] Distance = "+TempDistance)
-			Debug.Trace("NAKED DEFEAT: #ProximityScan ACTOR["+i+"]["+sTempName+"] [Distance = "+sTempDistance+"]")	
-				;CLOSE BY 
-				
-				;1	1.428 cm
-				;100 = 1,43 m
-					
-				;slaves are less "visible" and therefor detection distances are lower
-				if storqst.IsLocalSlave()
-					if (sTempDistance <= NearDistance) ;Actor nearby (8,4 metres)
-					ActorAllowed = true 
-					elseif  (sTempDistance <= FarDistance) && D100(33)
-					ActorAllowed = true 
-					else 	
-					ActorAllowed = false
-					;Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ["+TempName+"] is too far away")
-					endif 
-				else 
-
-					if (sTempDistance <= NearDistance) ;Actor nearby (8,4 metres)
-					ActorAllowed = true 
-					elseif  (sTempDistance <= FarDistance) && D100(50)
-					ActorAllowed = true 
-					else 	
-					ActorAllowed = false
-					;Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ["+TempName+"] is too far away")
-					endif 
-				endif 
-			
-				;LINE OF SIGHT / VIEWING ANGLE   
-				if ActorAllowed && cfgqst.PublicPunishment_LOS_TOGGLE
-					if CheckLos(a, sTempName) ;tracing in LOS Function 
-					ActorAllowed = true
-					else 
-					ActorAllowed = false
-					;DebugTracing("#ProximityScan ["+TempName+"] is FEC : Load Screen Detector")
-					endif 
-				endif 
-				
-				;if cfgqst.ModDEM && ActorAllowed ;&& ;(TempName == ; Guard Trolls?
-				;endif 		
-				;----- LAST CHECKS (only return FALSE) ------------------------------------------------------------------------------------------------------------
-				
-				if ActorAllowed && (sTempName == "FEC : Load Screen Detector")
-				ActorAllowed = false
-				NymTrace("#ProximityScan ["+sTempName+"] is FEC : Load Screen Detector")
-				endif 
-				
-				if ActorAllowed && !a.Is3DLoaded()
-				NymTrace("#ProximityScan ["+sTempName+"] no 3D")
-				ActorAllowed = false
-				endif 
-				
-				if ActorAllowed && a.IsInCombat()
-				NymTrace("#ProximityScan ["+sTempName+"] in Combat")
-				ActorAllowed = false
-				endif 
-				
-				if folqst.IsPresentFollower(a) ;allowed if NOT a Follower
-				NymTrace("#ProximityScan ["+sTempName+"] is Follower")
-				ActorAllowed = false							
-				endif 
-				
-				; 0 - Not sleeping    2 - Not sleeping, wants to sleep  3 - Sleeping   4 - Sleeping, wants to wake
-			
-				if ActorAllowed && (a.GetSleepState() > 2)
-				NymTrace("#ProximityScan ["+sTempName+"] is Sleeping:"+a.GetSleepState())
-				ActorAllowed = false 
-				endif 
-				;-------------------------------------------------------------------------------------------------------------------------------------------------- 
-			
-				if ActorAllowed	
-				
-					if slaveqst.Pretending && (sTempDistance <= NearDistance) && ((sTempGender == 0) || (sTempGender == 1 && cfgqst.FemalesAllowed))
-						if !slaveqst.TempMaster
-						NymTrace("#ProximityScan ["+sTempName+"] is our Punisher for Pretending") ;NOT IDEALLL!!! 
-						slaveqst.TempMaster = a
-						endif 
-					endif 
-				
-					NymTrace("#ProximityScan ["+sTempName+"] is Allowed")
-					
-					if (sTempGender < 2) ;|| (SexLab.GetGender(a) == 0)
-					NymTrace("#ProximityScan ["+sTempName+"] is Human and Allowed")
-						if cfgqst.IsGuard(a)  	
-						GuardSees = true
-						cfgqst.ProxGuardDetected += 1.0	;we count the guards for later use (currently 0 or 1 is all we need)
-						cfgqst.ProxActorDetected += 1.0 ;!!!!(Public Punishment Calculation only trigers on  ProxActorDetected > 1  !!!!
-						GuardName01 = sTempName
-						else
-						CivilianSees = true
-							;we count the actor for later use (currently 0 or 1 is all we need)
-							if CivilianName01 == "Nobody"
-							CivilianName01 = sTempName
-							cfgqst.ProxActorDetected += 1.0
-							elseif CivilianName02 == "Nobody"
-							CivilianName02 = sTempName
-							cfgqst.ProxActorDetected += 1.0
-							elseif CivilianName03 == "Nobody"
-							CivilianName03 = sTempName
-							cfgqst.ProxActorDetected += 1.0
-							else
-							cfgqst.ProxActorDetected += 1.0
-							endif 
-						endif
-					endif 
-				endif	
-		
-			else 
-		;	Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN ACTOR["+i+"] = NONE")
-			Debug.Trace("NAKED DEFEAT: #ProximityScan ACTOR["+i+"] = NONE")
-			endif	
-		
-		sTempGender = 5
-		
-	endwhile	
-	
-	;Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN END: ProxActorDetected: "+cfgqst.ProxActorDetected)
-	;Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN END: ProxGuardDetected: "+cfgqst.ProxGuardDetected)
-	;Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN END: GuardSees: "+GuardSees)
-	;Debug.Trace("NAKED DEFEAT: PROXIMITY SCAN END: CivilianSees: "+CivilianSees)
-	
-	if GuardSees
-		if Nym() && !cfgqst.IsDefeatRunning() && !storqst.SlaveAtWork
-		NymMessage(GuardName01+" (a Guard) sees you") 
-		else
-		InfoMessage(GuardName01+" (a Guard) sees you") 
-		endif 
-	elseif CivilianSees
-	;InfoMessage("A Civilian sees you") 
-		
-		if cfgqst.ProxActorDetected == 1.0
-			if Nym() && !cfgqst.IsDefeatRunning() && !storqst.SlaveAtWork
-			NymMessage(CivilianName01+" sees you") 
-			else
-			InfoMessage(CivilianName01+" sees you") 
-			endif 
-		elseif cfgqst.ProxActorDetected == 2.0
-			if Nym() && !cfgqst.IsDefeatRunning() && !storqst.SlaveAtWork
-			NymMessage(CivilianName01+" and "+CivilianName02+" can see you") 
-			else
-			InfoMessage(CivilianName01+" and "+CivilianName02+" can see you") 
-			endif 
-		elseif cfgqst.ProxActorDetected > 2.0
-			if Nym() && !cfgqst.IsDefeatRunning() && !storqst.SlaveAtWork
-			NymMessage(CivilianName01+", "+CivilianName02+" and "+CivilianName03+" can see you") 
-			else
-			InfoMessage(CivilianName01+", "+CivilianName02+" and "+CivilianName03+" can see you") 
-			endif 
-		endif 
-	endif 
-	Debug.Trace("NAKED DEFEAT: #ProximityScan ProxGuardDetected: "+cfgqst.ProxGuardDetected)
-	Debug.Trace("NAKED DEFEAT: #ProximityScan ProxActorDetected: "+cfgqst.ProxActorDetected)
-
-	SetStage(1000)
-	
-EndFunction	
+Function ProximityScan()
+    actor a
+    DebugTrace("ProximityScan(START)")
+    if slaveqst.StartDroppingGarbage
+        slaveqst.StartDroppingGarbage = false
+        NymTrace("StartDroppingGarbage THIS WORKED A")
+        SendModEvent("StartDropQuest", "", 0.0)
+        NymTrace("StartDroppingGarbage THIS WORKED B")
+    endif
+    cfgqst.ProxActorDetected = 0.0
+    cfgqst.ProxGuardDetected = 0.0
+    bool GuardSees = false
+    bool CivilianSees = false
+    bool ActorAllowed = true
+    string CivilianName01 = "Nobody"
+    string CivilianName02 = "Nobody"
+    string CivilianName03 = "Nobody"
+    string GuardName01 = "Nobody"
+    int i = NPC.Length
+    while i
+        i = i - 1
+        ActorAllowed = true
+        a = (NPC[i].GetReference() as actor)
+        bool ValidCreature = false
+        int sTempGender = 0
+        float sTempDistance = 0.0
+        if a
+            sTempGender = storqst.GetGender(a)
+            sTempDistance = cfgqst.PlayerRef.GetDistance(a)
+            string sTempName = cfgqst.GetActorName(a)
+            if !sTempName
+                sTempName = "No Name!"
+            endif
+            debug.Trace("NAKED DEFEAT: #ProximityScan ACTOR[" + i + "][" + sTempName + "] [Distance = " + sTempDistance + "][Gender = " + sTempGender + "]", 0)
+            if Nym() && IsJarl(a)
+                NymTrace("Jarl Distance: " + sTempDistance)
+            endif
+            if a.IsInFaction(cfgqst.NakedGhostFaction)
+                NymTrace("ProximityScan(NAKED GHOST [" + sTempName + "] DELETED [Distance = " + sTempDistance + "])")
+                a.disable(false)
+                a.delete()
+                a = None
+            endif
+            if storqst.InCity
+                if a.IsInFaction(cfgqst.NakedDuplicantFaction)
+                    NymTrace("ProximityScan(NAKED DUPLICANT [" + sTempName + "] DELETED)")
+                    a.disable(false)
+                    a.delete()
+                endif
+            endif
+            debug.Trace("NAKED DEFEAT: #ProximityScan ACTOR[" + i + "][" + sTempName + "] [Distance = " + sTempDistance + "]", 0)
+            if storqst.IsLocalSlave()
+                if sTempDistance <= NearDistance
+                    ActorAllowed = true
+                elseif sTempDistance <= FarDistance && !storqst.Resting && !storqst.DarkNight && D100(33.0)
+                    ActorAllowed = true
+                else
+                    ActorAllowed = false
+                endif
+            elseif sTempDistance <= NearDistance
+                ActorAllowed = true
+            elseif sTempDistance <= FarDistance && !storqst.Resting && !storqst.DarkNight && D100(50.0)
+                ActorAllowed = true
+            else
+                ActorAllowed = false
+            endif
+            if ActorAllowed && cfgqst.PublicPunishment_LOS_TOGGLE
+                if CheckLOS(a, sTempName)
+                    ActorAllowed = true
+                else
+                    ActorAllowed = false
+                endif
+            endif
+            if ActorAllowed && sTempName == "FEC : Load Screen Detector"
+                ActorAllowed = false
+                NymTrace("#ProximityScan [" + sTempName + "] is FEC : Load Screen Detector")
+            endif
+            if ActorAllowed && !a.Is3DLoaded()
+                NymTrace("#ProximityScan [" + sTempName + "] no 3D")
+                ActorAllowed = false
+            endif
+            if ActorAllowed && a.IsInCombat()
+                NymTrace("#ProximityScan [" + sTempName + "] in Combat")
+                ActorAllowed = false
+            endif
+            if folqst.IsPresentFollower(a)
+                NymTrace("#ProximityScan [" + sTempName + "] is Follower")
+                ActorAllowed = false
+            endif
+            if ActorAllowed && a.GetSleepState() > 2
+                NymTrace("#ProximityScan [" + sTempName + "] is Sleeping:" + a.GetSleepState())
+                ActorAllowed = false
+            endif
+            if ActorAllowed
+                if slaveqst.Pretending && sTempDistance <= NearDistance && (sTempGender == 0 || sTempGender == 1 && cfgqst.FemalesAllowed)
+                    if !slaveqst.TempMaster
+                        NymTrace("#ProximityScan [" + sTempName + "] is our Punisher for Pretending")
+                        slaveqst.TempMaster = a
+                    endif
+                endif
+                NymTrace("#ProximityScan [" + sTempName + "] is Allowed")
+                if sTempGender < 2
+                    NymTrace("#ProximityScan [" + sTempName + "] is Human and Allowed")
+                    if cfgqst.IsGuard(a)
+                        GuardSees = true
+                        cfgqst.ProxGuardDetected = cfgqst.ProxGuardDetected + 1.0
+                        cfgqst.ProxActorDetected = cfgqst.ProxActorDetected + 1.0
+                        GuardName01 = sTempName
+                    else
+                        CivilianSees = true
+                        if CivilianName01 == "Nobody"
+                            CivilianName01 = sTempName
+                            cfgqst.ProxActorDetected = cfgqst.ProxActorDetected + 1.0
+                        elseif CivilianName02 == "Nobody"
+                            CivilianName02 = sTempName
+                            cfgqst.ProxActorDetected = cfgqst.ProxActorDetected + 1.0
+                        elseif CivilianName03 == "Nobody"
+                            CivilianName03 = sTempName
+                            cfgqst.ProxActorDetected = cfgqst.ProxActorDetected + 1.0
+                        else
+                            cfgqst.ProxActorDetected = cfgqst.ProxActorDetected + 1.0
+                        endif
+                    endif
+                endif
+            endif
+            if cfgqst.ProxActorDetected > 0.0 && !storqst.ThePublicExposureCommenter
+                storqst.ThePublicExposureCommenter = a
+            endif
+        else
+            debug.Trace("NAKED DEFEAT: #ProximityScan ACTOR[" + i + "] = NONE", 0)
+        endif
+        sTempGender = 5
+    endwhile
+    if GuardSees
+        if Nym() && !cfgqst.IsDefeatRunning() && !storqst.SlaveAtWork
+            NymMessage(GuardName01 + " (a Guard) sees you")
+        else
+            InfoMessage(GuardName01 + " (a Guard) sees you")
+        endif
+    elseif CivilianSees
+        if cfgqst.ProxActorDetected == 1.0
+            if Nym() && !cfgqst.IsDefeatRunning() && !storqst.SlaveAtWork
+                NymMessage(CivilianName01 + " sees you")
+            else
+                InfoMessage(CivilianName01 + " sees you")
+            endif
+        elseif cfgqst.ProxActorDetected == 2.0
+            if Nym() && !cfgqst.IsDefeatRunning() && !storqst.SlaveAtWork
+                NymMessage(CivilianName01 + " and " + CivilianName02 + " can see you")
+            else
+                InfoMessage(CivilianName01 + " and " + CivilianName02 + " can see you")
+            endif
+        elseif cfgqst.ProxActorDetected > 2.0
+            if Nym() && !cfgqst.IsDefeatRunning() && !storqst.SlaveAtWork
+                NymMessage(CivilianName01 + ", " + CivilianName02 + " and " + CivilianName03 + " can see you")
+            else
+                InfoMessage(CivilianName01 + ", " + CivilianName02 + " and " + CivilianName03 + " can see you")
+            endif
+        endif
+    endif
+    debug.Trace("NAKED DEFEAT: #ProximityScan ProxGuardDetected: " + cfgqst.ProxGuardDetected, 0)
+    debug.Trace("NAKED DEFEAT: #ProximityScan ProxActorDetected: " + cfgqst.ProxActorDetected, 0)
+    SetStage(1000)
+EndFunction
 
 Bool Function IsGuard(Actor akRef)
 	if akRef.IsInFaction(cfgqst.GuardDiaogueFaction)
@@ -1720,10 +1763,24 @@ Bool Function IsGuard(Actor akRef)
 EndFunction
 
 Bool Function IsIdleMaster(Actor akRef)
-	if akRef.IsInFaction(cfgqst.GuardDiaogueFaction) && !akRef.IsInFaction(slaveqst.WhippingFaction)
+
+	if (slaveqst.EnslavedBy == "Bandits") && akRef.IsInFaction(cfgqst.BanditFaction)
+	return true
+	elseif (slaveqst.EnslavedBy == "Falmers") && storqst.IsActorInFaction("Falmers", akRef)
+	return true
+	elseif (slaveqst.EnslavedBy == "Rieklings") && storqst.IsActorInFaction("Rieklings", akRef)
+	return true
+	elseif (slaveqst.EnslavedBy == "Draugrs") && storqst.IsActorInFaction("Draugrs", akRef)
+	return true
+	elseif (slaveqst.EnslavedBy == "Masters") && storqst.IsActorInFaction("Masters", akRef)	;Specific Actors act as Masters only. Will be Added to a specific masterfaction
+	return true
 	
+	elseif akRef.IsInFaction(cfgqst.GuardDiaogueFaction) ;&& !akRef.IsInFaction(slaveqst.WhippingFaction)
 		;int MasterSits = akRef.GetSitState()
+	return true
 	
+	elseif IsJarl(akRef)
+		;int MasterSits = akRef.GetSitState()
 		return true
 	else
 		return false

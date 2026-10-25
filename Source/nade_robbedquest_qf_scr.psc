@@ -107,6 +107,14 @@ Function StartRobberyQuest(Actor akRobber = None)
 
 EndFunction
 
+Function DebugRobberyQuest_00()
+
+	Actor a
+	a = Alias_Robber.GetReference() as Actor
+	a.MoveTo(cfgqst.PlayerRef)
+	
+EndFunction 
+
 
 Function RestartQuest(Actor akRobber = None)
 	Int stg = GetStage()
