@@ -3540,7 +3540,7 @@ if Sexlab.IsValidActor(a)
 		Debug.Trace("NAKED DEFEAT rapequest: Human Actor allowed (Undead)")
 		;	if RaceKey == ("Humans")		;need to check for vampire/necromancer, how? #todo
 				;check for argonians & kajiits and sort out if necessary
-			if cfgqst.IsVampire(a) || cfgqst.IsNecromancer(a)		
+			if cfgqst.IsVampire(a) || cfgqst.IsNecromancer(a, false)		;#P+ patch: 6.50 added the FactionCheckOnly parameter; the stale one-argument call failed at runtime
 				if cfgqst.IsBeastRace(a) && !cfgqst.AllowArgonKajit
 				return false
 				else

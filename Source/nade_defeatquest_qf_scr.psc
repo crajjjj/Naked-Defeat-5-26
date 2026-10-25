@@ -12,12 +12,18 @@ ObjectReference Property XMarkerHeadingAnchor Auto
 nade_calmquest_qf_scr Property calmqst Auto
 nade_storage_qf_scr Property storqst Auto
 nade_slavery_qf_scr Property slaveqst Auto
+;nade_followerquest_qf_scr Property folqst Auto
 
 Sound[] Property NakedVoice_Pain Auto
 
 Faction Property NakedFollowerNamedFaction Auto
 Faction Property NakedCagePartnerFaction Auto
 Faction Property LocalSlaveFaction Auto
+
+Sound[] Property SoundStripCloth Auto
+Sound[] Property SoundStripWhipCloth Auto
+;Sound[] Property Breathing Auto	
+
 
 String Property LastNamedFollower Auto 
 
@@ -33,6 +39,7 @@ Perk[] Property LightFootPerks Auto	;[0] LightFoot - [1] Muffled Movement
 ;String Property CurrentLocationType Auto
 
 Bool Property DuplicationWasDone Auto ;needed for AllegianceQuest Duplication Functions --> and because cfgqst is overflowing
+Bool Property DDWiggleScene Auto
 
 ;Bool Property PreventRagdoll Auto
 ;Bool Property PlayerSoundRunning Auto
@@ -42,7 +49,7 @@ Bool Property DuplicationWasDone Auto ;needed for AllegianceQuest Duplication Fu
 int Property MouthOpening Auto
 int Property CurrentSlaveHair Auto
 int Property SexDuration Auto
-
+int Property TongueTimer Auto
 int Property AmbushChance Auto
 
 ;bool Property BlockPosing Auto
@@ -72,6 +79,110 @@ Revert()
 Removes all script added forms from the form list.
 /;
 
+
+ObjectReference Property PlacedTrapWall01 Auto
+ObjectReference Property PlacedTrapWall02 Auto
+
+Function DeleteTrapDoor()
+
+	NymTrace("DeleteTrapDoor()")
+	if PlacedTrapWall01
+	PlacedTrapWall01.DisableNoWait()
+	PlacedTrapWall01.Delete()
+	PlacedTrapWall01 = NONE
+	endif 
+	if PlacedTrapWall02
+	PlacedTrapWall02.DisableNoWait()
+	PlacedTrapWall02.Delete()
+	PlacedTrapWall02 = NONE
+	endif 
+
+EndFunction 
+
+;/
+
+SexLab MiscUtil's ScanCellObjects? PO3 Papyrus Extender has similar functions as well 
+Do doors use a unique form type?
+CheddarTrauma — 01:59
+okay yeah, either MiscUtil ScanCellObjects or PO3 Papyrus Extender FindAllReferencesOfFormType with formtype 29 for Door
+NymraLL — 02:47
+aaah, so this is how its supposed to work!  will try that, much appreciated
+
+
+
+/;
+
+
+Function StartTrapDoor()
+
+		NymTrace("StartTrapDoor()")
+
+		if storqst.IsLocationClearable() && !storqst.IsLocationCleared()
+
+		NymTrace("StartTrapDoor(Valid Location)")	
+
+			;ObjectReference PlacedTrapWall01
+			;ObjectReference PlacedTrapWall02
+			ObjectReference COCMarkerHeadingEntrance
+			Form COCMarkerHeading = (Game.GetFormFromFile(0x00000032, "Skyrim.esm") As Form)
+			;Form TrapWallTemp
+			Float EntranceDistance
+			int Countdown = 10
+		;	if COCMarkerHeading
+		;	NymMessage("COCMarkerHeading Found")
+		;	else 
+		;	NymMessage("COCMarkerHeading NOT Found")
+		;	endif 
+		
+			COCMarkerHeadingEntrance = Game.FindClosestReferenceOfTypeFromRef(COCMarkerHeading, cfgqst.PlayerRef, 2000.0)
+			
+			EntranceDistance = COCMarkerHeadingEntrance.GetDistance(cfgqst.PlayerRef)
+			NymTrace("StartTrapDoor() EntranceDistance["+EntranceDistance+"]")
+		
+			while (EntranceDistance < 125) && (Countdown > 0)
+			Utility.Wait(2.0)
+			EntranceDistance = COCMarkerHeadingEntrance.GetDistance(cfgqst.PlayerRef)	
+			NymTrace("StartTrapDoor() Countdown["+Countdown+"] EntranceDistance["+EntranceDistance+"]")
+			Countdown -= 1
+			endwhile 
+			
+			if Countdown > 0
+				;Float HeadingAngle = COCMarkerHeadingEntrance.GetHeadingAngle()
+				if COCMarkerHeadingEntrance
+				NymTrace("Entrance Marker Found")
+				else 
+				NymTrace("Entrance Marker NOT Found")
+				endif 
+				
+				PlacedTrapWall01 = COCMarkerHeadingEntrance.PlaceAtMe(Game.GetFormFromFile(0x02050620, "ZaZAnimationPack.esm")) ;WoodenJailWall01
+				PlacedTrapWall01.SetAngle(0.0, 0.0, 0.0)
+				PlacedTrapWall01.MoveTo(COCMarkerHeadingEntrance, -75.0 * Math.Sin(COCMarkerHeadingEntrance.GetAngleZ()), -75.0 * Math.Cos(COCMarkerHeadingEntrance.GetAngleZ()), 0.0, abMatchRotation = true)
+				
+				PlacedTrapWall02 = PlacedTrapWall01.PlaceAtMe(Game.GetFormFromFile(0x02050620, "ZaZAnimationPack.esm")) ;WoodenJailWall01
+				PlacedTrapWall02.SetAngle(0.0, 0.0, 0.0)
+				;PlacedTrapWall02.MoveTo(COCMarkerHeadingEntrance, -50.0 * Math.Sin(COCMarkerHeadingEntrance.GetAngleZ()), -50.0 * Math.Cos(COCMarkerHeadingEntrance.GetAngleZ()),  0.0, abMatchRotation = true)
+				
+				PlacedTrapWall02.MoveTo(PlacedTrapWall01, -255.0 * Math.Sin(PlacedTrapWall01.GetAngleZ()+90), -255.0 * Math.Cos(PlacedTrapWall01.GetAngleZ()+90), 0.0, abMatchRotation = true)
+			else 
+			NymTrace("StartTrapDoor() Countdown not 0 -> ABORT")
+			
+			endif 
+		;	if PlacedTrapWall01
+		;	NymTrace("PlacedTrapWall01 TRUE")
+		;	endif 
+				;	if PlacedTrapWall02
+		;	NymTrace("PlacedTrapWall02 TRUE")
+		;	endif 
+		
+		else 
+		NymTrace("StartTrapDoor(NO Valid Location)")
+		
+		endif 
+
+
+EndFunction 
+
+
 Bool Function IsPlayerInLocalSlaveFaction()
 
 	if cfgqst.PlayerRef.IsInFaction(LocalSlaveFaction) 
@@ -83,16 +194,18 @@ Bool Function IsPlayerInLocalSlaveFaction()
 EndFunction 
 
 
+
+
 String Function GetCurrentLocationName()
 
 	Location kCurrentLoc = cfgqst.PlayerRef.GetCurrentLocation()
 	String LocationName = kCurrentLoc.GetName()
 	
 	if !LocationName
-	LocationName = "No Name"
+	LocationName = "Wilderness"
 	endif 
 	
-	NymTrace("GetCurrentLocationName("+LocationName+")")
+	;NymTrace("GetCurrentLocationName("+LocationName+")")
 	
 	return LocationName
 
@@ -120,12 +233,12 @@ EndFunction
 
 Function RegisterModEvents()
 ;RegisterForModEvent("StartForceMouthOpening", "OnStartForceMouthOpening")
-
+RegisterForModEvent("StartSexFuckingSoundLoop", "OnStartSexFuckingSoundLoop")
 EndFunction 
 
 Function UnRegisterModEvents()
 UnRegisterForModEvent("StartForceMouthOpening")
-
+UnRegisterForModEvent("StartSexFuckingSoundLoop")
 EndFunction 
 
 
@@ -164,17 +277,19 @@ Function GetMouthStatePlayer()
 	cfgqst.Gagged = true
 	storqst.Sucking = true
 	MouthStatePlayer = 30
-	else 
-	
-		if storqst.ForceOpen == 1 ;sucking
-		storqst.Sucking = true
-		else 
-		storqst.Sucking = false 
-		endif
 	endif 
 	
+	if storqst.ForceOpen == 1 ;sucking
+	cfgqst.Gagged = true
+	storqst.Sucking = true
+	MouthStatePlayer = 30
+	endif
+		
+	NymTrace("GetMouthStatePlayer storqst.Sucking ("+storqst.Sucking+")")
+	NymTrace("GetMouthStatePlayer cfgqst.Gagged ("+cfgqst.Gagged+")")
 	NymTrace("GetMouthStatePlayer MouthStatePlayer ("+MouthStatePlayer+")")
 	NymTrace("GetMouthStatePlayer MouthOpening ("+MouthOpening+")")
+	
 EndFunction 
 
 
@@ -209,7 +324,7 @@ Function OnStartForceMouthOpening(String EventName, String ArgString, Float ArgN
 	
 		while (Enable || cfgqst.IsDefeatRunning() || cfgqst.SlaveAuction || (MouthOpening > 0)) && cfgqst.ModEnabled	
 			
-			NymTrace("#OpenMouth: "+MouthOpening)
+			NymTrace("#OpenMouth FINAL: "+MouthOpening)
 			
 			if cfgqst.SexScene
 			Utility.Wait(1.0)
@@ -236,6 +351,13 @@ EndFunction
 ; zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
 ; zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
 
+Function PlaySoundStripCloth()
+			SoundStripCloth[0].Play(cfgqst.PlayerRef)
+EndFunction
+
+Function PlaySoundStripWhipCloth()
+			SoundStripWhipCloth[0].Play(cfgqst.PlayerRef)
+EndFunction
 
 
 ;bool function SetExpression(Actor act, int mood, int value, float speed = 0.75) global
@@ -274,7 +396,7 @@ Function ResetModifier_FACE(actor akActor, float speed)
 
 EndFunction 
 
-Function OpenMouthMaintenance()
+Function OpenMouthMaintenance()			;#OpenMouthMaintenance()
 	NymTrace("OpenMouthMaintenance START (OpenMouth Received: "+MouthOpening+") (CurrentMood: "+storqst.CurrentMood+")")
 
 	Bool Open = false
@@ -285,9 +407,9 @@ Function OpenMouthMaintenance()
 	Open = true
 	MouthOpeningFinal = 100
 	
-		if storqst.ForceOpen == 2 ;Kissing
-		EquipTonguesPlayer()
-		endif 
+	;	if storqst.ForceOpen == 2 ;Kissing	<<<<---- CREATES LOOP
+	;	EquipTonguesPlayer()
+	;	endif 
 	
 	else 
 	
@@ -305,24 +427,37 @@ Function OpenMouthMaintenance()
 			endif 
 		endif 
 	endif 
-	
-	if cfgqst.Gagged && !storqst.Sucking ;gagged but not sucking (dont use Open 100)
-	MouthOpeningFinal = 85
-	endif 
-	
+
 	if storqst.CurrentMood == 16 && !storqst.Sucking
 	MouthOpeningFinal = 75
 	endif 
 	
 	if storqst.Sucking
 	MouthOpeningFinal = Utility.RandomInt(95, 100)
+	
+		if storqst.ForceOpen == 1
+		MouthOpeningFinal = 80
+		endif 
+		
 	endif 
 	
 	if MouthOpeningFinal > storqst.MouthOpenMax
 	MouthOpeningFinal = storqst.MouthOpenMax as int
 	endif 
 	
-	if !cfgqst.PlayExpressions 
+	if cfgqst.Gagged && !storqst.Sucking ;gagged but not sucking (dont use Open 100)
+	MouthOpeningFinal = 65
+	endif 
+	
+	if (TongueEquipped > 0) && (MouthOpeningFinal < 60)
+	MouthOpeningFinal = Utility.RandomInt(60, 100)
+	endif
+	
+	if Game.GetCameraState() == 3 ;Free Cam
+	MouthOpeningFinal = Utility.RandomInt(60, 100) ;BRUTE FORCE WORKAROUND 
+	endif 
+	
+	if !cfgqst.PlayExpressions ;|| (Nym() && storqst.Sucking)
 	MouthOpeningFinal = 0
 	endif 
 	
@@ -339,10 +474,27 @@ Function OpenMouthMaintenance()
 	
 EndFunction 
 
-Function InstantMouthOpening()
-	NymTrace("InstantMouthOpening START -> send to OpenMouthMaintenance")
+Function TeachWords()
+    wordofpower GetWord = (game.GetFormFromFile(81442, "Skyrim.esm") as wordofpower)
+    if GetWord
+        NymMessage("You learned the FUZ RO DA shout")
+        game.TeachWord(GetWord)
+        game.UnlockWord(GetWord)
+        GetWord = (game.GetFormFromFile(81443, "Skyrim.esm") as wordofpower)
+        game.TeachWord(GetWord)
+        game.UnlockWord(GetWord)
+        GetWord = (game.GetFormFromFile(81444, "Skyrim.esm") as wordofpower)
+        game.TeachWord(GetWord)
+        game.UnlockWord(GetWord)
+    endif
+EndFunction
+
+;Function InstantMouthOpening()
+;	NymTrace("InstantMouthOpening SKIPPED! -> send to OpenMouthMaintenance")
 	
-	OpenMouthMaintenance()
+	;SKIP!!!
+	
+	;OpenMouthMaintenance()
 	;/	
 
 	Bool Open = false
@@ -367,7 +519,7 @@ Function InstantMouthOpening()
 	
 	/;
 	
-EndFunction 
+;EndFunction 
 
 
 
@@ -420,7 +572,7 @@ Function PlayerMonitor_Loop(bool showmessage )
 EndFunction 
 
 int iUpdateTimer
-
+int iUpdateTimer10
 
 Function STA_CallSpanker()
 
@@ -437,30 +589,200 @@ Function STA_CallSpanker()
 	
 EndFunction
 	
+	;/
+Function PlayNymrasSexSounds()		;#PlayNymrasSexSounds()
+NymTrace("PlayNymrasSexSounds() - SexFuckingSound["+storqst.SexFuckingSound+"] SexFuckingPartners["+storqst.SexFuckingPartners+"]")
+
+	if storqst.SexFuckingSound > 0
+	
+		;2P
+		if storqst.SexFuckingPartners == 1
+		BridgePlaySexSounds()
+		
+		;3P
+		elseif storqst.SexFuckingPartners == 2
+		BridgePlaySexSounds()	
+		Utility.Wait(Utility.RandomInt(0,2))
+		BridgePlaySexSounds()
+		
+		;4P
+		elseif storqst.SexFuckingPartners == 3
+		BridgePlaySexSounds()	
+		Utility.Wait(Utility.RandomInt(0,1))
+		BridgePlaySexSounds()	
+		Utility.Wait(Utility.RandomInt(0,1))
+		BridgePlaySexSounds()	
+
+		;5P
+		elseif storqst.SexFuckingPartners == 4
+		BridgePlaySexSounds()	
+		Utility.Wait(Utility.RandomInt(0,1))
+		BridgePlaySexSounds()	
+		Utility.Wait(Utility.RandomInt(0,1))
+		BridgePlaySexSounds()		
+		Utility.Wait(Utility.RandomInt(0,1))
+		BridgePlaySexSounds()		
+		endif 
+		
+	endif 
+	
+EndFunction 
+
+/;
+
+
+Function OnStartSexFuckingSoundLoop(String EventName, String ArgString, Float ArgNum, Form Sender)
+	NymTrace("OnStartSexFuckingSoundLoop(START)")
+	
+	Bool Enable = false
+	
+	
+	if Enable && Nym() 
+
+		while cfgqst.SexScene && cfgqst.ModEnabled
+		
+		NymTrace("OnStartSexFuckingSoundLoop(LOOPING)")	
+		
+			if storqst.SexFuckingSound > 0
+				;2P
+				if storqst.SexFuckingPartners == 1
+				BridgePlaySexSounds()
+				
+				;3P
+				elseif storqst.SexFuckingPartners == 2
+				BridgePlaySexSounds()	
+				Utility.Wait(Utility.RandomFloat(0.0,2.0))
+				BridgePlaySexSounds()
+				
+				;4P
+				elseif storqst.SexFuckingPartners == 3
+				BridgePlaySexSounds()	
+				Utility.Wait(Utility.RandomInt(0,1))
+				BridgePlaySexSounds()	
+				Utility.Wait(Utility.RandomInt(0,1))
+				BridgePlaySexSounds()	
+
+				;5P
+				elseif storqst.SexFuckingPartners == 4
+				BridgePlaySexSounds()	
+				Utility.Wait(Utility.RandomInt(0,1))
+				BridgePlaySexSounds()	
+				Utility.Wait(0.2)
+				BridgePlaySexSounds()	
+				Utility.Wait(Utility.RandomInt(0,1))
+				BridgePlaySexSounds()		
+				Utility.Wait(Utility.RandomInt(0,1))
+				BridgePlaySexSounds()		
+				endif 
+			endif 
+			
+		Utility.Wait(Utility.RandomFloat(0.5,1.0))
+		
+		endwhile 
+		
+		NymTrace("OnStartSexFuckingSoundLoop(END)")
+		
+	endif 
+
+EndFunction 
+	
+
+Function BridgePlaySexSounds()
+	
+	;Normal Sex Scound
+	if (storqst.SexFuckingSound == 10) 
+	cfgqst.PlaySoundFuckBelt()	
+	elseif (storqst.SexFuckingSound == 20) 
+	storqst.PlaySoundSexMonster()
+	endif 
+
+EndFunction 
+
+Float PreviousZpos
+
+Function CrawlMaintenance()
+
+	if Nym()
+	;	if cfgqst.PlayerRef.IsInFaction(CrawlFaction)
+		Float checkZpos1
+		Float Difference
+		checkZpos1 = cfgqst.PlayerRef.GetPositionZ()
+		NymTrace("CrawlMaintenance(#Z: "+checkZpos1+")")
+		PreviousZpos = checkZpos1
+		Difference = PreviousZpos - checkZpos1
+		NymTrace("CrawlMaintenance(#Difference: "+Difference+")")
+	;	endif 
+	endif 
+
+EndFunction 
+
 
 int GracePeriodPunishers = 0	
+Bool IsWorkingOnStation = false
 	
-;PLAYER MONITOR - Fixed 3 Seconds Status Updates 
+;PLAYER MONITOR - Fixed 3 Seconds Status Updates <- no longer true. 1 second intervalls!
 	
 Event OnUpdate()			;#update	;#monitor #status
 
 	iUpdateTimer += 1
+	iUpdateTimer10 += 1
 	
-	;every second ticks this down.
-	if Nym() && slaveqst.Pretending && D100(10+storqst.Exhaustion)
-	storqst.Exhaustion+= 1
-	endif 
+	;>>>>>>> 1 Second Tick >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 	
-	if iUpdateTimer != 3		
-		if (MouthOpening > 0) && !ForceMouthOpeningRunning
-	;	SendModEvent("StartForceMouthOpening")
+	if cfgqst.PoisonDefeatChance > 0
+		if storqst.TIMER_Health > 0
+		storqst.TIMER_Health -= 1
+		endif 
+		
+		if storqst.TIMER_Stamina > 0
+		storqst.TIMER_Stamina -= 1
+		endif 
+		
+		if storqst.TIMER_NakedCurse > 0
+		storqst.TIMER_NakedCurse -= 1
+			if storqst.TIMER_NakedCurse == 0
+			storqst.NakedCurseEnd()
+			endif 
 		endif 
 
+		if iUpdateTimer10 == 10
+		
+		cfgqst.CheckDurationSpell("Stamina", true)
+		
+		elseif iUpdateTimer10 > 10
+		iUpdateTimer10 = 0
+		cfgqst.CheckDurationSpell("Health", true)
+		
+			if storqst.Toxication > 0 && D100(storqst.Toxication)
+			storqst.Toxication -= 1
+			endif 
+
+		endif 
 	endif 
+	
+	;every second ticks this down.
+	if Nym()
+		if slaveqst.Pretending && D100(10+storqst.Exhaustion)
+		storqst.Exhaustion+= 1
+		endif
 
+		if cfgqst.Dodged > 0 || storqst.Parried > 0 || cfgqst.PlayerInCombat()
+		NymTrace("!Dodge: "+cfgqst.Dodged+" Parried "+storqst.Parried)
+		endif
+	endif
+
+	;if iUpdateTimer != 3
+	;	if (MouthOpening > 0) && !ForceMouthOpeningRunning
+	;;	SendModEvent("StartForceMouthOpening")
+	;	endif
+	;endif
+
+	;>>>>>>> 1 Second Tick >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	OpenMouthMaintenance()
+	CrawlMaintenance()
 
-	NymTrace("defqst: OnUpdate(iUpdateTimer: "+iUpdateTimer+")")
+	NymTrace("defqst: OnUpdate(iUpdateTimer: "+iUpdateTimer+")(iUpdateTimer10: "+iUpdateTimer10+")(TIMER_Health: "+storqst.TIMER_Health+")(TIMER_Stamina: "+storqst.TIMER_Stamina+")(Toxication: "+storqst.Toxication+")")
 	
 	if iUpdateTimer > 3
 	
@@ -471,12 +793,72 @@ Event OnUpdate()			;#update	;#monitor #status
 	iUpdateTimer = 3
 	endif 
 	
+	;>>>>>>> 2 Second Tick >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	if iUpdateTimer == 2
+	storqst.Missbehaviors = 0
+	SavePlayerPosition()
+	endif
+		
+	;>>>>>>> 3 Second Tick >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	
 	if iUpdateTimer == 3		;3 seconds passed - happens everytime
 	iUpdateTimer = 0
-	
+
+	RevertLootedContainerListCountdown += 3
+		if RevertLootedContainerListCountdown > 7200
+		RevertLootedContainerListCountdown = 0
+		storqst.RevertLootedContainerList()
+		endif
+
 		if Nym()
-		NymTrace("Current Slave Gold: "+storqst.GetCurrentSlaveGold())
-		ManageTimeScale() ;test TimeScale
+		
+			if DuplosACount > 0 || (Nym() && DuplosA[0])
+				;we need to make sure that DuplosA get spawned all the time.
+				
+				if (storqst.CurrentLocationName == "Wilderness") && !cfgqst.PlayerRef.IsInInterior() && !cfgqst.PlayerIsInCombat
+				;we are now in the WILDERNESS and not in any other Location(!) and OUTSIDE, escaped (no combat) so we can remove the spawned duplicants.
+				;should we also remove the tags on the other actors? because else we can exploit this maybe?
+				Duplo_CleanUpActors("Duplos")
+				endif 
+			endif 
+		
+		
+			if storqst.SummonedHorses
+			
+			storqst.MonitorHorses()
+
+			endif 
+
+			NymTrace("Current Slave Gold: "+storqst.GetCurrentSlaveGold())
+			ManageTimeScale() ;test TimeScale
+	
+			if storqst.HairDryTimer > 0
+			storqst.HairDryTimer -= 3
+			
+				if storqst.HairDryTimer < 0
+				storqst.HairDryTimer = 0
+				endif 
+				
+				if storqst.HairDryTimer == 0
+				storqst.HairDryTimer
+				cfgqst.ChangeHairStyle("Standard")
+				endif 
+				
+			endif 
+	
+		storqst.TrackLocation()
+		
+			if storqst.IsLocalSlave() && storqst.DirtTattoos == 0
+			float DirtinessCurrent = cfgqst.GetDirtiness()
+			
+				if DirtinessCurrent > 15 && !storqst.Bathing
+				NymMessage("Dirtiness 15 -> Add Rape Hands")
+				storqst.DirtTattoos += 1
+				SendModEvent("StartAddRapeHands")
+				endif 
+				
+			endif 
+
 		endif 
 		
 		;if slaveqst.FetchTaskType == "Mine Iron Ore"	
@@ -485,31 +867,75 @@ Event OnUpdate()			;#update	;#monitor #status
 		
 		
 		Bool CallPunishers = false
-		int PunishmentChance = 0
+		int PunishmentChance = 50
 		if storqst.IsLocalSlave()
 			
+			if Nym() && storqst.IsExhausted() && !cfgqst.SexScene
+			storqst.PlayerSoundToPlay = "Breathing"
+			SendModEvent("Moan")
+			endif
 			
-			if storqst.SlaveAtWork && D100(10)
+			;/
+			if (slaveqst.FetchTaskType == "Flour") ; && 
+			
+				;Start Working and Loop
+				if slaveqst.IsWorkingOnStation("Mill") && !storqst.IsExhausted()
+					;START WORKING ON MILL
+					slaveqst.SlaveIsOccupied = 1
+					storqst.SlaveAtWork = true
+					
+					if !IsWorkingOnStation				
+					IsWorkingOnStation = true 
+					slaveqst.GoodMessage("You start pushing the mill")
+					endif 
+					;Process Grain Gain :P
+					SendModEvent("StartWorkingMill")
+				
+				elseif IsWorkingOnStation	
+				
+					;STOP WORKING ON MILL
+					
+					if storqst.IsExhausted()
+					slaveqst.BadMessage("You have to rest")
+					else 
+					slaveqst.BadMessage("You stop pushing the mill")
+					endif 
+					
+					slaveqst.SlaveIsOccupied = 0
+					storqst.SlaveAtWork = false
+					IsWorkingOnStation = false 				
+				
+				endif 
+			
+			endif 
+			
+			/;
+			
+			if storqst.SlaveAtWork && D100(50)
 			CallPunishers = true
 			else
-				PunishmentChance = 5 + cfgqst.PublicExposure - slaveqst.CompletedDayTasks
 
-				if D100(PunishmentChance) 
-				CallPunishers = true
-				endif 
+			;	if D100(10+cfgqst.PublicExposure) 	;STUPID! They whip thin air. we need to be stationary
+			;	CallPunishers = true
+			;	endif 
+				
 			endif 
 			
 		elseif Nym() && D100(cfgqst.PublicExposure) 
-		CallPunishers = true
+	;	NymBox("CALL PUNISHERS")	
+	;	NymTrace("#NOTE CallPunishers A")
+	;	CallPunishers = true
 		endif 
 		
-		if CallPunishers && GracePeriodPunishers == 0
-		GracePeriodPunishers += 10
+		if CallPunishers; && GracePeriodPunishers == 0
+		;GracePeriodPunishers += 10
 		CallPunishers = false
 		;NymTrace("WHIP AND TOUCH A")
 		;storqst.MoveWhipperMode == 0 ;no initial movement
-		NymTrace("CallWhipper")
-		storqst.StartWhipping_00(10)
+	;	NymMessage("#NOTE CallPunishers B")
+		NymTrace("#NOTE CallPunishers B")
+		storqst.StartWhipping_00(Utility.RandomInt(5,15))
+
 		;NymTrace("WHIP AND TOUCH B")
 		
 		;	if !cfgqst.SexScene && D100(50)
@@ -522,18 +948,33 @@ Event OnUpdate()			;#update	;#monitor #status
 		;WAITING Maintenance (outside SexScene)
 		
 		cfgqst.WaitLoopPlayerMaintenance()
+		
+		if Nym()
+			if storqst.IsLocationClearable() && storqst.IsLocationCleared()
+			DeleteTrapDoor()
+			endif 
+		endif 
+		
 		GetMouthStatePlayer()
 		
-		if cfgqst.IsDefeatRunning() || (Nym() && cfgqst.IsFucking(cfgqst.PlayerRef))
+		if cfgqst.IsDefeatRunning() || (storqst.FastSex == 1) || (Nym() && cfgqst.IsFucking(cfgqst.PlayerRef))
 		NymTrace("SexLoop A")	
 			;--- SEX SCENE ---;
-			if cfgqst.SexScene || (Nym() && cfgqst.IsFucking(cfgqst.PlayerRef))
+			if cfgqst.SexScene || (storqst.FastSex == 1) || (Nym() && cfgqst.IsFucking(cfgqst.PlayerRef))
 			NymTrace("SexLoop B")
 			SexDuration	+=3
 			
-				if Nym()	
-				NymTrace("SexScene A: "+cfgqst.SexScene)
+				if cfgqst.NymBeta
 				NymrasSexEffects()
+				endif
+
+				if Nym()
+				NymTrace("SexScene: "+cfgqst.SexScene+" SceneStage: "+storqst.SexSceneStage)
+
+				;	if storqst.SexFuckingSound > 0
+				;	PlayNymrasSexSounds()
+					
+				;	endif 
 				NymrasSexExpressions()	;sends Moan
 				;SendModEvent("Moan")
 				SendModEvent("StartRaperExpressions")
@@ -542,20 +983,30 @@ Event OnUpdate()			;#update	;#monitor #status
 			;--- NAKED DEFEAT EXPRESSIONS & SOZBDS ---;
 			else 	
 				
-				cfgqst.SetExpression(Utility.RandomInt(1,6))	
-			
-				;looping with fuckbelt sounds & gag sounds
-				if cfgqst.BoolCaptiveFuckBelt || cfgqst.Gagged || cfgqst.SexSceneBukkake
+				Bool DoPlay = false 
+				if cfgqst.IsDefeatRunning() && !cfgqst.IsFucking(cfgqst.PlayerRef)
+				DoPlay = true 
+				elseif (Nym() && cfgqst.IsFucking(cfgqst.PlayerRef))
+				DoPlay = true
+				endif 
 				
-					;only plays with fuckingbelt
-					if cfgqst.BoolCaptiveFuckBelt				
-					cfgqst.PlaySoundFuckBelt()
+				if DoPlay
+					cfgqst.SetExpression(Utility.RandomInt(1,6))	
+				
+					;looping with fuckbelt sounds & gag sounds
+					if cfgqst.BoolCaptiveFuckBelt || cfgqst.Gagged || cfgqst.SexSceneBukkake
 					
-					
+						;only plays with fuckingbelt
+						if cfgqst.BoolCaptiveFuckBelt				
+						cfgqst.PlaySoundFuckBelt()
+						
+						
+						endif
+						
+						SendModEvent("Moan")
 					endif
-					
-					SendModEvent("Moan")
-				endif
+				endif 
+				
 			endif 
 		;--- NAKED DROWNING ---;
 		elseif cfgqst.NakedDrowning && cfgqst.PlayerRef.IsSwimming()
@@ -664,7 +1115,7 @@ Function ToggleDroolPlayer(bool equip)
 			if Drool == TempArmor
 			NymTrace("ToggleDroolPlayer: REMOVE")
 			cfgqst.PlayerRef.UnequipItemEx(Drool, 0, false)
-			cfgqst.PlayerRef.RemoveItem(Drool)
+			cfgqst.PlayerRef.RemoveItem(Drool, 1, true, None)
 			endif 
 		endif 
 	endif 
@@ -723,47 +1174,158 @@ if Nym()
 endif 	
 EndFunction 
 
-Function EquipTonguesPlayer()
-NymTrace("EquipTonguesPlayer")
+Function EquipTonguesPlayer()		;#EquipTonguesPlayer()
+NymTrace("EquipTonguesPlayer[MouthOpening: "+MouthOpening+"][TongueEquipped: "+TongueEquipped+"][TongueTimer: "+TongueTimer+"]")
 
 if Nym()
+			
+	storqst.UseTongues = 1			
+			
+	;>>>>> STEP 0 -  Put Tongues in Inventory >>>>>>	
+	Int Version = 2
 
 	AddTonguesPlayer()
 
-	NymTrace("EquipTonguesPlayer(TongueEquipped CURRENT: "+TongueEquipped+")")
-	
 	Armor TempTongue
+	
+	if !Tongue1
+	Tongue1 = (Game.GetFormFromFile(0x00000D6C, "Tongues.esp") As Armor)
+	Tongue2 = (Game.GetFormFromFile(0x00000D6D, "Tongues.esp") As Armor)
+	Tongue3 = (Game.GetFormFromFile(0x00000D6E, "Tongues.esp") As Armor)
+	Tongue4 = (Game.GetFormFromFile(0x00000D6F, "Tongues.esp") As Armor)
+	Tongue5 = (Game.GetFormFromFile(0x00000D70, "Tongues.esp") As Armor)
+	Tongue6 = (Game.GetFormFromFile(0x00000D71, "Tongues.esp") As Armor)
+	Tongue7 = (Game.GetFormFromFile(0x00000D72, "Tongues.esp") As Armor)
+	Tongue8 = (Game.GetFormFromFile(0x00000D73, "Tongues.esp") As Armor)
+	Tongue9 = (Game.GetFormFromFile(0x00000D74, "Tongues.esp") As Armor)
+	Tongue10 = (Game.GetFormFromFile(0x00000D75, "Tongues.esp") As Armor)	
+	endif 
+
+
+	;ACTIVE VERSION : 
+	if Version == 2
 		
-		if !Tongue1
-		Tongue1 = (Game.GetFormFromFile(0x00000D6C, "Tongues.esp") As Armor)
-		Tongue2 = (Game.GetFormFromFile(0x00000D6D, "Tongues.esp") As Armor)
-		Tongue3 = (Game.GetFormFromFile(0x00000D6E, "Tongues.esp") As Armor)
-		Tongue4 = (Game.GetFormFromFile(0x00000D6F, "Tongues.esp") As Armor)
-		Tongue5 = (Game.GetFormFromFile(0x00000D70, "Tongues.esp") As Armor)
-		Tongue6 = (Game.GetFormFromFile(0x00000D71, "Tongues.esp") As Armor)
-		Tongue7 = (Game.GetFormFromFile(0x00000D72, "Tongues.esp") As Armor)
-		Tongue8 = (Game.GetFormFromFile(0x00000D73, "Tongues.esp") As Armor)
-		Tongue9 = (Game.GetFormFromFile(0x00000D74, "Tongues.esp") As Armor)
-		Tongue10 = (Game.GetFormFromFile(0x00000D75, "Tongues.esp") As Armor)	
+		bool EquipTongue = false
+		int CamState
+		int i = 0
+	
+		;>>>>> STEP 1 - Determine if we equip Tongue or Not >>>>>>
+		
+		;KISSING - Force Equip Tongue 
+		if storqst.IsPlayerKissing()
+		NymTrace("EquipTonguesPlayer(KISSING A)")
+		EquipTongue = true 
+
+		;Gagged / Sucking -> Remove Tongue 
+		elseif (cfgqst.Gagged || storqst.Sucking)
+		NymTrace("EquipTonguesPlayer(FORCED REMOVED because Gagged:"+cfgqst.Gagged+" // Sucking:"+storqst.Sucking+")")
+		
+		;NymBox("UnequipTongue FORCED")
+		UnequipTonguesPlayer("forced")
+		;Directly Unequippping after the "Deed" is done elsewhere 
+			
+			;I THINK WE DONT NEED THIS FOR REMOVING TONGUE?
+			;CamState = Game.GetCameraState() 
+			;NymTrace("CAMERA STATE B = "+CamState)
+			
+			;if CamState == 3	
+			;NymTrace("defqst.QueueNiNodeUpdate(cfqgst 712")
+			;NymMessage("NiNodeUpdate B!")
+			;cfgqst.PlayerRef.QueueNiNodeUpdate()
+			;endif 
+		
+		;No Tongue -> Equip A Tongue 
+		elseif TongueEquipped == 0 
+		
+		EquipTongue = true 	
+		
+		;Has Tongue -> Random Swapping 
+		elseif (TongueEquipped > 0) && D100(25)	;we have a tongue and we have a 25% chance of swapping it
+	
+		NymTrace("EquipTonguesPlayer(TONGUE SWAPPED (Gagged?: "+cfgqst.Gagged+" Sucking? "+storqst.Sucking+")  NEW B: "+TongueEquipped+")")
+		EquipTongue = true 
+		
 		endif 
+		;>>>>> STEP 2 - Actually DO Equip the Tongue here >>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	
+		if EquipTongue
 		
+		i = Utility.RandomInt(1,10)
+			
+			if i == 1 
+			TempTongue = Tongue1		;low long straight, 20 degree downfacing	(Sucking)
+			elseif i == 2 || i == 3 
+			TempTongue = Tongue2		;low tup facing down 20 degree downfacing (Sucking)
+			;elseif i == 3	
+			;TempTongue = Tongue3		;low, curled up. DONT use 
+			elseif i == 4 
+			TempTongue = Tongue4		;low very long, hanging down. gagged?
+			elseif i == 5	
+			TempTongue = Tongue5		;low tip facing up very long, hanging down. gagged?
+			elseif i == 6
+			TempTongue = Tongue6		;low, SHORT, straight, gagged? sucking
+			elseif i == 7	
+			TempTongue = Tongue7		;medium, curving down. neither gag nor suck
+			elseif i == 8 || i == 9
+			TempTongue = Tongue8	;medium, curving down. neither gag nor suck
+			;elseif i == 9	
+			;TempTongue = Tongue9		;curled upo, dont use
+			elseif i == 10	
+			TempTongue = Tongue10		;facing up
+			endif 
+			
+			;---- IMPORTANT - Set Tongues Equipped so we know.... Stupid. So replace please.
+			
+			TongueEquipped = i
+		;	if (cfgqst.Gagged || storqst.Sucking)	;we are gagged but not sucking ---> no tongue!
+		;	i = 404 
+		;	endif 
+
+		;	if i == 404
+		;	UnequipTonguesPlayer("forced")
+		;	else 
+			OpenMouthMaintenance()
+			Utility.Wait(0.1)	;wait short for mouth to open
+			NymTrace("EquipTonguesPlayer(TongueEquipped CURRENT CHANGED: "+TongueEquipped+")")
+			cfgqst.PlayerRef.EquipItemEx(TempTongue, 0, false, true)
+		;	endif 
+			
+		;	CamState = Game.GetCameraState() 
+		;	NymTrace("CAMERA STATE B = "+CamState)
+			
+		;	if CamState == 3	
+		;	NymTrace("defqst.QueueNiNodeUpdate(cfqgst 712")
+		;	NymMessage("NiNodeUpdate B!")
+		;	cfgqst.PlayerRef.QueueNiNodeUpdate()  ;----> NOT A WORKING WORKAROUND :( 
+			;InstantMouthOpening()
+		;	endif 
+		endif 
+	
+	;INACTIVE/OLD VERSION 
+	elseif Version == 1
+
+		;OLD CODE 
 		;EQUIP NEW Tongue (had no Tongue)
 		if TongueEquipped == 0 
 			int i = Utility.RandomInt(1,10)
 			NymTrace("EquipTonguesPlayer(TongueEquipped A)")	
-			if cfgqst.Gagged && !storqst.Sucking	;we are gagged but not sucking ---> no tongue!
-				
-				if D100(33)
-				i = 0 
-				else 
-				i = Utility.RandomInt(4,6)
-				endif 
-			elseif storqst.Sucking
-			NymTrace("EquipTonguesPlayer(TongueEquipped B)")
-			;select suitable tongue only
-				i = Utility.RandomInt(1,2)
-			endif 
 			
+			
+			if (cfgqst.Gagged || storqst.Sucking)	;we are gagged but not sucking ---> no tongue!
+			;NEW: tongues always clip. So for now, NO tongue until we have specialized meshes	
+			;	if D100(33)
+				i = 404 
+			;	else 
+			;	i = Utility.RandomInt(4,6)
+			;	endif 
+		;	elseif storqst.Sucking
+		;	NymTrace("EquipTonguesPlayer(TongueEquipped B)")
+			;select suitable tongue only
+			;NEW: tongues always clip. So for now, NO tongue until we have specialized meshes
+		;		i = 0 
+			;	i = Utility.RandomInt(1,2)
+			endif 
+						
 			if i == 1 
 			TempTongue = Tongue1		;low long straight, 20 degree downfacing	(Sucking)
 			elseif i == 2 || i == 3 
@@ -792,76 +1354,92 @@ if Nym()
 			cfgqst.PlayerRef.EquipItemEx(TempTongue, 0, false, true)
 			;nioverride.ApplyOverrides(cfgqst.PlayerRef)
 			;if !cfgqst.IsPlayerGagged()
-			int CamState = Game.GetCameraState() 
-			NymTrace("CAMERA STATE A = "+CamState)
+		;	int CamState = Game.GetCameraState() 
+		;	NymTrace("CAMERA STATE A = "+CamState)
 			
-			Bool AllowNiNodeUpdate = false 
+		;	Bool AllowNiNodeUpdate = false 
 			
-			if (CamState == 3)	;free cam
-			AllowNiNodeUpdate = true 
-				
-				if cfgqst.SexScene && cfgqst.Gagged ;during Sex when gagged NO updates allowed (or needed)
-				AllowNiNodeUpdate = false 
-				endif 
-			endif 
+		;	if (CamState == 3)	;free cam
+		;	AllowNiNodeUpdate = true 
+		;		
+		;		if cfgqst.SexScene && cfgqst.Gagged ;during Sex when gagged NO updates allowed (or needed)
+		;		AllowNiNodeUpdate = false 
+		;		endif 
+		;	endif 
 			
-			if AllowNiNodeUpdate 
-			NymTrace("defqst.QueueNiNodeUpdate(cfqgst 668")
-			NymMessage("NiNodeUpdate!")
-			cfgqst.PlayerRef.QueueNiNodeUpdate()
-			InstantMouthOpening()
-			endif 
+		;	if AllowNiNodeUpdate 
+		;	NymTrace("defqst.QueueNiNodeUpdate(cfqgst 668")
+		;	NymMessage("NiNodeUpdate!")
+		;	cfgqst.PlayerRef.QueueNiNodeUpdate()		;NOT WORKING 
+		;	OpenMouthMaintenance()
+		;	endif 
 			;endif 
 		;UNEQUIP TONGUE 
-		elseif (TongueEquipped > 0) && D100(25)
-		NymTrace("EquipTonguesPlayer(TongueEquipped NEW B: "+TongueEquipped+")")
+		
+		elseif (TongueEquipped > 0) && D100(25)	;we have a tongue and we have a 25% chance of swapping it
+		NymTrace("EquipTonguesPlayer(TONGUE SWAPPED (Gagged?: "+cfgqst.Gagged+" Sucking? "+storqst.Sucking+")  NEW B: "+TongueEquipped+")")
+
 		;UnequipTonguesPlayer()
 			
 			int i = Utility.RandomInt(1,10)
 			
 			if i == 1 
-			TempTongue = Tongue1
-			elseif i == 2 
-			TempTongue = Tongue2
-			elseif i == 3	
-			TempTongue = Tongue3	
+			TempTongue = Tongue1		;low long straight, 20 degree downfacing	(Sucking)
+			elseif i == 2 || i == 3 
+			TempTongue = Tongue2		;low tup facing down 20 degree downfacing (Sucking)
+			;elseif i == 3	
+			;TempTongue = Tongue3		;low, curled up. DONT use 
 			elseif i == 4 
-			TempTongue = Tongue4
+			TempTongue = Tongue4		;low very long, hanging down. gagged?
 			elseif i == 5	
-			TempTongue = Tongue5	
+			TempTongue = Tongue5		;low tip facing up very long, hanging down. gagged?
 			elseif i == 6
-			TempTongue = Tongue6
+			TempTongue = Tongue6		;low, SHORT, straight, gagged? sucking
 			elseif i == 7	
-			TempTongue = Tongue7	
-			elseif i == 8 
-			TempTongue = Tongue8
-			elseif i == 9	
-			TempTongue = Tongue9	
+			TempTongue = Tongue7		;medium, curving down. neither gag nor suck
+			elseif i == 8 || i == 9
+			TempTongue = Tongue8	;medium, curving down. neither gag nor suck
+			;elseif i == 9	
+			;TempTongue = Tongue9		;curled upo, dont use
 			elseif i == 10	
-			TempTongue = Tongue10	
+			TempTongue = Tongue10		;facing up
 			endif 
 			
-			TongueEquipped = i
+			if (cfgqst.Gagged || storqst.Sucking)	;we are gagged but not sucking ---> no tongue!
+			i = 404 
+			endif 
+
+			if i == 404
+			UnequipTonguesPlayer("forced")
+			
+			;elseif TongueEquipped
+			else 
 			NymTrace("EquipTonguesPlayer(TongueEquipped CURRENT CHANGED: "+TongueEquipped+")")
 			cfgqst.PlayerRef.EquipItemEx(TempTongue, 0, false, true)
 			;nioverride.ApplyOverrides(cfgqst.PlayerRef)
 			;if !cfgqst.IsPlayerGagged()
-			
-			int CamState = Game.GetCameraState() 
-			NymTrace("CAMERA STATE B = "+CamState)
-			if CamState == 3	
-			NymTrace("defqst.QueueNiNodeUpdate(cfqgst 712")
-			NymMessage("NiNodeUpdate B!")
-			cfgqst.PlayerRef.QueueNiNodeUpdate()
-			InstantMouthOpening()
 			endif 
+			
+		;	int CamState = Game.GetCameraState() 
+		;	NymTrace("CAMERA STATE B = "+CamState)
+			
+		;	if CamState == 3	
+			;NymTrace("defqst.QueueNiNodeUpdate(cfqgst 712")
+			;;NymMessage("NiNodeUpdate B!")
+			;cfgqst.PlayerRef.QueueNiNodeUpdate()
+			;OpenMouthMaintenance()
+		;	endif 
 			;endif 
 		
 		endif 
+	endif 
 endif 
 
 EndFunction 
 
+
+;-------->>>>>>>>>> MOVED TO PLAYERALIASQUEST >>>>>>>>>>>
+;/
 Armor PlugLantern
 Armor PlugTorch
 Spell FaceLightSpellDark
@@ -882,16 +1460,16 @@ endif
 EndFunction 
 
 
-Function TogglePlayerLight()
+Function TogglePlayerLight()		;#TogglePlayerLight()
 
+	NymTrace("TogglePlayerLight()")
 	
-
 	If Nym()
 	
 		DeleteTorch()
 	
 		if !PlugLantern
-		FaceLightSpellDark = Game.GetFormFromFile(0x0000D79, "Better Face Lighting - ENB Light.esp") as Spell ;dark	lvl 0
+		FaceLightSpellDark = Game.GetFormFromFile(0x0000D77, "Better Face Lighting - ENB Light.esp") as Spell ;dark	lvl 1
 		FaceLightSpellMedium = Game.GetFormFromFile(0x0000D73, "Better Face Lighting - ENB Light.esp") as Spell ;medium lvl 3
 		FaceLightSpellBright = Game.GetFormFromFile(0x0000857, "Better Face Lighting - ENB Light.esp") as Spell ;bright lvl 6
 		PlugTorch = Game.GetFormFromFile(0x0002312, "pchsImmersivePlugs.esp") as Armor ;torch
@@ -907,59 +1485,178 @@ Function TogglePlayerLight()
 		;DURING DEFEAT/SEX  
 		if cfgqst.IsDefeatRunning() || cfgqst.SexScene
 			
+			;----------------ADD 1 -----------------
 			if CurrentLight == 0 ;no Light
-			cfgqst.PlayerRef.AddSpell(FaceLightSpellDark) ;add light dark
+			cfgqst.PlayerRef.AddSpell(FaceLightSpellDark, false) ;add light dark
+				
+				;Followers ADD LIGHT 1 
+				if folqst.IsWithUs_Follower(0)
+				folqst.NakedFollower[0].AddSpell(FaceLightSpellDark, false)
+				endif
+				if folqst.IsWithUs_Follower(1)
+				folqst.NakedFollower[1].AddSpell(FaceLightSpellDark, false)
+				endif
+
 			CurrentLight = 1
+			
+			;------------- Remove 1 ADD 2 --------------------
 			elseif CurrentLight == 1
+			
 			cfgqst.PlayerRef.RemoveSpell(FaceLightSpellDark) 
-			cfgqst.PlayerRef.AddSpell(FaceLightSpellMedium)
+			
+				;Followers REMOVE LIGHT  1
+				if folqst.IsWithUs_Follower(0) && folqst.NakedFollower[0].HasSpell(FaceLightSpellDark)
+				folqst.NakedFollower[0].RemoveSpell(FaceLightSpellDark)
+				endif
+				if folqst.IsWithUs_Follower(1) && folqst.NakedFollower[1].HasSpell(FaceLightSpellDark)
+				folqst.NakedFollower[1].RemoveSpell(FaceLightSpellDark)
+				endif
+				
+			cfgqst.PlayerRef.AddSpell(FaceLightSpellMedium, false)
+			
+				;Followers ADD LIGHT 2
+				if folqst.IsWithUs_Follower(0)
+				folqst.NakedFollower[0].AddSpell(FaceLightSpellMedium, false)
+				endif
+				if folqst.IsWithUs_Follower(1)
+				folqst.NakedFollower[1].AddSpell(FaceLightSpellMedium, false)
+				endif
+
 			CurrentLight = 2
+			
+			;----------------Remove 2 ADD 3 -----------------
 			elseif CurrentLight == 2
 			cfgqst.PlayerRef.RemoveSpell(FaceLightSpellMedium) 
-			cfgqst.PlayerRef.AddSpell(FaceLightSpellBright) 
+			
+				;Followers REMOVE LIGHT  2
+				if folqst.IsWithUs_Follower(0) && folqst.NakedFollower[0].HasSpell(FaceLightSpellMedium)
+				folqst.NakedFollower[0].RemoveSpell(FaceLightSpellMedium)
+				endif
+				if folqst.IsWithUs_Follower(1) && folqst.NakedFollower[1].HasSpell(FaceLightSpellMedium)
+				folqst.NakedFollower[1].RemoveSpell(FaceLightSpellMedium)
+				endif
+			
+			cfgqst.PlayerRef.AddSpell(FaceLightSpellBright, false) 
+			
+				;Followers ADD LIGHT 3
+				if folqst.IsWithUs_Follower(0)
+				folqst.NakedFollower[0].AddSpell(FaceLightSpellBright, false)
+				endif
+				if folqst.IsWithUs_Follower(1)
+				folqst.NakedFollower[1].AddSpell(FaceLightSpellBright, false)
+				endif
+			
 			CurrentLight = 3
+			
+			
+			;------------------Remove Light 3 (on All) ---------------
 			elseif CurrentLight == 3	
+			
 			cfgqst.PlayerRef.RemoveSpell(FaceLightSpellBright) 
-			CurrentLight = 0
+
+				;Followers REMOVE LIGHT  3
+				if folqst.IsWithUs_Follower(0) && folqst.NakedFollower[0].HasSpell(FaceLightSpellBright)
+				folqst.NakedFollower[0].RemoveSpell(FaceLightSpellBright)
+				endif
+				if folqst.IsWithUs_Follower(1) && folqst.NakedFollower[1].HasSpell(FaceLightSpellBright)
+				folqst.NakedFollower[1].RemoveSpell(FaceLightSpellBright)
+				endif
+				
+				CurrentLight = 0
+			
+			;---------------------------------
 			elseif CurrentLight == 4	
 			cfgqst.PlayerRef.UnequipItemEx(PlugTorch, 0, false)
 			;cfgqst.PlayerRef.RemoveItem(PlugTorch)
 			Utility.Wait(0.2)
 			DeleteTorch()
 			CurrentLight = 0	
+			
+			;---------------------------------
 			elseif CurrentLight == 5	
 			cfgqst.PlayerRef.UnequipItemEx(PlugLantern, 0, false)
 			cfgqst.PlayerRef.RemoveItem(PlugLantern)
 			CurrentLight = 0
 			endif 
 		
-		;DURING ADVENTURE  - rotate medium and plug
+		;>>>>>>>>>>>>>>>> DURING ADVENTURE  - rotate medium and plug <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		else 
 			
 			;Has No Light
 			if CurrentLight == 0 
 			NymTrace("TogglePlayerLight() - No Light - Add Medium")
-			cfgqst.PlayerRef.AddSpell(FaceLightSpellMedium) 
+			cfgqst.PlayerRef.AddSpell(FaceLightSpellMedium, false) 
 			CurrentLight = 2
+			
+				;Followers ADD LIGHT 2 Adventure 
+				if folqst.IsWithUs_Follower(0)
+				folqst.NakedFollower[0].AddSpell(FaceLightSpellMedium, false)
+				endif
+				if folqst.IsWithUs_Follower(1)
+				folqst.NakedFollower[1].AddSpell(FaceLightSpellMedium, false)
+				endif
 			
 			;PLUG Lantern or Torch
 			elseif CurrentLight == 1 || CurrentLight == 2 || CurrentLight == 3	
-			NymTrace("TogglePlayerLight() - Medium Facelight - Add Plug")
+			NymTrace("TogglePlayerLight() - Remove Facelight ("+CurrentLight+") - Add Plug")
 			
 				if CurrentLight == 1
 				cfgqst.PlayerRef.RemoveSpell(FaceLightSpellDark) 
+				
+					;Followers REMOVE LIGHT  1
+					if folqst.IsWithUs_Follower(0) && folqst.NakedFollower[0].HasSpell(FaceLightSpellDark)
+					folqst.NakedFollower[0].RemoveSpell(FaceLightSpellDark)
+					endif
+					if folqst.IsWithUs_Follower(1) && folqst.NakedFollower[1].HasSpell(FaceLightSpellDark)
+					folqst.NakedFollower[1].RemoveSpell(FaceLightSpellDark)
+					endif
+					
+					;Followers ADD LIGHT 2
+					if folqst.IsWithUs_Follower(0) && !folqst.NakedFollower[0].HasSpell(FaceLightSpellMedium)
+					folqst.NakedFollower[0].AddSpell(FaceLightSpellMedium, false)
+					endif
+					if folqst.IsWithUs_Follower(1) && !folqst.NakedFollower[1].HasSpell(FaceLightSpellMedium)
+					folqst.NakedFollower[1].AddSpell(FaceLightSpellMedium, false)
+					endif
+					
 				elseif CurrentLight == 2
 				cfgqst.PlayerRef.RemoveSpell(FaceLightSpellMedium) 
+	
+					;Followers ADD LIGHT 2
+					if folqst.IsWithUs_Follower(0) && !folqst.NakedFollower[0].HasSpell(FaceLightSpellMedium)
+					folqst.NakedFollower[0].AddSpell(FaceLightSpellMedium, false)
+					endif
+					if folqst.IsWithUs_Follower(1) && !folqst.NakedFollower[1].HasSpell(FaceLightSpellMedium)
+					folqst.NakedFollower[1].AddSpell(FaceLightSpellMedium, false)
+					endif
+
 				elseif CurrentLight == 3	
 				cfgqst.PlayerRef.RemoveSpell(FaceLightSpellBright) 
+				
+					;Followers REMOVE LIGHT  3
+					if folqst.IsWithUs_Follower(0) && folqst.NakedFollower[0].HasSpell(FaceLightSpellBright)
+					folqst.NakedFollower[0].RemoveSpell(FaceLightSpellBright)
+					endif
+					if folqst.IsWithUs_Follower(1) && folqst.NakedFollower[1].HasSpell(FaceLightSpellBright)
+					folqst.NakedFollower[1].RemoveSpell(FaceLightSpellBright)
+					endif
+					
+					;Followers ADD LIGHT 2
+					if folqst.IsWithUs_Follower(0) && !folqst.NakedFollower[0].HasSpell(FaceLightSpellMedium)
+					folqst.NakedFollower[0].AddSpell(FaceLightSpellMedium, false)
+					endif
+					if folqst.IsWithUs_Follower(1) && !folqst.NakedFollower[1].HasSpell(FaceLightSpellMedium)
+					folqst.NakedFollower[1].AddSpell(FaceLightSpellMedium, false)
+					endif
+				
 				endif 
 			
 				if D100(50)	;torch
-				cfgqst.PlayerRef.AddItem(PlugTorch)
+				cfgqst.PlayerRef.AddItem(PlugTorch, 1, true)
 				cfgqst.PlayerRef.EquipItemEx(PlugTorch, 0, true ,true)
 				CurrentLight = 4		
 				else  ;lantern
-				cfgqst.PlayerRef.AddItem(PlugLantern)	;T
+				cfgqst.PlayerRef.AddItem(PlugLantern, 1, true)	;T
 				cfgqst.PlayerRef.EquipItemEx(PlugLantern, 0, true ,true)
 				CurrentLight = 5
 				endif 
@@ -968,14 +1665,14 @@ Function TogglePlayerLight()
 			elseif CurrentLight == 4
 			cfgqst.PlayerRef.UnequipItemEx(PlugTorch, 0, false)
 			;cfgqst.PlayerRef.RemoveItem(PlugTorch)
-			cfgqst.PlayerRef.AddSpell(FaceLightSpellMedium) 
+			cfgqst.PlayerRef.AddSpell(FaceLightSpellMedium, false) 
 			Utility.Wait(0.2)
 			DeleteTorch()
 			CurrentLight = 2
 			elseif CurrentLight == 5
 			cfgqst.PlayerRef.UnequipItemEx(PlugLantern, 0, false)
 			cfgqst.PlayerRef.RemoveItem(PlugLantern)
-			cfgqst.PlayerRef.AddSpell(FaceLightSpellMedium) 
+			cfgqst.PlayerRef.AddSpell(FaceLightSpellMedium, false) 
 			CurrentLight = 2
 			endif 
 
@@ -986,6 +1683,7 @@ EndFunction
 
 
 Function DeleteTorch()
+
 		NymTrace("DeleteTorch()")
 		ObjectReference ClosestTorch
 
@@ -1008,23 +1706,55 @@ Function DeleteTorch()
 		else 
 		NymTrace("DeleteTorch(ClosestTorch NOT FOUND)")
 
-		endif
+			endif
 
 EndFunction	
+/;
+	
+;<<<<<<<<<<<<<<<<<<< MOVED TO PLAYERALIASQUEST <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-Function UnequipTonguesPlayer()
-NymTrace("UnequipTonguesPlayer()")
-NymTrace("UnequipTonguesPlayer(TongueEquipped: "+TongueEquipped+")")
-	int Mode = 4
+
+
+Function UnequipTonguesPlayer(string sMode)				;#tongues3	;#UnequipTonguesPlayer()
+;NymTrace("UnequipTonguesPlayer()")
+NymTrace("UnequipTonguesPlayer[Mode: "+sMode+"][TongueEquipped: "+TongueEquipped+"][TongueTimer: "+TongueTimer+"][ForceOpen: "+storqst.ForceOpen+"]")
 
 	if Nym() 	;NakedTongues
+	
+		if sMode == "normal"
+
+			if storqst.IsPlayerKissing() ;Kissing - Force Tongues to remain outside.
+			;do nothing
+			else 		
+			
+				if TongueEquipped > 0 
+				;we keep the tongue for some time now...
+				TongueTimer += 1
+				
+					if TongueTimer > 4
+					
+					TongueTimer = 0
+					PO3_SKSEFunctions.RemoveAllModItems(cfgqst.PlayerRef, "Tongues.esp", true) 	;true -> only Unequip
+					TongueEquipped = 0
+					endif 
+				endif 
+			endif 
+			
+		elseif sMode == "forced"
+
+			if storqst.IsPlayerKissing() && cfgqst.SexScene ;Kissing - Force Tongues to remain outside.
+		;	NymBox("Forced Unequip Tongue while Kissing")		
+		;DO NOTHING 
+			else 
 		
-		if storqst.ForceOpen == 2 ;Kissing - Force Tongues to remain outside.
-		;do nothing
-		else 		
-		PO3_SKSEFunctions.RemoveAllModItems(cfgqst.PlayerRef, "Tongues.esp", true) ;only Unequip
+			PO3_SKSEFunctions.RemoveAllModItems(cfgqst.PlayerRef, "Tongues.esp", true) 	;true -> only Unequip
+			TongueEquipped = 0
+			TongueTimer = 0
+			endif 
 		endif 
+			
 	endif 
+	
 		;/
 		if Mode == 3 
 		
@@ -1077,30 +1807,57 @@ EndFunction
 
 
 Function NymrasSexEffects()
-
-	if SexEffect01 > 0
-	
-		if D100(75) ;randomize
-		
-			if SexEffect01 == 2
-			cfgqst.StartPunishmentEffect("Shock")
-			elseif SexEffect01 == 3 
-			cfgqst.StartPunishmentEffect("Forst")
-			elseif SexEffect01 == 4 
-			cfgqst.StartPunishmentEffect("Fire")
-			endif 
-		endif 		
-	endif 
-		
-
-EndFunction 
+    NymTrace("NymrasSexEffects(" + SexEffect01 + ")")
+    if SexEffect01 > 0
+        if D100(75.0)
+            if SexEffect01 == 2
+                cfgqst.StartPunishmentEffect("Shock")
+            elseif SexEffect01 == 3
+                cfgqst.StartPunishmentEffect("Frost")
+            elseif SexEffect01 == 4
+                cfgqst.StartPunishmentEffect("Fire")
+            elseif SexEffect01 == 5 && D100(50.0)
+                cfgqst.StartPunishmentEffect("Poison")
+            elseif SexEffect01 == 6
+                cfgqst.StartPunishmentEffect("Dwemer Sex")
+            endif
+        endif
+    endif
+EndFunction
 
 Armor[] Property DrippingPussyZAZ Auto
 
-Function DrippingPussy(bool Start)
+Function DrippingPussy(bool Start)		;#DrippingPussy()
 				
+		
+		if Nym()	;Squirt 0 is good. We test Squirt 1 now. Make a script with random squirting and orgasm effect maybe later.
+		;to do: we need to make a standard script that equips items and keeps track in a formlist so we can just remove all of them without the script needing to track? (PowerOfThree!)
+
+			if Start
+				
+			int i = Utility.RandomInt(0,1)
+			NymTrace("DrippingPussy START ["+i+"]")
+			cfgqst.PlayerRef.AddItem(DrippingPussyZAZ[i], 1, true)
+			cfgqst.PlayerRef.EquipItem(DrippingPussyZAZ[i], false, true)
+			else 
+			
+				int DripsRemovedCount = 0
+				Form[] DripList = new Form[2]
+				DripList[0] = DrippingPussyZAZ[0]
+				DripList[1] = DrippingPussyZAZ[1]
+	
+				;RulesList[5] = SlaveTask_RuleCrawling
+				DripsRemovedCount = SPE_ObjectRef.RemoveItems(cfgqst.PlayerRef, DripList, none) 	
+		
+			;cfgqst.PlayerRef.RemoveItem(DrippingPussyZAZ[0], 1, true, None)
+			;cfgqst.PlayerRef.RemoveItem(DrippingPussyZAZ[1], 1, true, None)
+			endif 
+		endif 
+			
+				
+			;/	
 		if storqst.BodyFluids	
-		;/
+		
 			if Start 
 			cfgqst.PlayerRef.AddItem(DrippingPussyZAZ[0], 1, true)
 			cfgqst.PlayerRef.EquipItem(DrippingPussyZAZ[0], false, true)
@@ -1112,10 +1869,11 @@ Function DrippingPussy(bool Start)
 			cfgqst.PlayerRef.EquipItem(DrippingPussyZAZ[2], false, true)
 			
 			else 
-			cfgqst.PlayerRef.RemoveItem(DrippingPussyZAZ[0], 1, true, None)
+			
 			endif 
-			/;
+			
 		endif 
+		/;
 
 EndFunction 
 
@@ -1132,18 +1890,27 @@ Debug.Trace("NAKED DEFEAT configquest: AddBrutalPlugs()")
 		iTypeNumber = Utility.RandomInt (1, 6)
 		endif 
 		
+		if iTypeNumber == 0
+			if cfgqst.DefeatType == "Undead" && cfgqst.DefeatTypeGeneral == "AreHumanoids"
+			iTypeNumber = Utility.RandomInt (4, 6)
+
+			else 
+			iTypeNumber = Utility.RandomInt (1, 6)
+			endif 
+		endif 
+		
 		if iTypeNumber == 1
 		;CARROT
 		BrutalPlug = (Game.GetFormFromFile(0x00000D63, "pchsImmersivePlugs.esp") As Armor)		
 
-		;COMMON SOULGEM
-		elseif iTypeNumber == 2
-		BrutalPlug = (Game.GetFormFromFile(0x000048DD, "pchsImmersivePlugs.esp") As Armor)
-			
 		;MEAD
+		elseif iTypeNumber == 2
+		BrutalPlug = (Game.GetFormFromFile(0x000012D0, "pchsImmersivePlugs.esp") As Armor)	
+			
+		;COMMON SOULGEM
 		elseif iTypeNumber == 3
-		BrutalPlug = (Game.GetFormFromFile(0x000012D0, "pchsImmersivePlugs.esp") As Armor)
-
+		BrutalPlug = (Game.GetFormFromFile(0x000048DD, "pchsImmersivePlugs.esp") As Armor)
+		
 		;HOOK
 		elseif iTypeNumber == 4
 		BrutalPlug = (Game.GetFormFromFile(0x0000183E, "pchsImmersivePlugs.esp") As Armor)
@@ -1957,74 +2724,246 @@ Function ReturnAggressorStuff(actor akActor, int number)
 		endif 
 		
 EndFunction	
-		
-Function TestFunction()		;##dir	;##test
-;empty
 
-	if Nym() && !cfgqst.IsDefeatRunning() && !cfgqst.IsFucking(cfgqst.PlayerRef) && !cfgqst.AlreadyImmobilized
+sslSystemConfig Property sslConfig Auto 
 
-		NymTrace("Warmth: "+cfgqst.PlayerRef.GetActorValue("SurvivalWarmth"))
+Function SexLabMCM_Toggle(string sOption, bool bToggle)
 
-		;SPELL_Escape_Loosen
-		;Spell RestoreHealt = Game.GetFormFromFile(0x0002F3B8, "Skyrim.Esm") as Spell
-		;Spell GrandHealing = Game.GetFormFromFile(0x000B62EE, "Skyrim.Esm" as Spell)   
-		;RestoreHealt.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)
-
-		;Form TempPotion = Game.GetFormFromFile(0x0003EADF, "Skyrim.Esm")  ;plentiful --- Minor: 0003EADD
-		;cfgqst.PlayerRef.AddItem(TempPotion, 1, true)
-		;cfgqst.PlayerRef.EquipItem(TempPotion, false, true)
-
-;		storqst.SPELL_Exhaustion_Increase.RemoteCast(cfgqst.PlayerRef, cfgqst.PlayerRef, cfgqst.PlayerRef)
-
-		if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage")
-		NymTrace("#DD Status: Heavy Bondage")
-		else 
-		NymTrace("#DD Status: Heavy Bondage - FALSE")
-		endif 
-		
-		if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Yoke Breast Front")
-		NymTrace("#DD Status: Yoke Breast Front")
-		else 
-		NymTrace("#DD Status: Yoke Breast Front - FALSE")
-		endif 	
-		
-		if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Yoke BB (Breast  Yoke)")
-		NymTrace("#DD Status: Yoke BB (Breast  Yoke)")
-		else 
-		NymTrace("#DD Status: Yoke BB (Breast  Yoke) - FALSE")
-		endif 
-			
-		if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "BlockingSex")
-		NymTrace("#DD Status: BlockingSex")
-		else 
-		NymTrace("#DD Status: BlockingSex - FALSE")
-		endif 
-		
-		Form a
-		a = cfgqst.PlayerRef.GetWornForm(0x00010000)	;46 - Unnamed 		(DD Armbinder/Yoke, Cloaks)
-		if a && a.HasKeyword(cfgqst.SexLabNoStrip)
-		NymTrace("#DD Status: SexLabNoStrip")
-		else 
-		NymTrace("#DD Status: SexLabNoStrip - FALSE")
-		endif 
-;	Message.ResetHelpMessage("Jump")
-;	Message.ResetHelpMessage("Test")
-;	storqst.MSG_CurfewBegins.ShowAsHelpMessage("Test", 4, 0, 1)
+	if sOption == "Clear Heels Height"
 	
-	;Message.ShowAsHelpMessage("Jump", 5, 30, 3)
-	;slaveqst.SlaveIsOccupied = 0
-	;cfgqst.PublicExposure = 0
-	;TestAnimationEvents()
-	
-	;	if cfgqst.PlayerRef.IsInFaction(storqst.BowingFaction)
-	;	cfgqst.PlayerRef.RemoveFromFaction(storqst.BowingFaction)
-	;	endif 
-	;	if cfgqst.PlayerRef.IsInFaction(cfgqst.CrawlFaction)
-	;	cfgqst.PlayerRef.RemoveFromFaction(cfgqst.CrawlFaction)
-	;	endif
-	;TestAnimationEvents()
+		Form SexLabQuestFramework  = Game.GetFormFromFile(0xD62, "SexLab.esm")
+		if SexLabQuestFramework
+			sslConfig      = SexLabQuestFramework as sslSystemConfig
+		;	ThreadLib   = SexLabQuestFramework as sslThreadLibrary
+		;	ThreadSlots = SexLabQuestFramework as sslThreadSlots
+		;	ActorLib    = SexLabQuestFramework as sslActorLibrary
+		;	Stats       = SexLabQuestFramework as sslActorStats
+		endIf
+		
+		sslConfig.RemoveHeelEffect = bToggle
+		
+		NymTrace("SexLabMCM_Toggle(Clear Heels Height): "+sslConfig.RemoveHeelEffect)	
+		;if sslConfig.RemoveHeelEffect
+		;NymBox("Heel effect setting changed successfully to: "+bDisable+"!")
+		
+		;NymTrace("ToggleHeelEffect OFF: "+sslConfig.RemoveHeelEffect)
+		;else 
+		;sslConfig.RemoveHeelEffect = TRUE
+		;NymTrace("ToggleHeelEffect ON: "+sslConfig.RemoveHeelEffect)
+		;NymBox("ERROR: Could not cast to sslSystemConfig.")
+		;endif
 	endif 
 
+EndFunction
+
+Function PlaceEffectObject(string sMode)
+    string sName
+    float zOffset = 0.0
+    if sMode == "Bathing Waterfall"
+        if D100(50.0)
+            ThePlacedEffectObject = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1036500, "Skyrim.esm"), 1, false, false)
+            sName = ThePlacedEffectObject.GetName()
+        else
+            ThePlacedEffectObject = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(288425, "Skyrim.esm"), 1, false, false)
+            sName = ThePlacedEffectObject.GetName()
+        endif
+        ThePlacedEffectObject.MoveTo(cfgqst.PlayerRef, 80.0 * math.Sin(cfgqst.PlayerRef.GetAngleZ() + 90.0), 80.0 * math.Cos(cfgqst.PlayerRef.GetAngleZ() + 90.0), cfgqst.PlayerRef.GetHeight() + 200.0, true)
+        zOffset = ThePlacedEffectObject.GetHeadingAngle(cfgqst.PlayerRef)
+        ThePlacedEffectObject.SetAngle(0.0, 0.0, ThePlacedEffectObject.GetAngleZ() + zOffset)
+        ThePlacedEffectObject.SetAngle(0.0, 0.0, 270.0)
+    elseif sMode == "Remove"
+        ThePlacedEffectObject.DisableNoWait(false)
+        ThePlacedEffectObject.Delete()
+        ThePlacedEffectObject = None
+    endif
+EndFunction
+
+Function PlaceExplosion(actor akActor, string sMode)
+    string EXPL_Name
+    if Nym()
+        explosion EXPL = None
+        if sMode == "Dust Medium"
+            EXPL_Name = "FXdustDropMedExplosion"
+            EXPL = (game.GetFormFromFile(106811, "Skyrim.esm") as explosion)
+        elseif sMode == "Dust Large"
+            EXPL_Name = "FallingDustExplosion01"
+            EXPL = (game.GetFormFromFile(557321, "Skyrim.esm") as explosion)
+        elseif sMode == "Dust Small"
+            EXPL_Name = "FXdustDropSmExplosion"
+            EXPL = (game.GetFormFromFile(106812, "Skyrim.esm") as explosion)
+        elseif sMode == "Dust Tiny"
+            EXPL_Name = "FXdustDropTinyExplosion"
+            EXPL = (game.GetFormFromFile(106815, "Skyrim.esm") as explosion)
+        elseif sMode == "Dust Very Tiny"
+            EXPL_Name = "FXdartDustExplosion"
+            EXPL = (game.GetFormFromFile(209474, "Skyrim.esm") as explosion)
+        elseif sMode == "Dust Giant"
+            EXPL_Name = "crGiantStompExplosion"
+            EXPL = (game.GetFormFromFile(468597, "Skyrim.esm") as explosion)
+        elseif sMode == "Naked Curse Start"
+            EXPL_Name = "ExplosionIllusionDark01"
+            EXPL = (game.GetFormFromFile(263277, "Skyrim.esm") as explosion)
+        elseif sMode == "Naked Curse End"
+            EXPL_Name = "ExplosionIllisionMassiveDark01"
+            EXPL = (game.GetFormFromFile(781487, "Skyrim.esm") as explosion)
+        elseif sMode == "Ritual Summoning 1"
+            EXPL_Name = "ExplosionIllusionMassiveLight01"
+            EXPL = (game.GetFormFromFile(140719, "Skyrim.esm") as explosion)
+        elseif sMode == "Heal"
+            EXPL_Name = "Heal"
+            EXPL = (game.GetFormFromFile(866688, "Skyrim.esm") as explosion)
+        elseif sMode == "Estrus Start"
+            EXPL_Name = "ExplosionTurnUndeadMass01"
+            EXPL = (game.GetFormFromFile(573868, "Skyrim.esm") as explosion)
+        elseif sMode == "Shockwave 1"
+            EXPL_Name = "TG08BShockwaveExplosion"
+            EXPL = (game.GetFormFromFile(1039290, "Skyrim.esm") as explosion)
+        elseif sMode == "Random Whipping Dust"
+            if D100(25.0)
+                int i = utility.RandomInt(1, 2)
+                if i == 5
+                    EXPL_Name = "FXdustDropMedExplosion"
+                    EXPL = (game.GetFormFromFile(106811, "Skyrim.esm") as explosion)
+                elseif i == 1
+                    EXPL_Name = "FXdustDropSmExplosion"
+                    EXPL = (game.GetFormFromFile(106812, "Skyrim.esm") as explosion)
+                elseif i == 2
+                    EXPL_Name = "FXdustDropTinyExplosion"
+                    EXPL = (game.GetFormFromFile(106815, "Skyrim.esm") as explosion)
+                endif
+            endif
+        endif
+        NymTrace("PlaceExplosion(" + sMode + ")(" + EXPL_Name + ")")
+        akActor.PlaceAtMe(EXPL, 1, false, false)
+    endif
+EndFunction
+
+Function Test_Explosions(int iForce)
+    string ExplosionName
+    NymTrace("#Test_Explosions Start")
+    explosion TestExplosion = None
+    if iTestInt == 0
+        ExplosionName = "ExplosionIllusionMassiveLight01"
+        TestExplosion = (game.GetFormFromFile(140719, "Skyrim.esm") as explosion)
+    elseif iTestInt == 1
+        ExplosionName = "ExplosionShoutArea01"
+        TestExplosion = (game.GetFormFromFile(543538, "Skyrim.esm") as explosion)
+    elseif iTestInt == 2
+        ExplosionName = "fakeForceBallNudge"
+        TestExplosion = (game.GetFormFromFile(819213, "Skyrim.esm") as explosion)
+    elseif iTestInt == 3
+        ExplosionName = "ExplosionShoutPacify01"
+        TestExplosion = (game.GetFormFromFile(1003638, "Skyrim.esm") as explosion)
+    elseif iTestInt == 4
+        ExplosionName = "DB10TrapOilExplosion"
+        TestExplosion = (game.GetFormFromFile(1032169, "Skyrim.esm") as explosion)
+    elseif iTestInt == 5
+        ExplosionName = "TrapExplosionRuneLightning01"
+        TestExplosion = (game.GetFormFromFile(471846, "Skyrim.esm") as explosion)
+    elseif iTestInt == 6
+        ExplosionName = "TrapExplosionRuneFrost01"
+        TestExplosion = (game.GetFormFromFile(471665, "Skyrim.esm") as explosion)
+    elseif iTestInt == 7
+        ExplosionName = "TG08BShockwaveExplosion"
+        TestExplosion = (game.GetFormFromFile(1039290, "Skyrim.esm") as explosion)
+    endif
+    NymMessage("Test[" + iTestInt + "]: " + ExplosionName)
+    cfgqst.PlayerRef.PlaceAtMe(TestExplosion, 1, false, false)
+    iTestInt = iTestInt + 1
+EndFunction
+
+Function Test_GetLocations()
+    NymTrace("#Test_Explosions Start")
+    if cfgqst.PlayerRef.IsInInterior()
+        NymMessage("We are Indoors")
+    endif
+    worldspace Tamriel = (game.GetFormFromFile(60, "Skyrim.esm") as worldspace)
+    cell ParentCell = cfgqst.PlayerRef.GetParentCell()
+    if ParentCell
+        NymMessage("We have ParentCell")
+    else
+        NymMessage("We have NO ParentCell")
+    endif
+    if cfgqst.PlayerRef.GetWorldSpace() == Tamriel
+        NymMessage("We are Outdoors (Tamriel)")
+    else
+        NymMessage("We are Indoors (not Tamriel)")
+    endif
+    location CurrentLocationTest = cfgqst.PlayerRef.GetCurrentLocation()
+    Keyword LocTypeDungeon = (game.GetFormFromFile(78043, "Skyrim.esm") as Keyword)
+    if CurrentLocationTest.HasKeyword(LocTypeDungeon)
+        NymTrace("We Are In Dungeon")
+    endif
+    Keyword LocSetCave = (game.GetFormFromFile(78063, "Skyrim.esm") as Keyword)
+    if CurrentLocationTest.HasKeyword(LocSetCave)
+        NymTrace("We Are In Cave")
+    endif
+    Keyword LocTypeClearable = (game.GetFormFromFile(1007232, "Skyrim.esm") as Keyword)
+    if CurrentLocationTest.HasKeyword(LocSetCave)
+        NymTrace("We Are In Clearable Location")
+    endif
+    Keyword LocTypeFalmerHive = (game.GetFormFromFile(78052, "Skyrim.esm") as Keyword)
+    if CurrentLocationTest.HasKeyword(LocSetCave)
+        NymTrace("We Are In Falmer Hive")
+    endif
+EndFunction
+
+Function TestInt(bool up)
+    if up
+        iTestInt = iTestInt + 1
+    else
+        iTestInt = iTestInt - 1
+    endif
+    NymBox("TestInt = " + iTestInt)
+EndFunction
+
+Function SavePlayerPosition()
+    XposLAST = cfgqst.PlayerRef.GetPositionX()
+    YposLAST = cfgqst.PlayerRef.GetPositionY()
+    ZposLAST = cfgqst.PlayerRef.GetPositionZ()
+EndFunction
+
+bool Function IsPlayerMoving()
+    float Xpos = cfgqst.PlayerRef.GetPositionX()
+    float Ypos = cfgqst.PlayerRef.GetPositionY()
+    float Zpos = cfgqst.PlayerRef.GetPositionZ()
+    if !XposLAST
+        SavePlayerPosition()
+    endif
+    if XposLAST == Xpos && YposLAST == Ypos && ZposLAST == Zpos
+        return false
+    else
+        return true
+    endif
+EndFunction
+
+
+		
+Function TestFunction()
+    NymTrace("##TestFunction Start")
+    if Nym()
+        capqst.Add_ImprovisedArmor_Falmer()
+    endif
+    if Nym()
+        if cfgqst.DefeatStateChapter == "Golden Shower"
+        elseif storqst.IsLocalSlave() && !cfgqst.IsDefeatRunning() && !cfgqst.SexScene && !storqst.SlaveAtWork
+            slaveqst.TrainingStartJogging()
+        elseif cfgqst.PlayerRef.IsSneaking()
+        endif
+    endif
+    if Nym() && cfgqst.SexScene
+        debug.SendAnimationEvent(cfgqst.PlayerRef, "AnimObjectUnequip")
+        utility.Wait(1.0)
+        calmqst.FixRaperHardness()
+    endif
+    if Nym() && !cfgqst.IsDefeatRunning() && !cfgqst.IsFucking(cfgqst.PlayerRef) && !cfgqst.AlreadyImmobilized
+        form a = cfgqst.PlayerRef.GetWornForm(1073741824)
+        if a && a.HasKeyword(cfgqst.SexLabNoStrip)
+            NymTrace("#DD Status: SexLabNoStrip")
+        else
+            NymTrace("#DD Status: SexLabNoStrip - FALSE")
+        endif
+    endif
 EndFunction
 
 		Spell Fuz1
@@ -2032,41 +2971,70 @@ EndFunction
 		Spell Fuz3
 
 Function CastFuz(int iMode)
+    if Nym()
+        NymTrace("CastFuz(" + iMode + ")")
+        float CurrentStamina = cfgqst.PlayerRef.GetAV("Stamina")
+        float StaminaCost = 50.0
+        if !Fuz1
+            Fuz1 = (game.GetFormFromFile(81417, "Skyrim.esm") as Spell)
+            Fuz2 = (game.GetFormFromFile(81721, "Skyrim.esm") as Spell)
+            Fuz3 = (game.GetFormFromFile(81722, "Skyrim.esm") as Spell)
+        endif
+        if iMode == 0
+            iMode = utility.RandomInt(1, 3)
+        endif
+        if IsPlayerNakedExceptHands()
+            iMode = 3
+            StaminaCost = 75.0
+        else
+            iMode = 2
+            StaminaCost = 50.0
+        endif
+        NymTrace("CastFuz A(" + CurrentStamina + ")")
+        if CurrentStamina >= StaminaCost
+            cfgqst.PlayerRef.DamageAV("Stamina", StaminaCost)
+            if iMode == 1
+                Fuz1.Cast(cfgqst.PlayerRef, None)
+            elseif iMode == 2
+                Fuz2.Cast(cfgqst.PlayerRef, None)
+            elseif iMode == 3
+                Fuz3.Cast(cfgqst.PlayerRef, None)
+            endif
+        endif
+        CurrentStamina = cfgqst.PlayerRef.GetAV("Stamina")
+        NymTrace("CastFuz B(" + CurrentStamina + ")")
+    endif
+EndFunction
 
-
-	if Nym()
-		NymTrace("CastFuz("+iMode+")")	
-		
-		float CurrentMagicka = cfgqst.PlayerRef.GetAV("Magicka")
-		float MagickaCost = 35
-		if !Fuz1
-		Fuz1 = (Game.GetFormFromFile(0x00013E09, "Skyrim.esm") as Spell)
-		Fuz2 = (Game.GetFormFromFile(0x00013F39, "Skyrim.esm") as Spell)
-		Fuz3 = (Game.GetFormFromFile(0x00013F3A, "Skyrim.esm") as Spell)			;Fuz1 0x00013E09 ;Fuz2 0x00013F39
-		endif 
-		
-		if iMode == 0
-		iMode = Utility.RandomInt(1,3)
-		endif 
-		
-		iMode = 2
-		;mode 1 , heavy armor 
-		;mode 2 , lieght armor /clothing
-		;mode 3, naked
-		
-		if CurrentMagicka >= MagickaCost
-		cfgqst.PlayerRef.DamageAV("Magicka", MagickaCost)
-			if iMode == 1
-			Fuz1.Cast(cfgqst.PlayerRef, none)
-			elseif iMode == 2
-			Fuz2.Cast(cfgqst.PlayerRef, none)
-			elseif iMode == 3
-			Fuz3.Cast(cfgqst.PlayerRef, none)
-			endif 
-		endif 
-	endif 
-		
-EndFunction 
+bool Function IsPlayerNakedExceptHands()
+    form FEET = cfgqst.PlayerRef.GetWornForm(128)
+    if FEET && !FEET.HasKeyword(cfgqst.SexLabNoStrip)
+        return false
+    endif
+    form BODY = cfgqst.PlayerRef.GetWornForm(4)
+    if BODY && !BODY.HasKeyword(cfgqst.SexLabNoStrip)
+        return false
+    endif
+    form CIRCLET = cfgqst.PlayerRef.GetWornForm(4096)
+    if CIRCLET && !CIRCLET.HasKeyword(cfgqst.SexLabNoStrip)
+        return false
+    endif
+    form HELMET = cfgqst.PlayerRef.GetWornForm(2)
+    if HELMET && !HELMET.HasKeyword(cfgqst.SexLabNoStrip)
+        return false
+    endif
+    form BOTTOM = cfgqst.PlayerRef.GetWornForm(4194304)
+    if BOTTOM && !BOTTOM.HasKeyword(cfgqst.SexLabNoStrip)
+        return false
+    endif
+    form THIGH = cfgqst.PlayerRef.GetWornForm(8388608)
+    if THIGH && !THIGH.HasKeyword(cfgqst.SexLabNoStrip)
+        return false
+    else
+        NymTrace("IsPlayerCompletelyNaked(TRUE)")
+        return true
+    endif
+EndFunction
 
 
 Function WhippingTest()
@@ -2558,59 +3526,34 @@ EndFunction
 
 
 Function Test_Shaders()
-
-			EffectShader TestSpell
-
-		TestSpell = (Game.GetFormFromFile(0x00075272, "Skyrim.esm") as EffectShader) ;ReanimateFXShader	;BLUE GLOW  - NAJA
-		;TestSpell = (Game.GetFormFromFile(0x00075272, "Skyrim.esm") as EffectShader) ;ReanimateFXShader	;BLUE GLOW  - NAJA
-		if !TestSpell
-		Debug.Messagebox("Spell 1 = NONE")
-		else
-		TestSpell.Play(cfgqst.PlayerRef, 5.0)	
-
-		endif 
-		
-		Utility.Wait(7.0)
-		
-
-		;TestSpell = (Game.GetFormFromFile(0x000D22FB, "Skyrim.esm") as EffectShader) ;ShockDisintegrate01FXS ;turns invisible ; NO
-		TestSpell = (Game.GetFormFromFile(0x0003BF79, "Skyrim.esm") as EffectShader) ;
-		if !TestSpell
-		Debug.Messagebox("Spell 2 = NONE")
-		else
-		TestSpell.Play(cfgqst.PlayerRef, 5.0)	
-
-		endif 
-		
-		
-		Utility.Wait(7.0)
-		
-
-		TestSpell = (Game.GetFormFromFile(0x0004D6B4, "Skyrim.esm") as EffectShader) 	;;Hole (Dragonoels)		 ;NO 
-		;TestSpell = (Game.GetFormFromFile(0x000F4575, "Skyrim.esm") as EffectShader) ;ShadowMere Trrans		;BLACK SMOKE --- maybe usefull
-		if !TestSpell
-		Debug.Messagebox("Spell 3 = NONE")
-		else
-		TestSpell.Play(cfgqst.PlayerRef, 5.0)	
-
-		endif 
-
-		Utility.Wait(7.0)
-
-		TestSpell = (Game.GetFormFromFile(0x000280C0, "Skyrim.esm") as EffectShader) ;IN USE F
-		;TestSpell = (Game.GetFormFromFile(0x010CDC95, "Skyrim.esm") as EffectShader) ;Heal Circle NOT WORKING ; NO 
-		if !TestSpell
-		Debug.Messagebox("Spell 4 = NONE")
-		else
-			
-		TestSpell.Play(cfgqst.PlayerRef, 5.0)	
-		
-		;AdrenalineRushFXS  0010F4A8
-				
-		endif 
-
-
-EndFunction 	
+    effectshader TestSpell = (game.GetFormFromFile(1100900, "Skyrim.esm") as effectshader)
+    if !TestSpell
+        debug.Messagebox("Spell 1 = NONE")
+    else
+        TestSpell.Play(cfgqst.PlayerRef, 5.0)
+    endif
+    utility.Wait(7.0)
+    TestSpell = (game.GetFormFromFile(606560, "Skyrim.esm") as effectshader)
+    if !TestSpell
+        debug.Messagebox("Spell 2 = NONE")
+    else
+        TestSpell.Play(cfgqst.PlayerRef, 5.0)
+    endif
+    utility.Wait(7.0)
+    TestSpell = (game.GetFormFromFile(1113593, "Skyrim.esm") as effectshader)
+    if !TestSpell
+        debug.Messagebox("Spell 3 = NONE")
+    else
+        TestSpell.Play(cfgqst.PlayerRef, 5.0)
+    endif
+    utility.Wait(7.0)
+    TestSpell = (game.GetFormFromFile(33569016, "Dawnguard.esm") as effectshader)
+    if !TestSpell
+        debug.Messagebox("Spell 4 = NONE")
+    else
+        TestSpell.Play(cfgqst.PlayerRef, 5.0)
+    endif
+EndFunction
 ;/
 Function FixActorFactions(actor akActor, string sMode)
 
@@ -2759,175 +3702,359 @@ EndFunction
 
 
 
+Function DeathFromShockScene()
+
+	int iTimer = Utility.RandomInt(10,20)
+	
+	;new idea. Initial Ragdoll > get up (do we track?)
+	;then chain up unbound struggle poses, then kneeling, then laying, then not moving laying (look for suitable ones for DDs?)
+	
+	cfgqst.Immobilize(false)
+	
+	while iTimer > 0
+	
+		iTimer -=1
+		cfgqst.StartPunishmentEffect("Shock")
+		Utility.Wait(0.5)
+		
+		if D100(90)
+		SendModEvent("Moan")
+		endif
+		
+		If D100(50)
+		cfgqst.StartPunishmentEffect("Shock")
+		endif
+		
+		float PushStrength = Utility.RandomFloat(0.1,2.0)
+		storqst.PushActorAwayFunc(cfgqst.PlayerRef, cfgqst.PlayerRef, PushStrength, "DeathFromShockScene")
+		Utility.Wait(0.5)
+		
+		if D100(10)
+		;break
+		Utility.Wait(5.0)
+		endif 
+		
+		;we need to transition form ragdoll to dead pose 
+		
+		if iTimer == 1
+		cfgqst.StartPunishmentEffect("Shock")
+		Utility.Wait(0.5)
+		cfgqst.StartPunishmentEffect("Shock")
+		Utility.Wait(1.0)		
+		cfgqst.StartPunishmentEffect("Shock")
+		Utility.Wait(0.5)	
+		cfgqst.StartPunishmentEffect("Shock")
+		endif	
+	endwhile	
+
+	cfgqst.FadeToBlack(true) 
+	
+	Utility.Wait(5.0)
+
+	cfgqst.FadeToBlack(false) 
+
+EndFunction 	
+
+
 
 Function TestAnimationEvents()
-
-			NymBox("Idle A")
-			cfgqst.PublicExposure = 0
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "IdlePickaxeEnterInstant")  ;WORKS
-			;Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazPoleDance_Loop") ;NEEDS POLE FURNITURE but nice!
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle B")
-			;Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazSnakeDance_Loop")	;OK ooo
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "IdlePickaxeEnter")	;OK ooo
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle C")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "IdlePickaxeTableEnterInstant") ;WORKS
-			;Debug.SendAnimationEvent(cfgqst.PlayerRef, "IdleChisel") ;NOT working
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle D")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "IdlePickaxeTableEnter") ;OK ooo
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)		
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle E")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazShakeAssDance_Loop")	 ;NICE - USE  oooo
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle F")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazSexyDance_Loop") ;ooo
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle G")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazKickDance_Loop") ;not working ,test AGAIN
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle H")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazGrooveGirl_Loop") ;oo
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle I")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazFunky_Loop") ;NO
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle J")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazDisco_VB_Loop") ;not working ,test AGAIN
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0
-			
-			NymBox("Idle K")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazBreakingPop_Loop") ;not working ,test AGAIN
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0			
-			
-			NymBox("Idle L")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazLMFAO_Shuffle_Loop") ;not working 
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0	
-			
-			NymBox("Idle M")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazSara_MelbourneShuffle_Loop") ;not working 
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0				
-
-			NymBox("Idle N")
-			Debug.SendAnimationEvent(cfgqst.PlayerRef, "ZazSeph05Disco_Loop") ;ooo 
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			cfgqst.PublicExposure = 0	
-		
+    string sTempEventToplay = ""
+    NymBox("Idle A [" + sTempEventToplay + "]")
+    cfgqst.PublicExposure = 0
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle B [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle C [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle D [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle E [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle F [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle G [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle H [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle I [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle J [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = "FB_PornStarDog_A1_S1"
+    NymBox("Idle K [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle L [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = ""
+    NymBox("Idle M [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
+    sTempEventToplay = "FB_VampAggrCow_A2_S"
+    NymBox("Idle N [" + sTempEventToplay + "]")
+    debug.SendAnimationEvent(cfgqst.PlayerRef, sTempEventToplay)
+    utility.Wait(10.0)
+    cfgqst.ResetIdle(cfgqst.PlayerRef)
+    utility.Wait(1.0)
+    cfgqst.PublicExposure = 0
 EndFunction
 
 
-
-
-
-Function TestIdles()
 			
+;DD TESTS:
+;ft_surrender	ft_surrender_hobbled	ft_unconcious_falling		ft_bdsm_idle_collarme		ft_bdsm_idle_egyptian		ft_bdsm_idle_inspection
+		
+	
+		
+
+Function TestIdles()		;##idles
+	
 			Idle TempIdle 
 			
-			ScreenMessage("Idle A")
-			TempIdle = (Game.GetFormFromFile(0x000F7C8A, "Skyrim.esm") as Idle) ;IdleCiceroDance1
-			if TempIdle
-			cfgqst.PlayerRef.PlayIdle(TempIdle)
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			endif 			
-
-			ScreenMessage("Idle B")
-			TempIdle = (Game.GetFormFromFile(0x000F7C8B, "Skyrim.esm") as Idle)	; ;IdleCiceroDance2
-			if TempIdle
-			cfgqst.PlayerRef.PlayIdle(TempIdle)
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			endif 
-		
-			ScreenMessage("Idle C")
-			TempIdle = (Game.GetFormFromFile(0x00103653, "Skyrim.esm") as Idle)	;;IdleCiceroDance3
-			if TempIdle
-			cfgqst.PlayerRef.PlayIdle(TempIdle)
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			endif 
+			int IdleSetToPlay = 404
 			
-			ScreenMessage("Idle D")
-			TempIdle = (Game.GetFormFromFile(0x0B068645, "ZazAnimationPack.esm") as Idle) ;ZazBellyDance
-			if TempIdle
-			cfgqst.PlayerRef.PlayIdle(TempIdle)
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			endif 			
+			if IdleSetToPlay == 1
+				ScreenMessage("IdleHoe")	
+				;YES, works. For Working on Farm!!!
+				TempIdle = (Game.GetFormFromFile(0x00075CB4, "Skyrim.esm") as Idle) 	
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 			
 
-			ScreenMessage("Idle E")
-			TempIdle = (Game.GetFormFromFile(0x0B068661, "ZazAnimationPack.esm") as Idle)	;ZazKickDance
-			if TempIdle
-			cfgqst.PlayerRef.PlayIdle(TempIdle)
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			endif 
-		
-			ScreenMessage("Idle F")
-			TempIdle = (Game.GetFormFromFile(0x0B06864D, "ZazAnimationPack.esm") as Idle)	;ZazSexyDance 
-			if TempIdle
-			cfgqst.PlayerRef.PlayIdle(TempIdle)
-			Utility.Wait(10.0)
-			cfgqst.ResetIdle(cfgqst.PlayerRef)
-			Utility.Wait(1.0)
-			endif 
+				ScreenMessage("IdleKneeling")
+				;NOT WORKING
+				TempIdle = (Game.GetFormFromFile(0x000E8E50, "Skyrim.esm") as Idle)		
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
 			
+				ScreenMessage("IdleLounge")
+				;weird, dont use (up in the air
+				TempIdle = (Game.GetFormFromFile(0x000B8F20, "Skyrim.esm") as Idle)		
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+				
+				ScreenMessage("IdleLookAround")
+				;Not working
+				TempIdle = (Game.GetFormFromFile(0x000F5D98, "Skyrim.esm") as Idle) 	
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 			
+
+				ScreenMessage("IdleLookFar")
+				;WORKS, look with hand on forehead, short
+				TempIdle = (Game.GetFormFromFile(0x00075C62, "Skyrim.esm") as Idle)		
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+			
+			elseif IdleSetToPlay == 3
+			
+				ScreenMessage("IdleBoyRitual")
+				TempIdle = (Game.GetFormFromFile(0x000B8F22, "Skyrim.esm") as Idle) 	;stabbing / beating the ground. long. camera locked
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 			
+
+				ScreenMessage("IdleBracedPain")
+				TempIdle = (Game.GetFormFromFile(0x000D8735, "Skyrim.esm") as Idle)		; short, ritual start. no idea, can be form of respectfull greeting
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+			
+				ScreenMessage("IdleCannibalFeedCrouching")
+				TempIdle = (Game.GetFormFromFile(0x000FE09F, "Skyrim.esm") as Idle)		;fast eating from ground. might be useufl
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+				
+				ScreenMessage("IdleCowering")
+				TempIdle = (Game.GetFormFromFile(0x000FF9E4, "Skyrim.esm") as Idle) 	;NOT working
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 			
+
+				ScreenMessage("IdleCrouchedPray")
+				TempIdle = (Game.GetFormFromFile(0x000F11E4, "Skyrim.esm") as Idle)		;NOT working
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+			
+				ScreenMessage("IdleDA02BoethiahPost")
+				TempIdle = (Game.GetFormFromFile(0x000F3B60, "Skyrim.esm") as Idle) 		;NOT working
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+
+				ScreenMessage("IdleExamine")
+				TempIdle = (Game.GetFormFromFile(0x00075C3D, "Skyrim.esm") as Idle) 	;Arme verschränken, looking down, short
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+				
+				ScreenMessage("IdleGetAttention")				;NOT working via Console, only CODE 
+				TempIdle = (Game.GetFormFromFile(0x0006FF15, "Skyrim.esm") as Idle) 
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 			
+				
+				
+			
+			elseif IdleSetToPlay == 2
+				ScreenMessage("Idle A")
+				TempIdle = (Game.GetFormFromFile(0x000F7C8A, "Skyrim.esm") as Idle) ;IdleCiceroDance1
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 			
+
+				ScreenMessage("Idle B")
+				TempIdle = (Game.GetFormFromFile(0x000F7C8B, "Skyrim.esm") as Idle)	; ;IdleCiceroDance2
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+			
+				ScreenMessage("Idle C")
+				TempIdle = (Game.GetFormFromFile(0x00103653, "Skyrim.esm") as Idle)	;;IdleCiceroDance3
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+				
+				ScreenMessage("Idle D")
+				TempIdle = (Game.GetFormFromFile(0x0B068645, "ZazAnimationPack.esm") as Idle) ;ZazBellyDance
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 			
+
+				ScreenMessage("Idle E")
+				TempIdle = (Game.GetFormFromFile(0x0B068661, "ZazAnimationPack.esm") as Idle)	;ZazKickDance
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+			
+				ScreenMessage("Idle F")
+				TempIdle = (Game.GetFormFromFile(0x0B06864D, "ZazAnimationPack.esm") as Idle)	;ZazSexyDance 
+				if TempIdle
+				cfgqst.PlayerRef.PlayIdle(TempIdle)
+				Utility.Wait(10.0)
+				cfgqst.ResetIdle(cfgqst.PlayerRef)
+				Utility.Wait(1.0)
+				endif 
+			endif 	
 			
 			;000F11ED	IdleBlessingKneelEnterInstant
 
@@ -3079,7 +4206,402 @@ Function TestSounds()
 	cfgqst.StopSoundOnActor()
 EndFunction 
 
+Actor[] Property DuplosA Auto
+Actor[] Property DuplosB Auto
+Actor[] Property DuplosC Auto
+int Property DuplosACount Auto 
+int Property DuplosBCount Auto 
+int Property DuplosCCount Auto 
+String Property DuplosALocation Auto 
+String Property DuplosBLocation Auto 
+String Property DuplosCLocation Auto 
 
+Actor[] Property AmbushersA Auto
+Actor[] Property AmbushersB Auto
+Actor[] Property AmbushersC Auto
+int Property AmbushersACount Auto 
+int Property AmbushersBCount Auto 
+int Property AmbushersCCount Auto 
+
+
+Function Duplo_CreateActors(string sMode)
+
+	NymTrace("Duplo_CreateActors("+sMode+")")
+	
+	if sMode == "DuplosA"
+	
+		if DuplosACount == 0
+		DuplosA = new Actor[20]					
+		DuplosA[0] = None						
+		DuplosA[1] = None						
+		DuplosA[2] = None						
+		DuplosA[3] = None	
+		DuplosA[4] = None						
+		DuplosA[5] = None						
+		DuplosA[6] = None						
+		DuplosA[7] = None
+		DuplosA[8] = None						
+		DuplosA[9] = None
+		DuplosA[10] = None
+		DuplosA[11] = None
+		DuplosA[12] = None
+		DuplosA[13] = None
+		DuplosA[14] = None
+		DuplosA[15] = None
+		DuplosA[16] = None
+		DuplosA[17] = None
+		DuplosA[18] = None
+		DuplosA[19] = None
+		endif 
+		
+	elseif sMode == "DuplosB"
+	
+		if DuplosBCount == 0
+		DuplosB = new Actor[20]					
+		DuplosB[0] = None						
+		DuplosB[1] = None						
+		DuplosB[2] = None						
+		DuplosB[3] = None	
+		DuplosB[4] = None						
+		DuplosB[5] = None						
+		DuplosB[6] = None						
+		DuplosB[7] = None
+		DuplosB[8] = None						
+		DuplosB[9] = None
+		DuplosB[10] = None
+		DuplosB[11] = None
+		DuplosB[12] = None
+		DuplosB[13] = None
+		DuplosB[14] = None
+		DuplosB[15] = None
+		DuplosB[16] = None
+		DuplosB[17] = None
+		DuplosB[18] = None
+		DuplosB[19] = None
+		endif 
+		
+	elseif sMode == "DuplosC"
+		if DuplosCCount == 0
+		DuplosC = new Actor[20]					
+		DuplosC[0] = None						
+		DuplosC[1] = None						
+		DuplosC[2] = None						
+		DuplosC[3] = None	
+		DuplosC[4] = None						
+		DuplosC[5] = None						
+		DuplosC[6] = None						
+		DuplosC[7] = None
+		DuplosC[8] = None						
+		DuplosC[9] = None
+		DuplosC[10] = None
+		DuplosC[11] = None
+		DuplosC[12] = None
+		DuplosC[13] = None
+		DuplosC[14] = None
+		DuplosC[15] = None
+		DuplosC[16] = None
+		DuplosC[17] = None
+		DuplosC[18] = None
+		DuplosC[19] = None
+		endif 
+		
+	elseif sMode == "Ambushers"	
+	
+		AmbushersA = new Actor[4]					
+		AmbushersA[0] = None						
+		AmbushersA[1] = None						
+		AmbushersA[2] = None						
+		AmbushersA[3] = None
+		AmbushersACount = 0
+		
+		AmbushersB = new Actor[4]					
+		AmbushersB[0] = None						
+		AmbushersB[1] = None						
+		AmbushersB[2] = None						
+		AmbushersB[3] = None
+		AmbushersBCount = 0
+
+		AmbushersC = new Actor[4]					
+		AmbushersC[0] = None						
+		AmbushersC[1] = None						
+		AmbushersC[2] = None						
+		AmbushersC[3] = None
+		AmbushersCCount = 0
+
+	endif 
+
+EndFunction  
+
+
+Function Duplo_CheckActors()
+    string sTempName
+    int iFound = 0
+    int iDead = 0
+    int iDuplosCount = DuplosACount
+    if DuplosACount > 0
+        NymTrace("Duplo_CheckActors(DuplosACount" + DuplosACount + ")(DuplosALocation" + DuplosALocation + ")(DuplosARoom" + DuplosARoom + ")")
+        while iDuplosCount > 0
+            iDuplosCount = iDuplosCount - 1
+            if DuplosA[iDuplosCount]
+                sTempName = cfgqst.GetActorName(DuplosA[iDuplosCount])
+                iFound = iFound + 1
+                NymTrace("Duplo_CheckActors(DuplosA: " + iDuplosCount + " " + sTempName + " Found)")
+                if DuplosA[iDuplosCount].IsDead()
+                    iDead = iDead + 1
+                    NymTrace("Duplo_CheckActors(DuplosA: " + iDuplosCount + " " + sTempName + " IsDead)")
+                endif
+            endif
+        endwhile
+        NymTrace("Duplo_CheckActors(DuplosACount: " + DuplosACount + " Found: " + iFound + " Dead: " + iDead + ")")
+    endif
+    iFound = 0
+    iDead = 0
+    iDuplosCount = DuplosBCount
+    if DuplosBCount > 0
+        NymTrace("Duplo_CheckActors(DuplosBCount" + DuplosBCount + ")(DuplosBLocation" + DuplosBLocation + ")(DuplosBRoom" + DuplosBRoom + ")")
+        while iDuplosCount > 0
+            iDuplosCount = iDuplosCount - 1
+            if DuplosB[iDuplosCount]
+                sTempName = cfgqst.GetActorName(DuplosB[iDuplosCount])
+                iFound = iFound + 1
+                NymTrace("Duplo_CheckActors(DuplosB: " + iDuplosCount + " " + sTempName + " Found)")
+                if DuplosB[iDuplosCount].IsDead()
+                    iDead = iDead + 1
+                    NymTrace("Duplo_CheckActors(DuplosB: " + iDuplosCount + " " + sTempName + " IsDead)")
+                endif
+            endif
+        endwhile
+        NymTrace("Duplo_CheckActors(DuplosBCount: " + DuplosBCount + " Found: " + iFound + " Dead: " + iDead + ")")
+    endif
+    iFound = 0
+    iDead = 0
+    iDuplosCount = DuplosCCount
+    if DuplosCCount > 0
+        NymTrace("Duplo_CheckActors(DuplosCCount" + DuplosCCount + ")(DuplosCLocation" + DuplosCLocation + ")(DuplosCRoom" + DuplosCRoom + ")")
+        while iDuplosCount > 0
+            iDuplosCount = iDuplosCount - 1
+            if DuplosC[iDuplosCount]
+                sTempName = cfgqst.GetActorName(DuplosC[iDuplosCount])
+                iFound = iFound + 1
+                NymTrace("Duplo_CheckActors(DuplosC: " + iDuplosCount + " " + sTempName + " Found)")
+                if DuplosC[iDuplosCount].IsDead()
+                    iDead = iDead + 1
+                    NymTrace("Duplo_CheckActors(DuplosC: " + iDuplosCount + " " + sTempName + " IsDead)")
+                endif
+            endif
+        endwhile
+        NymTrace("Duplo_CheckActors(DuplosCCount: " + DuplosCCount + " Found: " + iFound + " Dead: " + iDead + ")")
+    endif
+    iFound = 0
+    iDead = 0
+    iDuplosCount = AmbushersACount
+    if AmbushersACount > 0
+        NymTrace("Duplo_CheckActors(AmbushersACount" + AmbushersACount + ")")
+        while iDuplosCount > 0
+            iDuplosCount = iDuplosCount - 1
+            if AmbushersA[iDuplosCount]
+                iFound = iFound + 1
+                if AmbushersA[iDuplosCount].IsDead()
+                    iDead = iDead + 1
+                endif
+            endif
+        endwhile
+        NymTrace("Duplo_CheckActors(AmbushersACount: " + AmbushersACount + " Found: " + iFound + " Dead: " + iDead + ")")
+    endif
+EndFunction
+
+
+Function Duplo_CleanUpActors(string sMode)
+    bool bForced
+    NymTrace("Duplo_CleanUpActors(" + sMode + ")")
+    NymMessage("Duplo_CleanUpActors(" + sMode + ")")
+    int i = 10
+    int iDeleted = 0
+    int iSaveCount = 0
+    if sMode == "forced"
+        sMode = "All"
+        bForced = true
+    endif
+    if sMode == "DuplosA" || sMode == "Duplos" || sMode == "All"
+        NymTrace("Duplo_CleanUpActors DuplosACount(" + DuplosACount + ")DuplosALocation(" + DuplosALocation + ")")
+        if DuplosACount > 0 && (!(DuplosALocation == storqst.CurrentLocationName) || bForced)
+            iSaveCount = DuplosACount
+            while DuplosACount > 0
+                DuplosACount = DuplosACount - 1
+                if DuplosA[DuplosACount]
+                    DuplosA[DuplosACount].DisableNoWait(false)
+                    DuplosA[DuplosACount].Delete()
+                    DuplosA[DuplosACount] = None
+                    iDeleted = iDeleted + 1
+                endif
+            endwhile
+            DuplosACount = 0
+            DuplosALocation = "Empty"
+            DuplosARoom = 0
+            if iDeleted > 0
+                NymMessage("Duplo_CleanUpActorsA(Count: " + iSaveCount + " -> Deleted: " + iDeleted + ")")
+                iDeleted = 0
+                iSaveCount = 0
+            endif
+        endif
+    endif
+    if sMode == "DuplosB" || sMode == "Duplos" || sMode == "All"
+        if DuplosBCount > 0 && (!(DuplosBLocation == storqst.CurrentLocationName) || bForced)
+            iSaveCount = DuplosBCount
+            while DuplosBCount > 0
+                DuplosBCount = DuplosBCount - 1
+                if DuplosB[DuplosBCount]
+                    DuplosB[DuplosBCount].DisableNoWait(false)
+                    DuplosB[DuplosBCount].Delete()
+                    DuplosB[DuplosBCount] = None
+                    iDeleted = iDeleted + 1
+                endif
+            endwhile
+            DuplosBCount = 0
+            DuplosBLocation = "Empty"
+            DuplosBRoom = 0
+            if iDeleted > 0
+                NymMessage("Duplo_CleanUpActorsB(Count: " + iSaveCount + " -> Deleted: " + iDeleted + ")")
+                iDeleted = 0
+                iSaveCount = 0
+            endif
+        endif
+    endif
+    if sMode == "DuplosC" || sMode == "Duplos" || sMode == "All"
+        if DuplosCCount > 0 && (!(DuplosCLocation == storqst.CurrentLocationName) || bForced)
+            iSaveCount = DuplosCCount
+            while DuplosCCount > 0
+                DuplosCCount = DuplosCCount - 1
+                if DuplosC[DuplosCCount]
+                    DuplosC[DuplosCCount].DisableNoWait(false)
+                    DuplosC[DuplosCCount].Delete()
+                    DuplosC[DuplosCCount] = None
+                    iDeleted = iDeleted + 1
+                endif
+            endwhile
+            DuplosCCount = 0
+            DuplosCLocation = "Empty"
+            DuplosCRoom = 0
+            if iDeleted > 0
+                NymMessage("Duplo_CleanUpActorsC(Count: " + iSaveCount + " -> Deleted: " + iDeleted + ")")
+                iDeleted = 0
+                iSaveCount = 0
+            endif
+        endif
+    endif
+    if sMode == "Ambushers" || sMode == "All"
+        iDeleted = 0
+        NymTrace("Delete Ambushers START: AmbushersACount [" + AmbushersACount + "]")
+        if AmbushersACount > 0
+            iSaveCount = AmbushersACount + AmbushersBCount + AmbushersCCount
+            while AmbushersACount > 0
+                AmbushersACount = AmbushersACount - 1
+                if AmbushersA[AmbushersACount]
+                    NymTrace("Delete AmbushersA[" + AmbushersACount + "]")
+                    AmbushersA[AmbushersACount].DisableNoWait(false)
+                    AmbushersA[AmbushersACount].Delete()
+                    AmbushersA[AmbushersACount] = None
+                    iDeleted = iDeleted + 1
+                endif
+            endwhile
+            while AmbushersBCount > 0
+                AmbushersBCount = AmbushersBCount - 1
+                if AmbushersB[AmbushersBCount]
+                    NymTrace("Delete AmbushersB[" + AmbushersBCount + "]")
+                    AmbushersB[AmbushersBCount].DisableNoWait(false)
+                    AmbushersB[AmbushersBCount].Delete()
+                    AmbushersB[AmbushersBCount] = None
+                    iDeleted = iDeleted + 1
+                endif
+            endwhile
+            while AmbushersCCount > 0
+                AmbushersCCount = AmbushersCCount - 1
+                if AmbushersC[AmbushersCCount]
+                    NymTrace("Delete AmbushersC[" + AmbushersCCount + "]")
+                    AmbushersC[AmbushersCCount].DisableNoWait(false)
+                    AmbushersC[AmbushersCCount].Delete()
+                    AmbushersC[AmbushersCCount] = None
+                    iDeleted = iDeleted + 1
+                endif
+            endwhile
+            NymMessage("Duplo_CleanUpAmbushersCount: " + iSaveCount + " -> Deleted: " + iDeleted + ")")
+            iDeleted = 0
+            iSaveCount = 0
+        endif
+    endif
+EndFunction
+
+
+Function AmbushMonitor()
+    while cfgqst.PlayerRef.IsWeaponDrawn() && !AmbushEscapeCheck()
+        NymTrace("AmbushMonitor(LOOP)")
+        utility.Wait(3.0)
+    endwhile
+    utility.Wait(3.0)
+    if cfgqst.DefeatQuestRunning || cfgqst.PlayerDownAlready
+        NymTrace("AmbushMonitor(Player Defeated)")
+    elseif AmbushEscapeCheck()
+        NymTrace("AmbushMonitor(we escaped/ambush stuck)")
+        Duplo_CleanUpActors("Ambushers")
+    else
+        NymTrace("AmbushMonitor(Ambushers Defeated)")
+        utility.Wait(80.0)
+        Duplo_CleanUpActors("Ambushers")
+    endif
+    NymTrace("AmbushMonitor(Ambush END")
+    NymMessage("Ambush END")
+EndFunction
+
+
+Bool Function AmbushEscapeCheck()
+	NymTrace("AmbushEscapeCheck()")
+	float fDistanceTemp = 0
+	float fDistanceEscape = 1000
+	bool bEscaped = false 
+	
+	int iAmbusherCountTemp = AmbushersACount
+
+		while iAmbusherCountTemp > 0 && !bEscaped
+			iAmbusherCountTemp -= 1
+			
+			if AmbushersA[iAmbusherCountTemp] && !AmbushersA[iAmbusherCountTemp].IsDead() && (AmbushersA[iAmbusherCountTemp].GetDistance(cfgqst.PlayerRef) >= fDistanceEscape)
+			bEscaped = true
+			;NymTrace("AmbushEscapeCheck()")
+			endif
+			
+		endwhile	
+
+		iAmbusherCountTemp = AmbushersBCount
+
+		while iAmbusherCountTemp > 0 && !bEscaped
+			iAmbusherCountTemp -= 1
+			
+			if AmbushersB[iAmbusherCountTemp] && !AmbushersB[iAmbusherCountTemp].IsDead() && (AmbushersB[iAmbusherCountTemp].GetDistance(cfgqst.PlayerRef) >= fDistanceEscape)
+			bEscaped = true
+			endif
+			
+		endwhile	
+		
+		iAmbusherCountTemp = AmbushersCCount
+		
+		while iAmbusherCountTemp > 0 && !bEscaped
+			iAmbusherCountTemp -= 1
+			
+			if AmbushersC[iAmbusherCountTemp] && !AmbushersC[iAmbusherCountTemp].IsDead() && (AmbushersC[iAmbusherCountTemp].GetDistance(cfgqst.PlayerRef) >= fDistanceEscape)
+			bEscaped = true
+			endif
+			
+		endwhile
+		
+		
+		NymTrace("AmbushEscapeCheck(Escaped: "+bEscaped+")")
+;	Actor closestA = Game.FindClosestActorFromRef(cfgqst.PlayerRef, 1000.0)
+
+;	if !closestA.IsDead() && closestA.IsInFaction(cfgqst.BanditFaction) && closestA.IsInFaction(cfgqst.NakedDuplicantFaction) && closestA.IsInFaction(storqst.NakedRaperFaction)
+	;ambushers still close 
+	return bEscaped 
+
+EndFunction
 
 ;LOCAL SLAVERY FUNCTIONS START ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -3342,3 +4864,16 @@ Bool Function Nym()
 EndFunction
 
 ;BASE FUNCTIONS END ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+; ---- added in Naked Defeat 6.51 ----
+float XposLAST
+float YposLAST
+float ZposLAST
+int iTestInt
+int RevertLootedContainerListCountdown = 0
+objectreference ThePlacedEffectObject
+nade_capturequest_qf_scr Property capqst Auto
+int Property DuplosARoom Auto
+int Property DuplosBRoom Auto
+int Property DuplosCRoom Auto
+int Property Room Auto

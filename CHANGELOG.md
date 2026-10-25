@@ -1,5 +1,54 @@
 # Naked Defeat — Changelog
 
+## 6.51.1 P+ (delta over official 6.51) - 2026-10-25
+
+The 6.46.2 P+ patch rebased onto official Naked Defeat 6.51. Install it over **6.50 FULL + 6.51 Patch**
+(the official 6.51 esp is required; this patch ships scripts only). Still requires SexLab P+.
+
+### Carried over from 6.46.2
+
+Everything below in the 6.46.2 section still applies, merged into the 6.51 versions of the scripts:
+P+ native scene selection, the Acheron/bleedout release fixes (`RestorePlayerState()`), the Death Chance
+roll for "Adventure: Deadly Accident", follower/teammate hits ignored for the defeat type, the in-range
+enemy registration, the `==`/`=` fixes, the Acheron Bridge abort cleanup, the empty-furniture guard,
+the DF-Pause event, followers refreshed on load, humanoid whippers.
+
+### Now fixed upstream (patch version dropped in favour of 6.51's)
+
+- Second Acheron assailant added to the enemy faction (copy-paste bug).
+- Second ragdoll wait at defeat start is bounded.
+- Whipping cleanup on every exit path: 6.51 added `WhipppingCleanUp()` at stage 1000, which replaces the
+  patch's `CleanupWhipper()`. The patch keeps one guard on top of it: the whipper's speed debuff and stamina
+  are only restored when stage 20 actually applied them (`WhipperStateApplied`), so an early abort or a
+  whipper left over from an earlier scene no longer gets a stale debuff re-applied. (`nade_whipquest_00`)
+- Scene protectors reset their placed flag.
+- `PlayerTrackHealth` no longer downs the player on a non-combat health drop at all (6.51 reduced it to
+  health tracking), so the patch's Death Chance roll there is gone; the roll in `PlayerDown` stays.
+
+### New in 6.51, converted to P+ native queries
+
+- `GetSexTags` "Girlfriend" scenario: the count of `Loving` scenes used the legacy proxy pool and could
+  read 0 on large setups. (`nade_calmquest_qf_scr`)
+- `CheckSoftDependencies`: the SLATE action-log check (`NymLogVersion021`) used the legacy query.
+  (`nade_configquest_scr`)
+
+### Fixed
+
+- **Undead defeats can select vampires and necromancers again.** 6.50 gave `IsNecromancer()` a second
+  parameter, but the official `nade_rapequest_qf_scr` was not recompiled and still calls it with one
+  argument, which the game rejects at runtime. Now passes `false` like 6.51's own copy of the check.
+  (`nade_rapequest_qf_scr`) The same stale call is in `nade_sexquest_qf_scr`, which ships without source
+  and is not part of this patch.
+
+### Build
+
+- 6.51 ships no Papyrus sources. The 11 scripts it changed were rebuilt from the 6.50 sources, with the
+  changed functions taken from a decompile of the 6.51 scripts; every rebuilt script was compiled and
+  checked against the official 6.51 bytecode. Decompiled functions have no comments and use 4-space
+  indentation.
+- New compile imports: Creature Framework (`CreatureFramework`), AudioUtilTTS and AudioUtil
+  (6.51's storage quest voices lines through AudioUtilTTS).
+
 ## 6.46.2 P+ (delta over official 6.46) — 2026-07-12
 
 Fix pass over the core use case: Acheron defeat → punishment (furniture / whipping) → release.

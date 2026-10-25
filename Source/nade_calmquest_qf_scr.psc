@@ -63,7 +63,6 @@ ReferenceAlias[] Property ActorArray Auto
 
 import JsonUtil
 
-
 Faction Property CalmFaction Auto
 Faction Property AllegianceFaction Auto					;THIS ADDS THE NPC TO THE PLAYER ALLY FACTION.
 Faction Property CurrentFollowerFaction Auto
@@ -172,6 +171,7 @@ Int Property AggressorCount Auto
 Int Property Aggressor02Count Auto
 Int Property VictimCount Auto
 Int Property RaperCount Auto
+String Property RaperRace Auto
 
 Int Property VoyeursACount Auto
 
@@ -203,7 +203,7 @@ sslBaseAnimation[] Property AnimationsPee2 Auto
 sslBaseAnimation[] Property AnimationsPee3 Auto
 sslBaseAnimation[] Property AnimationsPee4 Auto
 
-sslBaseAnimation[] Property AnimationsIdle01 Auto
+sslBaseAnimation[] Property AnimationsIdle01 Auto	
 
 ;#SLPP native scene IDs (SexLab P+): scene selection now runs through the P+ registry (SexlabRegistry/GetByTagsImpl)
 ;instead of the legacy sslBaseAnimation arrays above, which are capped by the P+ legacy proxy pool.
@@ -223,17 +223,28 @@ String[] Property AnimationsPee2_IDs Auto Hidden
 String[] Property AnimationsPee3_IDs Auto Hidden
 String[] Property AnimationsPee4_IDs Auto Hidden
 
+
+;sslSystemConfig Property RemoveHeelEffect Auto
+
 Bool Property IsHuman Auto ;remove?
 ;Bool Property IsHumanoid Auto
 Bool Property IsHumanFucker Auto ;remove?
 
 Keyword Property ActorTypeNPC Auto
+
+Keyword Property KWD_nade_Cuffs Auto
+Keyword Property KWD_nade_Armbinder Auto
+Keyword Property KWD_nade_Yoke Auto
+Keyword Property KWD_nade_AnkleCuffs Auto
+
 Key[] Property Keys Auto
 FormList Property nade_HumanList Auto
 FormList Property nade_HumanoidList Auto
 Armor [] Property DefeatBinds Auto		
 Armor [] Property DefeatBindsYoke Auto		
 Armor [] Property DefeatBindsArmbinder Auto	
+Armor [] Property DefeatBindsAnkle Auto		;0 LEATHER, 1 Rope 01, 2 Rope 02, 3 Black, 4 Brown, 5 Gold, 6 Steel
+
 ;0 ArmBWrstArmbinder 02
 
 Armor[] Property EmptyArmor Auto
@@ -271,6 +282,11 @@ int SexScenesDone = 0
 
 ;bool RestartCalmQuest = false
 bool ReequipBindsAfterSex = false
+
+
+bool CHECK_Stage10_running
+bool CHECK_RapeSequence_running
+bool CHECK_Aftermath_running
 
 ;bool WaitForWashing = false
 
@@ -344,7 +360,17 @@ NymTrace("AllowShortDefeat()")
 	;elseif (storqst.IsLocalSlave > 0) && (storqst.SlavePunishmentLevel > 0)
 	;storqst.SlavePunishmentLevel = 0
 	;return false	
-	elseif (storqst.IsLocalSlave > 0) && D100(90)
+	elseif storqst.IsLocalSlave() 
+			
+		if slaveqst.ImmediatePunishment 
+		cfgqst.HarderDefeat = true
+		return false 
+		elseif D100(90) 
+		return true 
+		else 
+		return false 
+		endif 
+		
 	NymTrace("AllowShortDefeat(IsLocalSlave 90% short chance)")
 	return true	
 	elseif (cfgqst.DefeatTypeGeneral == "AreAnimals") && cfgqst.SkipSex
@@ -438,6 +464,12 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes()")
 		if cfgqst.SkipSex		
 			NymMessage("SkipSex...") 
 			return 0			;#IMPORTANT - we need to make sure the mod processes correctly RAPEAGAIN should not happen when SkipSex	
+		elseif slaveqst.ImmediatePunishment	
+		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: ImmediatePunishment(TRUE)")
+		slaveqst.ImmediatePunishment = false
+		
+		BadMessage("You are punished for your missbehavior")
+		return Utility.RandomInt(3,4)	
 			
 		elseif cfgqst.DefeatType == "Slaughterfishes" || cfgqst.DefeatType == "Mudcrabs"
 			return 1	
@@ -455,12 +487,15 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes()")
 		
 		;is this superfluous?
 		elseif cfgqst.RapeAgain && D100(cfgqst.DefeatChainProb) 
+		;RapeAgain (later Rape Cyles) have lower Sex Scene Count
 		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapeAgain()")
 			if D100(50)
 			return Utility.RandomInt(1,2)
 			else
 			return Utility.RandomInt(1,3)
 			endif
+			
+			
 		elseif cfgqst.DefeatTypeScenario == "FastTravel"
 		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: FastTravel()")
 		
@@ -525,12 +560,17 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes()")
 		;-- Regular Scenario based on MCM alone --;
 		elseif D100(cfgqst.DefeatChainProb)
 		;	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Defeat Chain Rape()")
-			;if D100(90)
+			;if D100(90)			if Nym()
+			
 			if Nym()
-			return 3
+				if D100(5)
+				return 4
+				else
+				return Utility.RandomInt(2,3) 
+				endif 
 			else 
 			return Utility.RandomInt(2,3) 
-			endif 
+			endif
 			;else
 			;return 0		;10% chance of NO Sex Scene playing (directly to furniture game)
 			;endif
@@ -753,445 +793,255 @@ EndFunction
 		;000A24B1	MarkerHeading in Quarters ->>> Public Display
 		;cells are full but there are three. Future update... 
 		
-Function GetMainSequence()	;#MAIN1		#GetMainSequence()		#sequence2
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetMainSequence()")
-	
-	;GENERAL ALLOWANCES --------------------------
-	;--- CREATURES --- ;
-	if cfgqst.AllowCreatures
-	Allow_Creatures = true		;set FALSE for cases where its not working internally (scenarios)
-	else
-	Allow_Creatures = false
-	endif
-	
-	;--- ESCAPE CRAWL ---;
-	if cfgqst.DefeatEscapeCrawl > 0
-	Allow_EscapeCrawl = true
-	endif
-	
-	if cfgqst.CivilRapeRunning 	
-	Allow_EscapeCrawl = false
-	endif	
-
-	;>>>>> HANDLE SCENARIOS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	;we want to be able to send a specified scenario later
-	
-
-	;>>>>> RAPE AGAIN SEQUENCE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	;DefeatViaSlavery does not trigger here since this is not the "Regular Sequence"
-
-	if cfgqst.RapeAgain
-	;ResetAllowance() dont need this here. we only make sure we get back into furniture
-	Allow_SexScenes = GetSexScenes()
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes(RapeAgain) "+Allow_SexScenes)
-	Allow_Aftermath = "Capture"
-	cfgqst.Allow_EscapeDifficulty = "RandomRapeAgain"
-	cfgqst.Allow_EscapeGameAftermath = true
-	cfgqst.HarderDefeat = false
-
-	;>>>>> FAST TRAVEL SEQUENCE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	;for now its simply a fucking event without much else. Add additional checks (naked/dirt) and risks later.
-	;needs to be before Short Defeat Chance because that should not trigger here	
-	elseif (cfgqst.DefeatTypeScenario == "FastTravel")
-		
-		ResetAllowance()
-		Allow_SexScenes = GetSexScenes()
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes(FastTravel) "+Allow_SexScenes)
-		Allow_EscapeCrawl = false
-		Allow_FindSpot = false	
-		Allow_AddBinds = false
-		Allow_AddCollar = false
-		Allow_ForcedBathing = false
-		Allow_GoldenShower = false
-		Allow_Foreplay = false	
-		Allow_Creatures = true			
-		cfgqst.Allow_Whipping = false
-		Allow_Aftermath = "None"
-		cfgqst.Allow_EscapeGameAftermath = false
-		cfgqst.Allow_EscapeDifficulty = "Random"	
-		Allow_PayFine = false
-		
-		;if cfgqst.DefeatEntranceVia == "Travel Ritual Save"
-		
-	;	if (cfgqst.DefeatEntranceVia == "Travel Ritual Risky") 
-			
-	;		if D100(50)
-	;		Allow_SexScenes = 3
-	;	
-	;	endif 
-	
-	;>>>>> AFTERLIFE SEQUENCE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	elseif cfgqst.DefeatTypeScenario == "Afterlife"
-		
-		ResetAllowance()
-	
-		if cfgqst.Nym()	;NYMRAS DARK WORLD 
-		Allow_SexScenes = Utility.Randomint(2,4)
-		else
-		Allow_SexScenes = Utility.Randomint(2,3)
-		
-		
-		
-		endif 
-	
-		Allow_EscapeCrawl = false
-		Allow_FindSpot = false	
-		Allow_AddBinds = false
-		Allow_AddCollar = false
-		Allow_ForcedBathing = false
-		Allow_GoldenShower = false
-		Allow_Foreplay = false	
-		Allow_Creatures = true			
-		cfgqst.Allow_Whipping = false
-		Allow_Aftermath = "Afterlife"
-		cfgqst.Allow_EscapeGameAftermath = false
-		cfgqst.Allow_EscapeDifficulty = "Random"	
-		Allow_PayFine = false
-			
-	;>>>>> EXECUTION SEQUENCE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< WIP, change, this is strange atm.
-	;this will execute the player AFTER the rape as aftermath
-;	elseif cfgqst.DefeatTypeScenario == "Execution"
-;	ScreenMessage("Your captors have a sinister smile in their faces...")
-;	ResetAllowance()
-;	Allow_SexScenes = 1
-;	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes(Execution) "+1)
-;	Allow_Aftermath = "Execution"
-	
-
-	;>>>>> PRISON SEQUENCE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<		#crime
-	;VIOLENT CRIME
-	elseif cfgqst.PunishCrimeMajor && !storqst.IsLocalSlave()
-	
-	;cfgqst.CrimeGoldToGet
-	;PayCrimeGold()	--- move to LATER 
-	
-	cfgqst.PunishCrimeMajor = false ;<<--- keep this around till later?
-	cfgqst.PunishCrimeMinor = false 
-;	cfgqst.ResetMinorCrime() <<--- keep this around till later?
-	ScreenMessage("You will be punished for your major crimes")
-	cfgqst.PublicExposure = 0
-	cfgqst.ShortPunishment = 0
-	Allow_FindSpot = true
-	Allow_SexScenes = 3
-	;Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes(IsMajorCrime) "+3)
-	Allow_Aftermath = "Capture"
-	cfgqst.Allow_EscapeDifficulty = "Hardest"
-	cfgqst.Allow_EscapeGameAftermath = true
-	;Allow_EscapeCrawl = true
-	cfgqst.Allow_Whipping = true
-	cfgqst.DefeatType = "Guards"	 ;---> Only Crime is allowed to shift the Scenario to Guards.
-	
-	
-	Allow_Creatures = false
-	Allow_Foreplay = false	
-		
-		
-	;cfgqst.HarderDefeat = true
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: (01) cfgqst.HarderDefeat = true")
-	
-	elseif cfgqst.PunishCrimeMinor && !storqst.IsLocalSlave()
-	cfgqst.PunishCrimeMinor = false 
-	ScreenMessage("You will be punished for your minor crimes")
-	cfgqst.PublicExposure = 0
-	cfgqst.ShortPunishment = 0			;<---- why not Short? 
-	Allow_FindSpot = true
-	Allow_SexScenes = 1
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes(IsMinorCrime) "+1)
-	Allow_Aftermath = "Capture"
-	cfgqst.Allow_EscapeDifficulty = "Easy"
-	cfgqst.Allow_EscapeGameAftermath = true
-	;Allow_EscapeCrawl = true
-	cfgqst.Allow_Whipping = false
-	cfgqst.DefeatType = "Guards" ;---> Only Crime is allowed to shift the Scenario to Guards.
-	
-	Allow_Creatures = false
-	Allow_Foreplay = false	
-		
-	;cfgqst.HarderDefeat = true
-
-	;>>>>> EXECUTE ON THE SPOT SEQUENCE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	;will start with Execution Animation directly after finding a spot
-	;elseif (cfgqst.DefeatTypeGeneral == "AreHumans") && (cfgqst.DefeatDeathChance > 0) && !cfgqst.DefeatViaSlavery
-	
-	;NO LONGER HAPPENS FOR ME 
-	elseif !Nym() && (cfgqst.DefeatTypeGeneral == "AreHumans") && !cfgqst.DefeatViaSlavery && (storqst.IsLocalSlave == 0) && D100(cfgqst.DefeatDeathChance) ;&& D100(33)	
-	
-			;new DEATH Scenario ---> Last Steps! 
-		
-				
-			;OLD EXECUTION SCENARIO 
-			
-			
-			ScreenMessage("Your captors have a sinister smile in their faces...")
-			ResetAllowance()
-			Allow_FindSpot = true
-
-			Allow_SexScenes = 1
-			Allow_EscapeCrawl = false
-			cfgqst.DefeatTypeScenario = "Execution"
-			
-				int y = Utility.RandomInt(1,3)
-				;int y = 1
-
-				if y == 1
-				DefeatTypeExecution = "ProxyImpale"
-				elseif y == 2
-				DefeatTypeExecution = "ProxySoils"
-				elseif y == 3
-				DefeatTypeExecution = "NymraGallows"
-				endif
-			
-			Allow_Aftermath = "Afterlife"
-	
-	;/
-	
-	This needs lot of work...
-	Basically we can move around now, set spots in the cities, add tasks etc.
-	make crawl from one way to the other.
-	This is only the basic scenario.
-	
-	IMPORTANT: we can now "calm" the guards by removing the crimegold, so we can add defeated by guards, which should also lead here
-	
-	/;
-	
-
-	;>>>>> SHORT DEFEAT SEQUENCE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<	##Short
-	elseif AllowShortDefeat() && !cfgqst.DefeatViaSlavery 
-	
-		cfgqst.ShortPunishment = GetShortDefeatScenario()	;very elaborate :P but "Short Sex happens to seldom
-		
-		if cfgqst.ShortPunishment > 1 && D100(33)	;make sex happen abit more often. Maybe add "groping" as Short Defeat Scenario -> Foreplay Scenes with 2+ Stages
-		cfgqst.ShortPunishment = 1
-		endif 
-		
-		String TempMessageShort
-		
-		if cfgqst.DefeatSpotAndEscape	;move to general?
-		Allow_FindSpot = true
-		endif
-		
-		if (storqst.IsLocalSlave > 0) && (cfgqst.ShortPunishment == 4)
-		cfgqst.ShortPunishment = 3
-		endif 
-		
-		if Nym() ;---test new furniture system 
-	;	NymMessage("SHORT SEX FOR DEBUG")
-	;	cfgqst.ShortPunishment = 1
-		endif 
-		
-		;-- SHORT SEX --;
-		if cfgqst.ShortPunishment == 1 
-		ScreenMessage("This will be over quick, bow down. [SHORT SEX]")		
-		Allow_SexScenes = 1			;scenarios are allowed, careful, need second check for this
-		Allow_Aftermath = "None"
-		cfgqst.Allow_EscapeGameAftermath = false
-		Allow_ForcedBathing = false
-		Allow_GoldenShower = false
-		Allow_Foreplay = false	
-	
-		;-- SHORT WHIPPING --;
-		elseif cfgqst.ShortPunishment == 2 		
-		ScreenMessage("Feel the whip! [SHORT WHIPPING]")	
-		cfgqst.Allow_Whipping = true	;make sure its 100% chance!!!!
-		Allow_Aftermath = "Capture"
-		cfgqst.Allow_EscapeDifficulty = "Easy"
-		cfgqst.Allow_EscapeGameAftermath = false
-		Allow_Creatures = false
-		
-		;-- SHORT ESCAPE GAME --;
-		elseif cfgqst.ShortPunishment == 3
-		ScreenMessage("Lets see how you escape from that! [SHORT CAPTURE]")	
-		Allow_Aftermath = "Capture"
-		cfgqst.Allow_EscapeDifficulty = "Normal"
-		cfgqst.Allow_EscapeGameAftermath = false
-		Allow_Creatures = false
-		
-		;-- SHORT PAY FINE --;
-		elseif cfgqst.ShortPunishment == 4	
-		ScreenMessage("You have to pay a fine for your misdemeanor! [SHORT FINE]")
-		Allow_PayFine = true
-		Allow_FindSpot = false
-		Allow_Creatures = false
-		
-		;-- SHORT BATHING --;
-		elseif cfgqst.ShortPunishment == 5
-		Allow_Creatures = false
-				if D100(cfgqst.DefeatPeeProb)
-				ScreenMessage("Like a golden shower you dirty scum? [SHORT PEE]")	
-				Allow_GoldenShower = true
-				else
-				ScreenMessage("Get yourself clean. Fast! [SHORT BATHING]")
-				Allow_ForcedBathing = true
-				endIf	
-		Allow_Aftermath = "None"
-		cfgqst.Allow_EscapeGameAftermath = false					
-		endif
-		
-	;>>>>> DD Sequence <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<	
-	
-	elseif cfgqst.DefeatTypeScenario == "DD"
-	;we are equipped with DDs during Naked Defeat
-	NymTrace("cfgqst.DefeatTypeScenario == DD")
-	ResetAllowance()
-	Allow_FindSpot = true
-	Allow_SexScenes = GetSexScenes()
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes(DD) "+Allow_SexScenes)
-	
-	Allow_Foreplay = true 
-	if cfgqst.ModDDNG
-	Allow_Creatures = true
-	else
-	Allow_Creatures = false
-	endif 
-	Allow_ForcedBathing = false
-	cfgqst.Allow_Whipping = true
-	Allow_Aftermath = "Random"
-	cfgqst.Allow_EscapeGameAftermath = true
-
-	;Allow_AddBinds = false
-
-	;>>>>> REGULAR SEQUENCE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	else 
-		;-- FIND SPOT --;
-		
-		if cfgqst.DefeatSpotAndEscape
-		Allow_FindSpot = true
-		endif
-	
-		;-- FOREPLAY --;
-		;!!!!! THIS NEEDS TO BE ROLLED at GetMainSequenceLastSteps !!!!
-		;this only determines if we have ANY foreplay possibly.
-		;scenarios can say "NO FOREPLAY" and then there will be no roll in the end.
-		if cfgqst.DefeatForeplayChance > 0
-		Allow_Foreplay = true 
-		endif	
-
-		;-- SEX SCENES --;			
-		Allow_SexScenes = GetSexScenes()	
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes(Regular Sequence) "+Allow_SexScenes)
-			
-		;-- AFTERMATH --;														
-		Allow_Aftermath = "Random"		;This allows the Aftermath Function to randomly choose an Aftermath. :Capture Event will allow its own stuff then		
-		cfgqst.Allow_EscapeGameAftermath = true
-		
-		;-- WHIPPING --;		
-		if cfgqst.DefeatWhipProb > 0		;WhipChance is again Checked on the respective Whipping Events. This just allows those events to trigger.
-		cfgqst.Allow_Whipping = true
-		endif		
-		
-		;-- ESCAPE CRAWL --; (moved to general allowances)
-		;if (cfgqst.DefeatEscTime > 0) && !cfgqst.CivilRapeRunning	;no Escape Crawl when public punishment? hmm
-		;Allow_EscapeCrawl = true
-		;endif
-		
-		cfgqst.Allow_EscapeDifficulty = "Random"
-							
-		;MODIFY REGULAR SEQUENCE >>>>> DEFEAT BINDS ALLOWED? <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<			
-		;DefeatBinds are added in 75% of cases for humans and humanoids, 50% is only collar.
-		;might make more elaborte chances later
-		if (cfgqst.DefeatTypeGeneral == "AreHumans") || (cfgqst.DefeatType == "Falmers") || (cfgqst.DefeatType == "Rieklings") || (cfgqst.DefeatType == "Draugr")
-		
-			if D100(75)
-			Allow_AddBinds = true
-			Allow_AddCollar = true			
-			elseif D100(75)
-			Allow_AddCollar = true	
-			else
-			Allow_AddCollar = false
-			Allow_AddBinds = false
-			endif
-
-		;elseif cfgqst.DefeatTypeGeneral == "AreHumanoids"				
-		;	if (cfgqst.DefeatType == "Falmers") || (cfgqst.DefeatType == "Rieklings") || (cfgqst.DefeatType == "Draugr") 	
-		;	Allow_AddBinds = true
-		;	Allow_AddCollar = true			
-		;	endif
-		endif	
-		
-		;MODIFY REGULAR SEQUENCE >>>>> SLAVERY SCENARIO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-		;needs to come here because it has higher priority than "Binds allowed"
-		;after Regular Scenario we modiy it here because its easier to do
-		;the first round is harder. 3 SexScenes + Hardest Escape Chance, but then it is handled like normal Scenario (Rape Again etc.)
-		
-		if cfgqst.DefeatViaSlavery || cfgqst.DefeatEntranceVia == "Sold as Slave" || cfgqst.DefeatEntranceVia == "Sold as Public Slave"	
-		Allow_FindSpot = True	;WIP ;overrules other stuff
-		Allow_Aftermath = "Capture"
-			if cfgqst.RapeAgain	;WE NEVER GET HERE!
-			cfgqst.Allow_EscapeDifficulty = "HardestRapeAgain"
-			cfgqst.Allow_EscapeGameAftermath = true
-			else
-			cfgqst.Allow_EscapeDifficulty = "Hard"	;1% but gets 1-5% easier	OK
-			cfgqst.Allow_EscapeGameAftermath = true
-			endif
-		endif
-				
-		;Creatures and Animals
-		;needs to come last because else we have bugged stuff	
-		if (cfgqst.DefeatTypeGeneral == "AreHumanoids")
-		Allow_ForcedBathing = false
-		;Allow_GoldenShower = false
-		elseif (cfgqst.DefeatTypeGeneral == "AreAnimals")
-		Allow_ForcedBathing = false
-		;Allow_GoldenShower = false
-		cfgqst.Allow_Whipping = false
-		Allow_Aftermath = "Escape"
-		
-		elseif (cfgqst.DefeatTypeGeneral == "AreFunny")
-		Allow_Aftermath = "Escape"
-		Allow_AddCollar = false
-		Allow_AddBinds = false
-		Allow_ForcedBathing = false
-		cfgqst.Allow_Whipping = false
-		
-		else		
-		Allow_ForcedBathing = true		
-		endif
-	endif	
-
-	if cfgqst.DefeatEntranceVia == "Orgy"
-	Allow_FindSpot = false
-	endif 
-	
-	;SEQUENCE LIST
-	;/
-	Allow_FindSpot			true/false
-	Allow_AddBinds			true/false
-	Allow_AddCollar			true/false
-	Allow_ForcedBathing		true/false	
-	Allow_GoldenShower		true/false
-	Allow_Foreplay			true/false	
-	Allow_SexScenes			0-6
-	cfgqst.Allow_Whipping	true/false
-	Allow_Aftermath			String				"Random" "Capture" "Escape"	
-	Allow_EscapeCrawl		true/false
-	cfgqst.Allow_EscapeDifficulty String		Hard, Hardest ?
-	
-	/;
-	
-	if Nym()
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: :::::::::::::::::::::: #Sequence STEP 1 ::::::::::::::::::::::")
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: DefeatEntranceVia: "+cfgqst.DefeatEntranceVia)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapeAgain: "+cfgqst.RapeAgain)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: DefeatTypeScenario: "+cfgqst.DefeatTypeScenario)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: DefeatTypeGeneral: "+cfgqst.DefeatTypeGeneral)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: DefeatType: "+cfgqst.DefeatType)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_Creatures: "+Allow_Creatures)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_FindSpot: "+Allow_FindSpot)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_ForcedBathing: "+Allow_ForcedBathing)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_GoldenShower: "+Allow_GoldenShower)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_Foreplay: "+Allow_Foreplay)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_SexScenes: "+Allow_SexScenes)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_Whipping: "+cfgqst.Allow_Whipping)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_Aftermath: "+Allow_Aftermath)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_EscapeCrawl: "+Allow_EscapeCrawl)
-	;minor Bools
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_EscapeGameAftermath: "+cfgqst.Allow_EscapeGameAftermath)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_EscapeDifficulty: "+cfgqst.Allow_EscapeDifficulty)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Allow_PayFine: "+Allow_PayFine)
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: ShortDefeat: "+cfgqst.ShortPunishment)
-	endif
-	
-EndFunction	
+Function GetMainSequence()
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GetMainSequence() DefeatTypeScenario: " + cfgqst.DefeatTypeScenario, 0)
+    if cfgqst.AllowCreatures
+        Allow_Creatures = true
+    else
+        Allow_Creatures = false
+    endif
+    if cfgqst.DefeatEscapeCrawl > 0
+        Allow_EscapeCrawl = true
+    endif
+    if cfgqst.CivilRapeRunning
+        Allow_EscapeCrawl = false
+    endif
+    if cfgqst.RapeAgain
+        Allow_SexScenes = GetSexScenes()
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GetSexScenes(RapeAgain) " + Allow_SexScenes, 0)
+        Allow_Aftermath = "Capture"
+        cfgqst.Allow_EscapeDifficulty = "RandomRapeAgain"
+        cfgqst.Allow_EscapeGameAftermath = true
+        cfgqst.HarderDefeat = false
+    elseif cfgqst.DefeatTypeScenario == "FastTravel"
+        ResetAllowance()
+        Allow_SexScenes = GetSexScenes()
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GetSexScenes(FastTravel) " + Allow_SexScenes, 0)
+        Allow_EscapeCrawl = false
+        Allow_FindSpot = false
+        Allow_AddBinds = false
+        Allow_AddCollar = false
+        Allow_ForcedBathing = false
+        Allow_GoldenShower = false
+        Allow_Foreplay = false
+        Allow_Creatures = true
+        cfgqst.Allow_Whipping = false
+        Allow_Aftermath = "None"
+        cfgqst.Allow_EscapeGameAftermath = false
+        cfgqst.Allow_EscapeDifficulty = "Random"
+        Allow_PayFine = false
+    elseif cfgqst.DefeatTypeScenario == "Afterlife"
+        ResetAllowance()
+        if cfgqst.Nym()
+            Allow_SexScenes = utility.RandomInt(2, 4)
+        else
+            Allow_SexScenes = utility.RandomInt(2, 3)
+        endif
+        Allow_EscapeCrawl = false
+        Allow_FindSpot = false
+        Allow_AddBinds = false
+        Allow_AddCollar = false
+        Allow_ForcedBathing = false
+        Allow_GoldenShower = false
+        Allow_Foreplay = false
+        Allow_Creatures = true
+        cfgqst.Allow_Whipping = false
+        Allow_Aftermath = "Afterlife"
+        cfgqst.Allow_EscapeGameAftermath = false
+        cfgqst.Allow_EscapeDifficulty = "Random"
+        Allow_PayFine = false
+    elseif cfgqst.PunishCrimeMajor && !storqst.IsLocalSlave()
+        cfgqst.PunishCrimeMajor = false
+        cfgqst.PunishCrimeMinor = false
+        ScreenMessage("You will be punished for your major crimes")
+        cfgqst.PublicExposure = 0
+        cfgqst.ShortPunishment = 0
+        Allow_FindSpot = true
+        Allow_SexScenes = 3
+        Allow_Aftermath = "Capture"
+        cfgqst.Allow_EscapeDifficulty = "Hardest"
+        cfgqst.Allow_EscapeGameAftermath = true
+        cfgqst.Allow_Whipping = true
+        cfgqst.DefeatType = "Guards"
+        Allow_Creatures = false
+        Allow_Foreplay = false
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: (01) cfgqst.HarderDefeat = true", 0)
+    elseif cfgqst.PunishCrimeMinor && !storqst.IsLocalSlave()
+        cfgqst.PunishCrimeMinor = false
+        ScreenMessage("You will be punished for your minor crimes")
+        cfgqst.PublicExposure = 0
+        cfgqst.ShortPunishment = 0
+        Allow_FindSpot = true
+        Allow_SexScenes = 1
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GetSexScenes(IsMinorCrime) " + "1", 0)
+        Allow_Aftermath = "Capture"
+        cfgqst.Allow_EscapeDifficulty = "Easy"
+        cfgqst.Allow_EscapeGameAftermath = true
+        cfgqst.Allow_Whipping = false
+        cfgqst.DefeatType = "Guards"
+        Allow_Creatures = false
+        Allow_Foreplay = false
+    elseif !Nym() && cfgqst.DefeatTypeGeneral == "AreHumans" && !cfgqst.DefeatViaSlavery && storqst.IsLocalSlave == 0 && D100(cfgqst.DefeatDeathChance)
+        ScreenMessage("Your captors have a sinister smile in their faces...")
+        ResetAllowance()
+        Allow_FindSpot = true
+        Allow_SexScenes = 1
+        Allow_EscapeCrawl = false
+        cfgqst.DefeatTypeScenario = "Execution"
+        int y = utility.RandomInt(1, 3)
+        if y == 1
+            DefeatTypeExecution = "ProxyImpale"
+        elseif y == 2
+            DefeatTypeExecution = "ProxySoils"
+        elseif y == 3
+            DefeatTypeExecution = "NymraGallows"
+        endif
+        Allow_Aftermath = "Afterlife"
+    elseif AllowShortDefeat() && !cfgqst.DefeatViaSlavery
+        cfgqst.ShortPunishment = GetShortDefeatScenario()
+        if cfgqst.ShortPunishment > 1 && D100(33.0)
+            cfgqst.ShortPunishment = 1
+        endif
+        if cfgqst.DefeatSpotAndEscape
+            Allow_FindSpot = true
+        endif
+        if storqst.IsLocalSlave > 0 && cfgqst.ShortPunishment == 4
+            cfgqst.ShortPunishment = 3
+        endif
+        if Nym()
+        endif
+        if cfgqst.ShortPunishment == 1
+            ScreenMessage("This will be over quick, bow down. [SHORT SEX]")
+            Allow_SexScenes = 1
+            Allow_Aftermath = "None"
+            cfgqst.Allow_EscapeGameAftermath = false
+            Allow_ForcedBathing = false
+            Allow_GoldenShower = false
+            Allow_Foreplay = false
+        elseif cfgqst.ShortPunishment == 2
+            ScreenMessage("Feel the whip! [SHORT WHIPPING]")
+            cfgqst.Allow_Whipping = true
+            Allow_Aftermath = "Capture"
+            cfgqst.Allow_EscapeDifficulty = "Easy"
+            cfgqst.Allow_EscapeGameAftermath = false
+            Allow_Creatures = false
+        elseif cfgqst.ShortPunishment == 3
+            ScreenMessage("Lets see how you escape from that! [SHORT CAPTURE]")
+            Allow_Aftermath = "Capture"
+            cfgqst.Allow_EscapeDifficulty = "Normal"
+            cfgqst.Allow_EscapeGameAftermath = false
+            Allow_Creatures = false
+        elseif cfgqst.ShortPunishment == 4
+            ScreenMessage("You have to pay a fine for your misdemeanor! [SHORT FINE]")
+            Allow_PayFine = true
+            Allow_FindSpot = false
+            Allow_Creatures = false
+        elseif cfgqst.ShortPunishment == 5
+            Allow_Creatures = false
+            if D100(cfgqst.DefeatPeeProb)
+                ScreenMessage("Like a golden shower you dirty scum? [SHORT PEE]")
+                Allow_GoldenShower = true
+            else
+                ScreenMessage("Get yourself clean. Fast! [SHORT BATHING]")
+                Allow_ForcedBathing = true
+            endif
+            Allow_Aftermath = "None"
+            cfgqst.Allow_EscapeGameAftermath = false
+        endif
+    elseif cfgqst.DefeatTypeScenario == "DD"
+        NymTrace("cfgqst.DefeatTypeScenario == DD")
+        ResetAllowance()
+        Allow_FindSpot = true
+        Allow_SexScenes = GetSexScenes()
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GetSexScenes(DD) " + Allow_SexScenes, 0)
+        Allow_Foreplay = true
+        if cfgqst.ModDDNG
+            Allow_Creatures = true
+        else
+            Allow_Creatures = false
+        endif
+        Allow_ForcedBathing = false
+        cfgqst.Allow_Whipping = true
+        Allow_Aftermath = "Random"
+        cfgqst.Allow_EscapeGameAftermath = true
+    else
+        if cfgqst.DefeatSpotAndEscape
+            Allow_FindSpot = true
+        endif
+        if cfgqst.DefeatForeplayChance > 0.0
+            Allow_Foreplay = true
+        endif
+        Allow_SexScenes = GetSexScenes()
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GetSexScenes(Regular Sequence) " + Allow_SexScenes, 0)
+        Allow_Aftermath = "Random"
+        cfgqst.Allow_EscapeGameAftermath = true
+        if cfgqst.DefeatWhipProb > 0.0
+            cfgqst.Allow_Whipping = true
+        endif
+        cfgqst.Allow_EscapeDifficulty = "Random"
+        if cfgqst.DefeatTypeGeneral == "AreHumans" || cfgqst.DefeatType == "Falmers" || cfgqst.DefeatType == "Rieklings" || cfgqst.DefeatType == "Draugr"
+            if D100(75.0)
+                Allow_AddBinds = true
+                Allow_AddCollar = true
+            elseif D100(75.0)
+                Allow_AddCollar = true
+            else
+                Allow_AddCollar = false
+                Allow_AddBinds = false
+            endif
+        endif
+        if cfgqst.DefeatViaSlavery || cfgqst.DefeatEntranceVia == "Sold as Slave" || cfgqst.DefeatEntranceVia == "Sold as Public Slave"
+            Allow_FindSpot = true
+            Allow_Aftermath = "Capture"
+            if cfgqst.RapeAgain
+                cfgqst.Allow_EscapeDifficulty = "HardestRapeAgain"
+                cfgqst.Allow_EscapeGameAftermath = true
+            else
+                cfgqst.Allow_EscapeDifficulty = "Hard"
+                cfgqst.Allow_EscapeGameAftermath = true
+            endif
+        endif
+        if cfgqst.DefeatTypeGeneral == "AreHumanoids"
+            Allow_ForcedBathing = false
+        elseif cfgqst.DefeatTypeGeneral == "AreAnimals"
+            Allow_ForcedBathing = false
+            cfgqst.Allow_Whipping = false
+            Allow_Aftermath = "Escape"
+        elseif cfgqst.DefeatTypeGeneral == "AreFunny"
+            Allow_Aftermath = "Escape"
+            Allow_AddCollar = false
+            Allow_AddBinds = false
+            Allow_ForcedBathing = false
+            cfgqst.Allow_Whipping = false
+        else
+            Allow_ForcedBathing = true
+        endif
+    endif
+    if cfgqst.DefeatEntranceVia == "Orgy"
+        Allow_FindSpot = false
+    endif
+    if Nym()
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: :::::::::::::::::::::: #Sequence STEP 1 ::::::::::::::::::::::", 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: DefeatEntranceVia: " + cfgqst.DefeatEntranceVia, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: RapeAgain: " + cfgqst.RapeAgain, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: DefeatTypeScenario: " + cfgqst.DefeatTypeScenario, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: DefeatTypeGeneral: " + cfgqst.DefeatTypeGeneral, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: DefeatType: " + cfgqst.DefeatType, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_Creatures: " + Allow_Creatures, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_FindSpot: " + Allow_FindSpot, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_ForcedBathing: " + Allow_ForcedBathing, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_GoldenShower: " + Allow_GoldenShower, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_Foreplay: " + Allow_Foreplay, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_SexScenes: " + Allow_SexScenes, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_Whipping: " + cfgqst.Allow_Whipping, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_Aftermath: " + Allow_Aftermath, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_EscapeCrawl: " + Allow_EscapeCrawl, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_EscapeGameAftermath: " + cfgqst.Allow_EscapeGameAftermath, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_EscapeDifficulty: " + cfgqst.Allow_EscapeDifficulty, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Allow_PayFine: " + Allow_PayFine, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: ShortDefeat: " + cfgqst.ShortPunishment, 0)
+    endif
+EndFunction
 
 	
 	;DO NOT END CALMQUEST!!!
@@ -1416,11 +1266,21 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Stage 11 [Last Scene
 	endif 
 	
 	if cfgqst.NymStripping && (!cfgqst.AbortAll)
-	;cfgqst.PlayerRef.UnequipItemSlot(32)	;body 		
-	cfgqst.Strip(48, cfgqst.PlayerRef)		;Bikini Tops (Dwarven etc.)
-	cfgqst.GroupStripMaintenance()
+	;cfgqst.PlayerRef.UnequipItemSlot(32)	;body 	
+
+		if storqst.IsSlotOccupied(cfgqst.PlayerRef, 48)
+		cfgqst.Strip(48, cfgqst.PlayerRef)	;Bikini Tops (Dwarven etc.)
+		defqst.PlaySoundStripCloth()
+		endif
+
 	
-	cfgqst.Strip(32, cfgqst.PlayerRef)
+;	cfgqst.Strip(48, cfgqst.PlayerRef)		
+;	cfgqst.GroupStripMaintenance()
+	
+		if storqst.IsSlotOccupied(cfgqst.PlayerRef, 32)
+		cfgqst.Strip(32, cfgqst.PlayerRef)
+		defqst.PlaySoundStripCloth()
+		endif
 	endif		
 		
 	;WE NEED TO REWORK THIS SHIT<<<<<<<<		
@@ -1448,8 +1308,13 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Stage 12 [Last Scene
 	SetStage(1000)
 	endif 
 	
-	if cfgqst.NymStripping&& (!cfgqst.AbortAll)			
-	cfgqst.Strip(37, cfgqst.PlayerRef)		;boots
+	if cfgqst.NymStripping&& (!cfgqst.AbortAll)	
+	
+		if storqst.IsSlotOccupied(cfgqst.PlayerRef, 37)
+		defqst.PlaySoundStripCloth()	
+		cfgqst.Strip(37, cfgqst.PlayerRef)		;boots
+		endif
+		
 	cfgqst.GroupStripMaintenance()
 	endif
 	
@@ -1633,366 +1498,242 @@ Bool StartResurrection = false
 ;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
-Function Fragment_1()						;ENDofDEFEAT			;1000	##end1	##1000##
-
-Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 ()")	
-
-
-	if Nym()
-;	Message.ResetHelpMessage("SexSlaveDutiesStart")
-	endif 
-
-	if cfgqst.DefeatTypeGeneral == "Giving Up/Abort"
-	cfgqst.AbortAll = true
-	endif 
-	
-if cfgqst.SlaveAuction
-cfgqst.SlaveAuction = false 
-Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 (SlaveAuction #END)")				;THIS HAS TO BE IMPROVED!!! I DO NOT NEED CALMQUEST FOR THE SLAVE AUCTION STUFF!!!
-
-			if folqst.Actor_Follower01 	;Victims0		
-			folidle01.StartDoingNothing_01(false)
-			;Vehicle_Follower_01("remove") 
-			cfgqst.ResetIdle(folqst.Actor_Follower01)
-			endif
-			if folqst.Actor_Follower02	
-			folidle01.StartDoingNothing_02(false)	
-			;Vehicle_Follower_02("remove") 
-			cfgqst.ResetIdle(folqst.Actor_Follower02)
-			endif	
-			
-			folidle01.EndFollowerIdleQuest_01()	
-			
-			Stop()
-
-;do nothing, jump to end Directly.
-
-else
-
-Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 (Defeat #END)")	
-	cfgqst.CheckFastTravel()
-
-	if cfgqst.AbortAll
-	cfgqst.RapeAgain = false
-	cfgqst.DefeatTypeScenario = "none"
-	StartSlavery = false
-	endif 
-
-	RemoveSpawnedRapers()	;Replaced By A Function in Calm(OFF) 
-
-	if (cfgqst.DefeatTypeScenario == "Afterlife") || (cfgqst.DefeatTypeScenario == "Execution")
-	Utility.Wait(5.0)
-	;do nothing. with afterlife we keep the Fade
-	else
-	cfgqst.FadeToBlack(false) ; FADE IN
-	endif
-
-	if cfgqst.RapeAgain && Rescued
-	cfgqst.RapeAgain = false
-	NymBox("Naked Defeat #ERROR 1551 - RapeAgain + Rescued")
-	endif
-
-	;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	; END ::::::::::::::::: RAPE AGAIN END // LOOP :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-	if cfgqst.RapeAgain
-
-	cfgqst.RapeAgain = false
-
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 (RAPE AGAIN FALSE)")
-	HairChangedOnce = false 	;ResetBools 
-
-		if Victimcount > 0
-		folidle01.StartDoingNothing_01(true)
-		endif
-		if Victimcount > 1
-		folidle01.StartDoingNothing_02(true)
-		folidle01.StartDoingNothing_02(true)
-		endif
-
-		if cfgqst.DefeatTypeScenario !=("Yoke") && cfgqst.DefeatTypeScenario !=("Cuffs") && cfgqst.DefeatTypeScenario !=("Armbinder")
-		RemoveDefeatBinds()
-		endif
-
-	Stop()
-	;----> nothing else triggers after here
-	
-	
-	;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	; END ::::::::::::::::: REGULAR ENDING START :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-	;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-	else
-
-		;>>>>>>>>>> Remove Binds & Chains >>>>>>>>>>>>>>>>>>>>>>>
-		RemoveDefeatBinds()
-		cfgqst.RemoveChains()
-		;--------------------------------------------------------
-
-	Vehicle("Remove") 		
-			
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			; END ::::::::::::::::: END MESSAGE :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-			if NoActors_StartSlavery ;;why is this before Abort? well sigh....
-			ScreenMessage("They cannot fuck you but they can sell you...") 
-			elseif cfgqst.AbortAll ;&& !NoActors_StartSlavery
-			ScreenMessage("NAKED DEFEAT Aborted")	
-			elseif Rescued && cfgqst.DefeatTypeScenario == "Afterlife"
-			cfgqst.DefeatTypeScenario = "none"
-			ScreenMessage("You are alive. Again?")
-			elseif Rescued 	
-			ScreenMessage("You were miraculously rescued!")
-			
-			;SLAVERY before we are moved elswhere
-			elseif StartTeleportIntoDanger
-			ScreenMessage("Fuck... Something went wrong during the Ritual!")
-			elseif StartSlavery
-			ScreenMessage("You are blindfolded and carried elsewhere...")		
-			elseif NoActorsAbort
-			ScreenMessage("Nobody there to take advantage of your situation.")
-			elseif (cfgqst.ShortPunishment > 0) 		
-			ScreenMessage("That was over surprisingly quick. They let you go!")	
-			elseif IsGuardEndDefeat
-			ScreenMessage("The guard defeated you...but it seems they wont rape you.")
-			elseif OnlyAnimals && !cfgqst.CivilRapeRunning
-			ScreenMessage("No humans around to take advantage of your situation.")
-			OnlyAnimals = false
-			NoActorsAbort = true	;---> skip crawling away
-			
-			elseif cfgqst.DefeatViaSlavery ;&& !isArrested
-			ScreenMessage("Your owners got bored of you and let you go.")
-			
-			elseif cfgqst.CivilRapeRunning && !isArrested
-			ScreenMessage("You are free to go. Follow the rules in the future!")
-		;	elseif (cfgqst.DefeatTypeScenario == "DDeEvent")			;REWRITING the DDe Scenario
-		;	ScreenMessage("Equiped with all those devices your enemies really let you.. well... 'go'...")
-					
-			elseif (cfgqst.DefeatTypeScenario == "Execution")		;??????
-			ScreenMessage("You are DEAD")		
-			;AFTERLIFE - before we wake up
-			elseif (cfgqst.DefeatTypeScenario == "Afterlife")			;???????
-			ScreenMessage("You feel like you are falling...")	
-			elseif !isArrested
-			;ScreenMessage("Your enemies give you a headstart...")
-			endif
-			
-			;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-			
-			isArrested = false	;improve the message system please
-			
-			Sexlab.ThreadSlots.StopAll()		;see if this speeds up things
-				
-			; END >>>>>>>>>>>>>>>>>> GodMode Option >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			;if cfgqst.GodMode
-		;	Debug.SetGodMode(false)
-		;	Debug.trace("NAKED DEFEAT GodModeFalse")
-			;endif
-	
-			; END >>>>>>>>>>>>>>>>>> Followers Reset (move to function) >>>>>>>>>>>>>>>>>>>>>
-			
-			ResetFollowers()
-			cfgqst.FollowerStripUpdate()
-	
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			; END ::::::::::::::::: ESCAPE CRAWL :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::#ESCAPE
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-			if Allow_EscapeCrawl
-			
-				if !StartSlavery && !Rescued && !NoActorsAbort && !cfgqst.AbortAll ;&& (cfgqst.DefeatEscTime > 0); && (cfgqst.ShortPunishment == 0)
-				cfgqst.SlowDownPlayer("Start", false)
-				
-				cfgqst.Immobilize(false)
-
-				cfgqst.ImmobilizeCrawl(true)
-				
-				;>>>>>>>>>>>>>>
-				Escape()							;#Escape1
-				;>>>>>>>>>>>>>>
-				
-				cfgqst.Immobilize(false)
-				
-				cfgqst.SlowDownPlayer("End", false)	
-				endif	
-				
-				cfgqst.Crawl(cfgqst.PlayerRef, false)
-				
-				if folqst.IsWithUs_Follower(0)
-				Utility.Wait(0.5)
-				cfgqst.Crawl(folqst.Actor_Follower01, false)
-				endIf
-				if folqst.IsWithUs_Follower(1)
-				Utility.Wait(0.5)
-				cfgqst.Crawl(folqst.Actor_Follower02, false)
-				endif
-				
-				cfgqst.DefeatQuestRunning = false ;<<<---- maybe better with ResetBools??	
-
-			endif
-			
-			if cfgqst.HeelsFix
-			;GENEREL ENABLING  
-			cfgqst.RestoreHeelsEffectOnActor(cfgqst.PlayerRef, 1813)
-				if folqst.IsWithUs_Follower(0)
-				cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[0], 1813)
-				endif 
-				if folqst.IsWithUs_Follower(1)
-				cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[1], 1813)
-				endif
-				if folqst.IsWithUs_Follower(2)
-				cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[2], 1813)
-				endif
-				if folqst.IsWithUs_Follower(32)
-				cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[3], 1813)
-				endif
-			endif 
-
-			cfgqst.SlowDownPlayer("End", false) ;FOR SAFETY
-			cfgqst.Crawl(cfgqst.PlayerRef, false)
-			cfgqst.Immobilize(false)
-
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			; END ::::::::::::::::: LOCL SLAVERY CHECK :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-			if (cfgqst.DefeatEntranceVia == "Orgy") && storqst.IsLocalSlave()
-			slaveqst.SexTaskDuration += 1
-			slaveqst.CompleteSlaveSexTask()		;FINISH ORGY 
-			endif 		
-
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			; END ::::::::::::::::: UNCALMING :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-			Calm(false,1)		;earlier ReDressing Of Actors
-			CalmFollowers(False) ;SPE_Actor based ---> 
-			
-			if SPE_Actor.IsActorCalmed(cfgqst.PlayerRef)
-			SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, false)
-			NymTrace("#CALM OFF Player only")
-			endif 
-
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			; END ::::::::::::::::: CLEAN UP :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-			;>>>>>>>>>>>>>>>>>> HealthBoost Option >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		;	if cfgqst.HealthBoost && (cfgqst.PlayerRef.GetActorValue("health") > 100000)
-		;	cfgqst.PlayerRef.ModActorValue("health", -100000.0)	
-		;	endif
-			;-------------------------------------------------------------------------
-			;>>>>>>>>>>>>>>>>>> DAR compatibility >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ????
-			if cfgqst.PlayerRef.IsInFaction(DefeatFaction)
-			cfgqst.PlayerRef.RemoveFromFaction(DefeatFaction)
-			endif
-			;-------------------------------------------------------------------------
-
-			ResetValues()
-
-			cfgqst.SexSceneCountPlayer = 0
-			cfgqst.ResetExpressions()
-
-			cfgqst.RestorePlayerState()		;#ACHERON 	;re-enables Acheron, restores bleedout recovery, resets PlayerDownAlready
-
-
-			cfgqst.SendModEvents(false)
-			cfgqst.PlaceFloor("remove") ;#floor
-			cfgqst.PlaceLight("remove")
-			cfgqst.AddVictimsToCalmFactions(false)
-
-			if cfgqst.PlayerRef.IsInFaction(cfgqst.ProtectedActorFaction)
-			cfgqst.PlayerRef.RemoveFromFaction(cfgqst.ProtectedActorFaction)
-			endif 
-
-			;(Acheron rescue/release now happens inside cfgqst.RestorePlayerState() above)
-
-			Stop() ;this is before the Transitions because they could be VOIDS I think... Should be mostly Save now due to the ModEvents. But it works so....
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #STOP")
-		
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			; END ::::::::::::::::: >>>> TRANSITIONS >>>> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-			;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-
-			if NoActors_StartSlavery
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: No Actors - SSLV Entry")
-			NoActors_StartSlavery = false 
-			
-				if cfgqst.DefeatRobberyProb > 0
-					if storqst.ImmersiveRobbery
-					cfgqst.StartRobberyAtLocation()
-					endif 
-				endif 
-			;SendModEvent("SSLV Entry")
-				if Nym()
-				Message.ResetHelpMessage("SoldIntoSlavery")
-				storqst.MSG_SlaverySold.ShowAsHelpMessage("SoldIntoSlavery", 4, 0, 1)
-				Utility.Wait(1.0)
-				endif 
-			CreateModEvent("NakedDefeatTransition", "Simple Slavery Entry")
-			
-			elseif StartTeleportIntoDanger && !cfgqst.AbortAll
-			StartTeleportIntoDanger = false 
-			CreateModEvent("NakedDefeatTransition", "Teleport Misshap")
-
-			elseif StartRescued && !cfgqst.AbortAll
-			StartRescued = false 
-			CreateModEvent("NakedDefeatTransition", "Rescued")
-		
-			elseif StartWakeUpInWilderness && !cfgqst.AbortAll
-			StartWakeUpInWilderness = false 
-			CreateModEvent("NakedDefeatTransition", "Wake up in the Wilderness")
-			
-			elseif StartResurrection && !cfgqst.AbortAll
-			StartResurrection = false 
-			CreateModEvent("NakedDefeatTransition", "Resurrection")
-
-			elseif StartSlavery && !cfgqst.AbortAll
-			StartSlavery = false 
-			
-				if Nym()
-				Message.ResetHelpMessage("SoldIntoSlavery")
-				storqst.MSG_SlaverySold.ShowAsHelpMessage("SoldIntoSlavery", 4, 0, 1)
-				Utility.Wait(1.0)
-				endif 
-				
-				if storqst.ModSS			
-				CreateModEvent("NakedDefeatTransition", "Simple Slavery Entry")
-				else 
-				Debug.Messagebox("Simple Slavery is NOT installed -> you are free")			
-				endif 
-				
-			elseif StartAfterlife
-			StartAfterlife = false
-				if Nym()
-				Message.ResetHelpMessage("AfterLifeStart")
-				storqst.MSG_AfterLifeStart.ShowAsHelpMessage("AfterLifeStart", 4, 0, 1)
-				Utility.Wait(1.0)
-				endif 
-			CreateModEvent("NakedDefeatTransition", "Afterlife")
-			endif
-			
-			; END :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-			cfgqst.AbortAll = false 
-			IsEndOfDefeat = false 
-			
-			Debug.Trace(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::")
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 1000 ::::::::::::::::::::::: ##Shutdow##:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::")
-			Debug.Trace(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::")
-		
-	endif		
-
-endif		
-
+Function Fragment_1()
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 1000 ()", 0)
+    if Nym()
+        if CHECK_Aftermath_running
+            NymBox("ERROR CHECK_Aftermath_running")
+        endif
+        if CHECK_Stage10_running
+            NymBox("ERROR CHECK_Stage10_running")
+        endif
+        if CHECK_RapeSequence_running
+            NymBox("ERROR CHECK_RapeSequence_running")
+        endif
+    endif
+    if cfgqst.DefeatTypeGeneral == "Giving Up/Abort"
+        cfgqst.AbortAll = true
+    endif
+    if cfgqst.SlaveAuction
+        cfgqst.SlaveAuction = false
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 1000 (SlaveAuction #END)", 0)
+        if folqst.Actor_Follower01
+            folidle01.StartDoingNothing_01(false)
+            cfgqst.ResetIdle(folqst.Actor_Follower01)
+        endif
+        if folqst.Actor_Follower02
+            folidle01.StartDoingNothing_02(false)
+            cfgqst.ResetIdle(folqst.Actor_Follower02)
+        endif
+        folidle01.EndFollowerIdleQuest_01()
+        Vehicle("Remove")
+        Stop()
+    else
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 1000 (Defeat #END)", 0)
+        cfgqst.CheckFastTravel()
+        if cfgqst.AbortAll
+            cfgqst.RapeAgain = false
+            cfgqst.DefeatTypeScenario = "None"
+            StartSlavery = false
+        else
+            storqst.NakedExperience(1)
+        endif
+        RemoveSpawnedRapers()
+        if cfgqst.DefeatTypeScenario == "Afterlife" || cfgqst.DefeatTypeScenario == "Execution"
+            utility.Wait(5.0)
+        else
+            cfgqst.FadeToBlack(false)
+        endif
+        if cfgqst.RapeAgain && Rescued
+            cfgqst.RapeAgain = false
+            NymBox("Naked Defeat #ERROR 1551 - RapeAgain + Rescued")
+        endif
+        if cfgqst.RapeAgain
+            cfgqst.RapeAgain = false
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 1000 (RAPE AGAIN FALSE)", 0)
+            HairChangedOnce = false
+            if VictimCount > 0
+                folidle01.StartDoingNothing_01(true)
+            endif
+            if VictimCount > 1
+                folidle01.StartDoingNothing_02(true)
+                folidle01.StartDoingNothing_02(true)
+            endif
+            if !(cfgqst.DefeatTypeScenario == "Yoke") && !(cfgqst.DefeatTypeScenario == "Cuffs") && !(cfgqst.DefeatTypeScenario == "Armbinder")
+                RemoveDefeatBinds()
+            endif
+            Stop()
+        else
+            RemoveDefeatBinds()
+            cfgqst.RemoveChains()
+            Vehicle("Remove")
+            if NoActors_StartSlavery
+                ScreenMessage("They cannot fuck you but they can sell you...")
+            elseif cfgqst.AbortAll
+                ScreenMessage("NAKED DEFEAT Aborted")
+            elseif Rescued && cfgqst.DefeatTypeScenario == "Afterlife"
+                cfgqst.DefeatTypeScenario = "none"
+                ScreenMessage("You are alive. Again?")
+            elseif Rescued
+                ScreenMessage("You are miraculously rescued!")
+            elseif StartTeleportIntoDanger
+                ScreenMessage("Fuck... Something went wrong during the Ritual!")
+            elseif StartSlavery
+                ScreenMessage("You are blindfolded and carried elsewhere...")
+            elseif NoActorsAbort
+                ScreenMessage("Nobody there to take advantage of your situation.")
+            elseif cfgqst.ShortPunishment > 0
+                ScreenMessage("That was over surprisingly quick. They let you go!")
+            elseif IsGuardEndDefeat
+                ScreenMessage("The guard defeated you...but it seems they wont rape you.")
+            elseif OnlyAnimals && !cfgqst.CivilRapeRunning
+                ScreenMessage("No humans around to take advantage of your situation.")
+                OnlyAnimals = false
+                NoActorsAbort = true
+            elseif storqst.IsLocalSlave()
+            elseif cfgqst.DefeatViaSlavery
+                ScreenMessage("Your owners got bored of you and let you go.")
+            elseif cfgqst.CivilRapeRunning && !isArrested
+                ScreenMessage("You are free to go. Follow the rules in the future!")
+            elseif cfgqst.DefeatTypeScenario == "Execution"
+                ScreenMessage("You are DEAD")
+            elseif cfgqst.DefeatTypeScenario == "Afterlife"
+                ScreenMessage("You feel like you are falling...")
+                utility.Wait(1.0)
+                storqst.BlackFadeLocked = 666
+                cfgqst.FadeToBlack(true)
+            elseif !isArrested
+            endif
+            isArrested = false
+            SexLab.ThreadSlots.StopAll()
+            ResetFollowers()
+            cfgqst.FollowerStripUpdate()
+            if Allow_EscapeCrawl
+                if !StartSlavery && !Rescued && !NoActorsAbort && !cfgqst.AbortAll
+                    cfgqst.SlowDownPlayer("Start", false)
+                    cfgqst.Immobilize(false)
+                    cfgqst.ImmobilizeCrawl(true)
+                    Escape()
+                    cfgqst.Immobilize(false)
+                    cfgqst.SlowDownPlayer("End", false)
+                endif
+                defqst.UnequipTonguesPlayer("Forced")
+                defqst.DrippingPussy(false)
+                cfgqst.Crawl(cfgqst.PlayerRef, false)
+                if folqst.IsWithUs_Follower(0)
+                    utility.Wait(0.5)
+                    cfgqst.Crawl(folqst.Actor_Follower01, false)
+                endif
+                if folqst.IsWithUs_Follower(1)
+                    utility.Wait(0.5)
+                    cfgqst.Crawl(folqst.Actor_Follower02, false)
+                endif
+                cfgqst.DefeatQuestRunning = false
+            endif
+            if cfgqst.HeelsFix
+                cfgqst.RestoreHeelsEffectOnActor(cfgqst.PlayerRef, "DEFEAT END (Stage 1000) Restore Player")
+                if folqst.IsWithUs_Follower(0)
+                    cfgqst.RestoreHeelsEffectOnActor(folqst.NakedFollower[0], "DEFEAT END (Stage 1000) Restore Follower[0]")
+                endif
+                if folqst.IsWithUs_Follower(1)
+                    cfgqst.RestoreHeelsEffectOnActor(folqst.NakedFollower[1], "DEFEAT END (Stage 1000) Restore Follower[1]")
+                endif
+                if folqst.IsWithUs_Follower(2)
+                    cfgqst.RestoreHeelsEffectOnActor(folqst.NakedFollower[2], "DEFEAT END (Stage 1000) Restore Follower[2]")
+                endif
+                if folqst.IsWithUs_Follower(3)
+                    cfgqst.RestoreHeelsEffectOnActor(folqst.NakedFollower[3], "DEFEAT END (Stage 1000) Restore Follower[3]")
+                endif
+            endif
+            cfgqst.SlowDownPlayer("End", false)
+            cfgqst.Crawl(cfgqst.PlayerRef, false)
+            cfgqst.Immobilize(false)
+            if cfgqst.DefeatEntranceVia == "Orgy" && storqst.IsLocalSlave()
+                slaveqst.SexTaskDuration = slaveqst.SexTaskDuration + 1
+                slaveqst.CompleteSlaveSexTask()
+            endif
+            calm(false, 1)
+            CalmFollowers(false)
+            if spe_actor.IsActorCalmed(cfgqst.PlayerRef)
+                spe_actor.SetActorCalmed(cfgqst.PlayerRef, false)
+                NymTrace("#CALM OFF Player only")
+            endif
+            if cfgqst.PlayerRef.IsInFaction(DefeatFaction)
+                cfgqst.PlayerRef.RemoveFromFaction(DefeatFaction)
+            endif
+            ResetValues()
+            cfgqst.SexSceneCountPlayer = 0.0
+            cfgqst.ResetExpressions()
+            cfgqst.RestorePlayerState()		;#ACHERON 	;re-enables Acheron, restores bleedout recovery, resets PlayerDownAlready
+            cfgqst.SendModEvents(false)
+            cfgqst.PlaceFloor("Remove")
+            cfgqst.PlaceLight("Remove")
+            cfgqst.AddVictimsToCalmFactions(false)
+            if cfgqst.PlayerRef.IsInFaction(cfgqst.ProtectedActorFaction)
+                cfgqst.PlayerRef.RemoveFromFaction(cfgqst.ProtectedActorFaction)
+            endif
+            ;(Acheron rescue/release now happens inside cfgqst.RestorePlayerState() above)
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #STOP", 0)
+            Stop()
+            if NoActors_StartSlavery
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: No Actors - SSLV Entry", 0)
+                NoActors_StartSlavery = false
+                if cfgqst.DefeatRobberyProb > 0.0
+                    if storqst.ImmersiveRobbery
+                        cfgqst.StartRobberyAtLocation()
+                    endif
+                endif
+                if Nym()
+                    message.ResetHelpMessage("SoldIntoSlavery")
+                    storqst.MSG_SlaverySold.ShowAsHelpMessage("SoldIntoSlavery", 4.0, 0.0, 1)
+                    utility.Wait(1.0)
+                endif
+                CreateModEvent("NakedDefeatTransition", "Simple Slavery Entry")
+            elseif StartTeleportIntoDanger && !cfgqst.AbortAll
+                StartTeleportIntoDanger = false
+                CreateModEvent("NakedDefeatTransition", "Teleport Misshap")
+            elseif StartRescued && !cfgqst.AbortAll
+                StartRescued = false
+                CreateModEvent("NakedDefeatTransition", "Rescued")
+            elseif StartWakeUpInWilderness && !cfgqst.AbortAll
+                StartWakeUpInWilderness = false
+                CreateModEvent("NakedDefeatTransition", "Wake up in the Wilderness")
+            elseif StartResurrection && !cfgqst.AbortAll
+                StartResurrection = false
+                CreateModEvent("NakedDefeatTransition", "Resurrection")
+            elseif StartSlavery && !cfgqst.AbortAll
+                StartSlavery = false
+                if Nym()
+                    message.ResetHelpMessage("SoldIntoSlavery")
+                    storqst.MSG_SlaverySold.ShowAsHelpMessage("SoldIntoSlavery", 4.0, 0.0, 1)
+                    utility.Wait(1.0)
+                endif
+                if storqst.ModSS
+                    CreateModEvent("NakedDefeatTransition", "Simple Slavery Entry")
+                else
+                    debug.Messagebox("Simple Slavery is NOT installed -> you are free")
+                endif
+            elseif StartAfterlife
+                StartAfterlife = false
+                if Nym()
+                    message.ResetHelpMessage("AfterLifeStart")
+                    storqst.MSG_AfterLifeStart.ShowAsHelpMessage("AfterLifeStart", 4.0, 0.0, 1)
+                    utility.Wait(1.0)
+                endif
+                CreateModEvent("NakedDefeatTransition", "Afterlife")
+            endif
+            cfgqst.AbortAll = false
+            IsEndOfDefeat = false
+            debug.trace(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::", 0)
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 1000 ::::::::::::::::::::::: ##Shutdow##:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::", 0)
+            debug.trace(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::", 0)
+        endif
+    endif
 EndFunction
 
 
 Function CreateModEvent(String sEventName, String sEventType)	;#CreateModEvent
-NymTrace("CreateModEvent")
+NymTrace("CreateModEvent - Name: "+sEventName+" Type: "+sEventType)
     int handle = ModEvent.Create(sEventName)
     if (handle)
 		ModEvent.PushForm(handle, self)
@@ -2412,12 +2153,12 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 500 (AFTERMATH)")
 	
 	AftermathStarted = true
-	
+	CHECK_Aftermath_running = true
 	NymTrace("Allow_Aftermath = "+Allow_Aftermath)	
 	Bool isRescued = false	
 		
 	while cfgqst.SexFinished && cfgqst.ModEnabled && (!cfgqst.AbortAll)
-	Utility.Wait(1.0)
+	Utility.Wait(0.5)
 	endwhile	
 	
 	cfgqst.GroupStripMaintenance()
@@ -2470,12 +2211,14 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		if D100(95) ;95% chance they keep their word
 		ScreenMessage("They keep their word and let you go!")
 		InfoMessage("SCENARIO: Girlfriend end")
+		CHECK_Aftermath_running = false
 		StartPlayerFree()
 		else
 		ScreenMessage("The evil bastards betrayed you!")
 		cfgqst.DefeatTypeScenario = "none"
 		cfgqst.Allow_EscapeDifficulty = "Hard"
 		StartPlayerRobbed()
+		CHECK_Aftermath_running = false
 		StartPlayerCaptured()
 		endif
 					
@@ -2503,6 +2246,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		
 		;cfgqst.SendWashPlayerEvent() ;DOUBLE WASHING? 
 		;StartWakeUpInWilderness = true
+		CHECK_Aftermath_running = false
 		StartResurrection = true 
 		SetStage(1000)	
 		
@@ -2513,7 +2257,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		;ScreenMessage("Welcome in Hell!")			
 	;	StartAfterlife = true
 		;cfgqst.DefeatTransition = "Send To Execution"
-		
+		CHECK_Aftermath_running = false
 		StartAfterlife = true		;Stage 1000 will MOVE us via cfgqst.LocationEvent -> the event will wait for CalmQuest to end
 		SetStage(1000)
 
@@ -2527,6 +2271,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 			if D100(75)		;90 Chance of Fast Travel to suceed
 			StartPlayerFree()
 			cfgqst.FastTravel("Enabled", true)	
+			storqst.FastTravelStatus = 1 ;Save Travels
 			cfgqst.RemoveAllDDevices()	
 			else
 			ScreenMessage("Fuck... Something went wrong during the Ritual!")
@@ -2536,6 +2281,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 					cfgqst.StartRobberyAtLocation()
 					endif 
 				endif 
+				CHECK_Aftermath_running = false
 				StartTeleportIntoDanger = true		;Stage 1000 will MOVE us via cfgqst.LocationEvent -> the event will wait for CalmQuest to end
 				SetStage(1000)	
 			endif
@@ -2546,9 +2292,10 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 			if D100(95)		;90 Chance of Fast Travel to suceed
 			
 			cfgqst.RemoveAllDDevices()
-
+			CHECK_Aftermath_running = false
 			StartPlayerFree()
 			cfgqst.FastTravel("Enabled", true)	
+			storqst.FastTravelStatus = 1 ;Save Travels
 			else
 		
 			Utility.Wait(1.0)
@@ -2557,6 +2304,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 					cfgqst.StartRobberyAtLocation()
 					endif 
 				endif 
+				CHECK_Aftermath_running = false
 				StartTeleportIntoDanger = true
 				SetStage(1000)	
 			endif
@@ -2573,6 +2321,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		cfgqst.DefeatTypeScenario = "none"
 		cfgqst.Allow_EscapeDifficulty = "Hard"
 		StartPlayerRobbed()
+		CHECK_Aftermath_running = false
 		StartPlayerCaptured()
 		endif	
 		
@@ -2582,8 +2331,7 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 	; --- "Random" --- ; 						
 	elseif Allow_Aftermath == "Random"				
 	StartRandomAftermath()		
-		
-	
+
 	;>>>>>>>> AFTERMATH PRESET >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
 	
 	; --- "Pay Fine" --- ; 
@@ -2594,22 +2342,27 @@ Function Fragment_8()	;#aftermath ;############ STAGE 500 ############		#500	#br
 		Utility.Wait(2.0)
 		cfgqst.PlayerRef.PlayIdle(KnockdownIdles[0])		;works
 		cfgqst.Immobilize(false)	
+		CHECK_Aftermath_running = false
 		SendModEvent("EndofDefeat")	
 							
 	; --- "Capture" --- ; 
 	elseif Allow_Aftermath == "Capture"
+	CHECK_Aftermath_running = false
 	StartPlayerCaptured()
 	; --- "Free / Escape" --- ;
 	elseif Allow_Aftermath == "Escape"
+	CHECK_Aftermath_running = false
 	StartPlayerFree()
 	
 	;>>>>>>>> AFTERMATH FREE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
 	
 	
 	; --- "None" --- ; 			
-	elseif Allow_Aftermath == "None"		
+	elseif Allow_Aftermath == "None"	
+	CHECK_Aftermath_running = false	
 	StartPlayerFree()	
 	else 
+	CHECK_Aftermath_running = false
 	StartPlayerFree()
 	endif 
 					
@@ -2648,12 +2401,13 @@ EndFunction
 Bool Function CanSellSlaves()
 
 	if cfgqst.DefeatTypeGeneral == "AreHumans"
+	;FactionScans!
 	return true
 	elseif cfgqst.DefeatTypeGeneral == "AreAnimals"
 	return false
 	elseif cfgqst.DefeatTypeGeneral == "AreHumanoids"
 		
-		if (cfgqst.DefeatType == "Trolls") || (cfgqst.DefeatType == "Giants") || (cfgqst.DefeatType == "Gargoyles") || (cfgqst.DefeatType == "Draugr") || (cfgqst.DefeatType == "Undead")
+		if (cfgqst.DefeatType == "Trolls") || (cfgqst.DefeatType == "Giants") || (cfgqst.DefeatType == "Gargoyles") ||  (cfgqst.DefeatType == "Draugr") || (cfgqst.DefeatType == "Falmers") || (cfgqst.DefeatType == "Undead") || (cfgqst.DefeatType == "Funny")
 		return false
 		else
 		return true
@@ -2684,136 +2438,106 @@ RESCUE1 happens in Stage 500
 
 /;
 
+String Function FillDefeatTypeFaction()
+	
+	NymTrace("FillDefeatTypeFaction(START)")
+	
+	String ReturnString = "Humans"
 
-Function StartRandomAftermath()			;RANDOM AFTERMATH
-	NymTrace("StartRandomAftermath()")	
-		
-	;#EXECUTION >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>		;WIP #WIP #execution2 as aftermath
-	;if !isSlave && noGuards && D100(cfgqst.DefeatDeathChance)	
-	;StartPlayerExecuted()	
-	
-	Bool Bandits = cfgqst.IsItBandits() ;UNRELIABLE 
-	
-	if !Bandits
-		if cfgqst.DefeatType == "Bandits"
-		Bandits = true
-		endif
-	endif 	
-	
-	if Bandits
-	NymTrace("StartRandomAftermath(Bandits)")	
+	if (RapersACount > 0) && RapersA[0] 
+	ReturnString = storqst.GetDefeatTypeFaction(RapersA[0])
+	elseif (RapersBCount > 0) && RapersB[0]
+	ReturnString = storqst.GetDefeatTypeFaction(RapersB[0])
+	elseif (RapersCCount > 0) && RapersC[0]
+	ReturnString = storqst.GetDefeatTypeFaction(RapersC[0])
 	endif 
-	;---- 1st Roll ----- #RESCUE1 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 1st
-	if !cfgqst.HarderDefeat && !isSlave && noGuards && D100(cfgqst.DefeatRescueProb)
 	
-		;IN NYMRAS GAME WE STILL CAN GET ROBBED BEFORE RESCUE
-		if Nym() && D100(33) ;Nymras Dark World
-		StartPlayerRobbed()
-		Utility.Wait(1.0)
-		endif
-		
-	if D100(50)
-	cfgqst.RemoveAllDDevices()
-	endif
-		
-	Rescued = true
-	StartRescued = true
-	SetStage(1000)	
-		
-	;---- nothing else triggers after here (Rescued = True)
+	NymTrace("FillDefeatTypeFaction("+ReturnString+")")
 	
-	;---- 2nd Roll ----- #ROBBERY >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	elseif !cfgqst.DefeatViaSlavery && noGuards && noGhosts && noAnimals && noTrolls && !cfgqst.CivilRapeRunning && (storqst.IsLocalSlave == 0)
+	return ReturnString
 		
-			;NymMessage("Robbed by Bandits: ("+cfgqst.IsItBandits()+")")
-				
-			if storqst.NymDarkWorld && Bandits ;Nymras Dark World .-- CAREFUL; We can only ask For Bandits ONCES 	
-			BadMessage("Nymra's Dark World: Robbers being Robbers")
-			;In Nymras Game robbers rob 100% of the time
-			StartPlayerRobbed()	
-			
-				if !cfgqst.IsRobberyWorthIt
-				ScreenMessage("They sell you because your body is only thing valuable that you brought with you")
-				StartSlavery = true
-				SetStage(1000)
-				endif 
-			
-			;BANDITS rob x2 Chance		
-			elseif cfgqst.NymBeta && Bandits && (cfgqst.DefeatRobberyProb > 0)	;careful, can only ask ONCE for "IsBandits"!!
-			float tempRobchance = (cfgqst.DefeatRobberyProb) + (cfgqst.DefeatRobberyProb) ;+ (cfgqst.DefeatRobberyProb)	
-
-				if D100(tempRobchance)
-				InfoMessage("Bandits have a x2 the MCM-robberychance to rob you. BanditsRobChance: "+tempRobchance)
-				StartPlayerRobbed()
-				;---- nothing else triggers after here
-				endif
-				 
-			StartPlayerRobbed()
-			;---- nothing else triggers after here
-			elseif (D100(cfgqst.DefeatRobberyProb))
-			StartPlayerRobbed()
-			;---- nothing else triggers after here
-			endif
-	;--- further checks possible if no robbery		
-	endif
-
-	if !Rescued	
-	
-		;<<<<<<<<<< PRISON (POP) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #POP
-		if cfgqst.ModPOP && cfgqst.CivilRapeRunning && D100(cfgqst.DefeatArrestProb)
-		StartPlayerPrisonerPOP()
-		
-		
-		;---- 3rd Roll -----  ;<<<<<<<<<< SLAVERY (SD+ & SS++) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #SS
-		
-		elseif Nym() && IsItSlavers(RapersA[0])	;Nymras Dark World - Slavers
-		
-		StripFollower(0)
-		StripFollower(1)
-		
-		if cfgqst.DefeatRobberyProb > 0 
-			if storqst.ImmersiveRobbery
-			cfgqst.StartRobberyAtLocation()
-			endif 
-		endif 
-		;StartPlayerSlaverySS()
-		StartSlavery = true
-		SetStage(1000)
-		
-		
-		
-		elseif !noCaptivity && !noslavery && !cfgqst.HarderDefeat && !isSlave && noGuards && noGhosts && D100(cfgqst.DefeatSlaveryProb) ;|| (cfgqst.IsItBandits() && D100(cfgqst.DefeatSlaveryProb + 10))  ;---------------------- SLAVERY event
-
-		
-		
-			if D100(cfgqst.DefeatSDweight)
-			StartPlayerSlaverySD()		
-			elseif noAnimals && noTrolls
-					
-			if cfgqst.DefeatRobberyProb > 0
-			ScreenMessage("They take all your stuff before selling you as a slave")
-			StartPlayerRobbed()
-			Utility.Wait(1.0)
-			endif
-			
-			StartSlavery = true
-			SetStage(1000)
-			
-			else
-			StartPlayerFree()
-			endif
-			
-		;<<<<<<<<<< CAPTURE >>>>>>>>>>> furniture or DDe >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>				
-		elseif !noCaptivity && !ShortDefeat && noAnimals && noTrolls && (D100(cfgqst.DefeatCaptivityProb) || cfgqst.HarderDefeat)		;---------------------- LOCAL CAPTIVITYevent
-		StartPlayerCaptured()
-
-		;<<<<<<<<<< NO OUTCOME >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		else
-		StartPlayerFree()	
-		endif
-	endif ;!if Rescued
+EndFunction 
 
 
+Function StartRandomAftermath()
+    NymTrace("StartRandomAftermath()")
+    bool Bandits = false
+    if cfgqst.DefeatTypeGeneral == "AreHumans"
+        cfgqst.DefeatType = FillDefeatTypeFaction()
+        if cfgqst.DefeatType == "Bandits"
+            Bandits = true
+        endif
+    endif
+    if storqst.AllowSellingToSS()
+        noSlavery = false
+    else
+        noSlavery = true
+    endif
+    if Bandits
+        NymTrace("StartRandomAftermath(Bandits)")
+    endif
+    if !cfgqst.HarderDefeat && !isSlave && noGuards && D100(cfgqst.DefeatRescueProb)
+        if Nym() && D100(33.0)
+            StartPlayerRobbed()
+            utility.Wait(1.0)
+        endif
+        if D100(50.0)
+            cfgqst.RemoveAllDDevices(false, "", "", "", "", "")
+        endif
+        Rescued = true
+        CHECK_Aftermath_running = false
+        StartRescued = true
+        SetStage(1000)
+    elseif !cfgqst.DefeatViaSlavery && noGuards && noGhosts && noAnimals && noTrolls && !cfgqst.CivilRapeRunning && storqst.IsLocalSlave == 0
+        if storqst.NymDarkWorld && Bandits
+            BadMessage("Nymra's Dark World: Robbers being Robbers")
+            StartPlayerRobbed()
+            if !cfgqst.IsRobberyWorthIt
+                ScreenMessage("They sell you because your body is only thing valuable that you brought with you")
+                StartSlavery = true
+                CHECK_Aftermath_running = false
+                SetStage(1000)
+            endif
+        elseif cfgqst.NymBeta && Bandits && cfgqst.DefeatRobberyProb > 0.0
+            float tempRobchance = cfgqst.DefeatRobberyProb + cfgqst.DefeatRobberyProb
+            if D100(tempRobchance)
+                InfoMessage("Bandits have a x2 the MCM-robberychance to rob you. BanditsRobChance: " + tempRobchance)
+                StartPlayerRobbed()
+            endif
+            StartPlayerRobbed()
+        elseif D100(cfgqst.DefeatRobberyProb)
+            StartPlayerRobbed()
+        endif
+    endif
+    if !Rescued
+        if cfgqst.ModPOP && cfgqst.CivilRapeRunning && D100(cfgqst.DefeatArrestProb)
+            CHECK_Aftermath_running = false
+            StartPlayerPrisonerPOP()
+        elseif !noCaptivity && !noSlavery && !cfgqst.HarderDefeat && !isSlave && noGuards && noGhosts && D100(cfgqst.DefeatSlaveryProb)
+            if D100(cfgqst.DefeatSDweight)
+                CHECK_Aftermath_running = false
+                StartPlayerSlaverySD()
+            elseif noAnimals && noTrolls
+                if cfgqst.DefeatRobberyProb > 0.0
+                    ScreenMessage("They take all your stuff before selling you as a slave")
+                    StartPlayerRobbed()
+                    utility.Wait(1.0)
+                endif
+                CHECK_Aftermath_running = false
+                StartSlavery = true
+                SetStage(1000)
+            else
+                CHECK_Aftermath_running = false
+                StartPlayerFree()
+            endif
+        elseif !noCaptivity && !ShortDefeat && noAnimals && noTrolls && (D100(cfgqst.DefeatCaptivityProb) || cfgqst.HarderDefeat)
+            CHECK_Aftermath_running = false
+            StartPlayerCaptured()
+        else
+            CHECK_Aftermath_running = false
+            StartPlayerFree()
+        endif
+    endif
 EndFunction
 
 
@@ -3168,7 +2892,7 @@ EndFunction
 ;EndFunction
 
 
-Bool Function CheckRobber(actor akactor)			;NO LONGER GOOD -- needs to be more elaborate than this :(
+Bool Function CheckRobber(actor akactor)			;NO LONGER GOOD -- needs to be more elaborate than this :(			;#CheckRobber
 
 Actor a = akactor
 Int iModIndex
@@ -3265,6 +2989,8 @@ Function Fragment_20()							;############ STAGE 14 ############	;#14
 	
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 14")
 
+	CHECK_RapeSequence_running = false
+
 	SexScenesDone = 0
 	FuckingRound = 0
 	LastSceneOrdered = 100 ;END!
@@ -3321,30 +3047,25 @@ Keyword DemonicCreature
 
 ;bool StartCombatScan = false
 
-Function RegisterForModEvents()			;#events #register
-
-RegisterForModEvent("Bis_BatheEvent", "OnBis_BatheEvent")
-;RegisterForModEvent("StartForceExpression", "OnStartForceExpression")
-;RegisterForModEvent("StartCombatScanner", "OnStartCombatScanner")
-RegisterForModEvent("StartAddRapeHands", "OnStartAddRapeHands")
-RegisterForModEvent("StartAddRapeTears", "OnStartAddRapeTears")
-RegisterForModEvent("StartAddRapeCount", "OnStartAddRapeCount")
-RegisterForModEvent("StartForceImmobilize", "OnStartForceImmobilize")
-RegisterForModEvent("EndofDefeat", "OnEndofDefeat")
-RegisterForModEvent("EndofDefeat_Slavery", "OnEndofDefeat_Slavery") 
-RegisterForModEvent("EndofDefeat_Afterlife", "OnEndofDefeat_Afterlife") 
-RegisterForModEvent("StartPlayerRescued", "OnStartPlayerRescued") 
-RegisterForModEvent("StartMoaning", "OnStartMoaning")
-RegisterForModEvent("HookStageStart", "StageStart")
-RegisterForModEvent("StartEscape", "OnStartEscape")
-RegisterForModEvent("StartSolo", "OnStartSolo")
-RegisterForModEvent("StartCallMolesters", "OnStartCallMolesters")
-RegisterForModEvent("StartVoyeurs", "OnStartVoyeurs")
-RegisterForModEvent("StartNakedSexExpressions", "OnStartNakedSexExpressions")
-;RegisterForModEvent("StartRaperExpressions", "OnStartRaperExpressions")
-RegisterForModEvent("ForceStageProgression", "OnStartForceStageProgression")
-RegisterForModEvent("StartForceOpenMouth", "OnStartForceOpenMouth")
-
+Function RegisterForModEvents()
+    NymTrace("RegisterForModEvents()")
+    RegisterForModEvent("Bis_BatheEvent", "OnBis_BatheEvent")
+    RegisterForModEvent("StartAddRapeCount", "OnStartAddRapeCount")
+    RegisterForModEvent("StartForceImmobilize", "OnStartForceImmobilize")
+    RegisterForModEvent("EndofDefeat", "OnEndofDefeat")
+    RegisterForModEvent("EndofDefeat_Slavery", "OnEndofDefeat_Slavery")
+    RegisterForModEvent("EndofDefeat_Afterlife", "OnEndofDefeat_Afterlife")
+    RegisterForModEvent("StartPlayerRescued", "OnStartPlayerRescued")
+    RegisterForModEvent("StartMoaning", "OnStartMoaning")
+    RegisterForModEvent("HookStageStart", "StageStart")
+    RegisterForModEvent("StartEscape", "OnStartEscape")
+    RegisterForModEvent("StartSolo", "OnStartSolo")
+    RegisterForModEvent("StartCallMolesters", "OnStartCallMolesters")
+    RegisterForModEvent("StartVoyeurs", "OnStartVoyeurs")
+    RegisterForModEvent("StartNakedSexExpressions", "OnStartNakedSexExpressions")
+    RegisterForModEvent("ForceStageProgression", "OnStartForceStageProgression")
+    RegisterForModEvent("StartForceOpenMouth", "OnStartForceOpenMouth")
+    RegisterForModEvent("StartSpawnRapers", "OnStartSpawnRapers")
 EndFunction
 
 
@@ -3409,137 +3130,91 @@ EndFunction
 		
 		Bool WearingDDsBlockingSex = false
 
-Function InitialMaintenance()	;STAGE 10 start
-	NymTrace("InitialMaintenance() ::::::::::::::::::::::::::::::::::::::::::::::::::::")	
-
-	;Follower Handling!!!
-
-	if !SPE_Actor.IsActorCalmed(cfgqst.PlayerRef)	
-	NymTrace("InitialMaintenance() Actor was NOT calmed")
-	SPE_Actor.SetActorCalmed(cfgqst.PlayerRef, true)
-	endif
-
-	cfgqst.FixExpressions()
-	
-	cfgqst.PublicExposure = 0
-	cfgqst.StopHeartBeat()
-	
-	LastHitterAsWhipper()
-
-	RegisterForModEvents()
-	cfgqst.PlayerDownAlready = false  ;too early?
-
-		
-		if cfgqst.ModDDframework
-
-			if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Lockable")
-			DebugTrace("InitialMaintenance() Wearing Lockable DD")
-			WearingDDs = true 
-			endif 
-		
-			if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage")
-			WearingDDs_HeavyBondage = true 
-			DebugTrace("InitialMaintenance() Wearing HeavyBondage DD")
-			endif 
-		
-		
-			if WearingDDs && !storqst.IsLocalSlave()	;slaves dont get their DDs removed!
-		
-				float fRemoveDDChanceTemp
-				
-				if (cfgqst.DefeatEntranceVia == ("Surrendered in Combat")) && D100(cfgqst.CooperativeSurrenderChance)
-				fRemoveDDChanceTemp = cfgqst.RemoveDDChance + cfgqst.RemoveDDChance
-				else
-				fRemoveDDChanceTemp = cfgqst.RemoveDDChance
-				endif 
-				
-				if (cfgqst.DefeatEntranceVia == ("Send to Afterlife")) 
-				cfgqst.RemoveAllDDevices(true, "empty01", "empty02", "empty03", "empty04", "empty05")
-				NymTrace("InitialMaintenance() - RemoveAllDDevices(Afterlife)")
-				elseif D100(fRemoveDDChanceTemp)
-				cfgqst.RemoveAllDDevices(true, "Piercing Nipples", "empty02", "empty03", "empty04", "empty05")
-				NymTrace("InitialMaintenance() - RemoveAllDDevices()")
-				endif 
-			endif 
-			
-			if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "BlockingSex")
-			NymTrace("InitialMaintenance() IsWearingDDs")
-			WearingDDsBlockingSex = true
-			cfgqst.DefeatTypeScenario = "DD"	
-			else 
-			WearingDDsBlockingSex = false
-			endif
-
-		endif 
-
-		
-	;--- REMOVE POTION EFFECTS -------------------------------------------------------------- ;
-	
-	if cfgqst.CheckDurationSpell("Magicka")
-	cfgqst.RemoveDurationSpell("Magicka")
-	endif
-	
-	if cfgqst.CheckDurationSpell("Health")
-	cfgqst.RemoveDurationSpell("Health")
-	endif
-	
-	if cfgqst.RapeAgain
-	
-	AddDefeatBinds()		;AddBindsAgain to restore the "DefeatStateBindings" for RapeAgain (else the poses will not match)
-	
-		;if D100(33)			;33% chance that the scenario is changed on RapeAgain (NOT tested)
-		;cfgqst.DefeatTypeScenario = "none"
-		;endif
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: cfgqst.RapeAgain = TRUE")
-	else
-	;GracePeriod needs to be set to 0 for the first start of Naked Defeat.
-	;when RapeAgain is true, the GracePeriod is used for the EscapeGame.
-	cfgqst.GracePeriod = 0
-	endif
-	
-	if cfgqst.PlayerRef.IsInFaction(SexLabForbiddenActors)
-	;ScreenMessage("FORBIDDEN Fuck...!!!!!!####")
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 (SexLabForbiddenActors)")
-	cfgqst.PlayerRef.RemoveFromFaction(SexLabForbiddenActors)
-	endif
-
-	if cfgqst.CivilRapeRunning
-	cfgqst.DefeatTypeGeneral = "AreHumans"
-	cfgqst.DefeatType = "Humans"
-	endIf
-
-	;Demonic Creatures Keyword RapeAgain
-	if cfgqst.ModDEM
-	DemonicCreature = (Game.GetFormFromFile(0x0081F780, "DemonicCreatures.esp") As Keyword)
-	endif	
-		
-	;Search Radius Setup 				
-	if cfgqst.DefeatViaSlavery || (cfgqst.DefeatTypeScenario == "Afterlife")
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: cfgqst.DefeatViaSlavery")
-	Distance = 10000
-	elseif cfgqst.PlayerRef.IsInInterior()
-	Distance = cfgqst.SearchRadiusInterior
-	else
-	Distance = cfgqst.SearchRadius
-	endif
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SearchRadius: "+Distance)
-
-	;Search Radius error check
-	if Distance < 5000
-	;Distance = 5000
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR SearchRadius is very low. Distance: "+Distance)
-	;Debug.Notification("NAKED DEFEAT: #ERROR SearchRadius not found. now set to 5000, report to forum")
-	endif
-	
-	;enable Godmode (MCM toggle)
-;	if cfgqst.GodMode
-;	Debug.SetGodMode(true)
-;	Debug.trace ("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Godmode TRUE")
-;	endif
-	
-	AllowPlaceFloor = true
-	cfgqst.SexState = 0 ;no Sex 
-	
+Function InitialMaintenance()
+    float fRemoveDDChanceTemp
+    NymTrace("InitialMaintenance() ::::::::::::::::::::::::::::::::::::::::::::::::::::")
+    if !spe_actor.IsActorCalmed(cfgqst.PlayerRef)
+        NymTrace("InitialMaintenance() Actor was NOT calmed")
+        spe_actor.SetActorCalmed(cfgqst.PlayerRef, true)
+    endif
+    cfgqst.FixExpressions()
+    cfgqst.PublicExposure = 0
+    cfgqst.StopHeartBeat()
+    RegisterForModEvents()
+    cfgqst.PlayerDownAlready = false
+    CreateGroups()
+    if cfgqst.ModDDframework
+        if nade_ddint.IsWearingDDs(cfgqst.PlayerRef, "Lockable")
+            DebugTrace("InitialMaintenance() Wearing Lockable DD")
+            WearingDDs = true
+        endif
+        if nade_ddint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage")
+            WearingDDs_HeavyBondage = true
+            DebugTrace("InitialMaintenance() Wearing HeavyBondage DD")
+        endif
+        if WearingDDs && !storqst.IsLocalSlave()
+            if cfgqst.DefeatEntranceVia == "Surrendered in Combat" && D100(cfgqst.CooperativeSurrenderChance)
+                fRemoveDDChanceTemp = cfgqst.RemoveDDChance + cfgqst.RemoveDDChance
+            else
+                fRemoveDDChanceTemp = cfgqst.RemoveDDChance
+            endif
+            if cfgqst.DefeatEntranceVia == "Send to Afterlife"
+                cfgqst.RemoveAllDDevices(true, "empty01", "empty02", "empty03", "empty04", "empty05")
+                cfgqst.DefeatTypeScenario = "Afterlife"
+                cfgqst.DefeatStateBindings = "Unbound"
+                NymTrace("InitialMaintenance() - RemoveAllDDevices(Afterlife)")
+            elseif D100(fRemoveDDChanceTemp)
+                cfgqst.RemoveAllDDevices(true, "Piercing Nipples", "empty02", "empty03", "empty04", "empty05")
+                cfgqst.DefeatTypeScenario = "None"
+                cfgqst.DefeatStateBindings = "Unbound"
+                NymTrace("InitialMaintenance() - RemoveAllDDevices()")
+            endif
+        endif
+        if nade_ddint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage")
+            NymTrace("InitialMaintenance() IsWearingDDs (Heavy Bondage KWD)")
+            WearingDDsBlockingSex = true
+            cfgqst.DefeatTypeScenario = "DD"
+        else
+            WearingDDsBlockingSex = false
+        endif
+    endif
+    if cfgqst.CheckDurationSpell("Stamina", false)
+        cfgqst.RemoveDurationSpell("Stamina")
+    endif
+    if cfgqst.CheckDurationSpell("Health", false)
+        cfgqst.RemoveDurationSpell("Health")
+    endif
+    if cfgqst.RapeAgain
+        AddDefeatBinds()
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: cfgqst.RapeAgain = TRUE", 0)
+    else
+        cfgqst.GracePeriod = 0
+    endif
+    if cfgqst.PlayerRef.IsInFaction(SexLabForbiddenActors)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 (SexLabForbiddenActors)", 0)
+        cfgqst.PlayerRef.RemoveFromFaction(SexLabForbiddenActors)
+    endif
+    if cfgqst.CivilRapeRunning
+        cfgqst.DefeatTypeGeneral = "AreHumans"
+        cfgqst.DefeatType = "Humans"
+    endif
+    if cfgqst.ModDEM
+        DemonicCreature = (game.GetFormFromFile(8517504, "DemonicCreatures.esp") as keyword)
+    endif
+    if cfgqst.DefeatViaSlavery || cfgqst.DefeatTypeScenario == "Afterlife"
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: cfgqst.DefeatViaSlavery", 0)
+        Distance = 10000.0
+    elseif cfgqst.PlayerRef.IsInInterior()
+        Distance = cfgqst.SearchRadiusInterior
+    else
+        Distance = cfgqst.SearchRadius
+    endif
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: SearchRadius: " + Distance, 0)
+    if Distance < 5000.0
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR SearchRadius is very low. Distance: " + Distance, 0)
+    endif
+    AllowPlaceFloor = true
+    cfgqst.SexState = 0
 EndFunction
 
 int Prost
@@ -4035,6 +3710,7 @@ EndFunction
 
 Function GetDDScenario()
 	;Bool SetDDScenario = fale
+	NymTrace("GetDDScenario()")
 	
 	if (cfgqst.DefeatTypeGeneral != "AreAnimals") && (cfgqst.DefeatType != "Trolls") && (cfgqst.ShortPunishment == 0) && !cfgqst.RapeAgain && (!cfgqst.AbortAll)
 	
@@ -4093,912 +3769,556 @@ ObjectReference Afterlife_Stairs_Center
 ObjectReference Afterlife_Stairs_Right
 ObjectReference Afterlife_Stairs_Left
 
-Function Fragment_3()	;############ STAGE 10 ############			##Start1 ##START##
-	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 (NAKED DEFEAT ##START##)")
-
-	Debug.Trace("::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::")
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 ::::::::::::::::::::::::: ##START## :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::")
-	Debug.Trace("::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::")
-	
-	if storqst.IsLocalSlave() && Nym()
-	ScreenMessage("Your sex slave duties are calling!")
-	Message.ResetHelpMessage("Sneak")
-	Utility.Wait(0.1)
-	storqst.MSG_SexSlaveDutiesStart.ShowAsHelpMessage("Sneak", 4, 0, 1)
-	;Utility.Wait(5.0)
-	;cfgqst.Immobilize(false)
-	;cfgqst.PlayerRef.StartSneaking()
-	;Utility.Wait(0.1)
-	;cfgqst.PlayerRef.StartSneaking()
-	;cfgqst.Immobilize(true)
-	Message.ResetHelpMessage("Empty")
-	storqst.MSG_TutorialEmptyMSG.ShowAsHelpMessage("Empty", 1, 0, 1)
-;	Message.ResetHelpMessage("SexSlaveDutiesStart")
-;	storqst.MSG_SexSlaveDutiesStart.ShowAsHelpMessage("SexSlaveDutiesStart", 4, 0, 1)
-;	Utility.Wait(5.0)
-	endif 
-;	Utility.Wait(5.0)
-;	Message.ResetHelpMessage("EmptyMessage")
-;	storqst.MSG_TutorialEmptyMSG.ShowAsHelpMessage("EmptyMessage", 1, 0, 1)
-
-	storqst.IsBlockedAttack = false
-	
-	if Nym()
-	IsHumanFucker = false  ;Let Sexlab Handle NIoverred 
-				 ;= True 	;Defeat handles 
-	endif 
-	
-
-	;/
-	if cfgqst.IsNymrasGame() && cfgqst.DefeatViaSlavery
-		
-;	VehiclePlayerTest = game.GetFormFromFile(0x00000034, "Skyrim.esm") 
-	VehiclePlayerTest = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(0x00000034, "Skyrim.esm") as Static, 1)
-		if VehiclePlayerTest
-		NymTrace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: VEHICLE FOUND")
-		else 
-		NymTrace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: VEHICLE NONE")
-		endif
-;	NymTrace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: VEHICLE PLACEMENT FOR LOCATION")
-	;VehiclePlayerTest = Alias_Vehicle.GetReference() 
-					
-			
-	VehiclePlayerTest.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)
-	endif 
-	/;
-	
-;	if cfgqst.IsNymrasGame()
-;	SlaveryLocBeta = TRUE
-;	else
-;	SlaveryLocBeta = false 
-;	endif	
-	
-	
-	storqst.Defeat_ID += 1
-	bool Test = false 
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;:::::::::::::::::::::	DEFEAT START	:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;	
-		DebugTrace("MODVERSION: "+cfgqst.NakedDefeat_ModVersion)
-		DebugTrace("stage 10 #Start#: DefeatTypeGeneral: "+cfgqst.DefeatTypeGeneral)		
-		DebugTrace("stage 10 #Start#: DefeatType: "+cfgqst.DefeatType)	
-		DebugTrace("stage 10 #Start#: DefeatTypeScenario: "+cfgqst.DefeatTypeScenario)
-		if cfgqst.RapeAgain
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 #Start#: DefeatEntranceVia (RapeAgain): "+cfgqst.DefeatEntranceVia)
-		else
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 #Start#: DefeatEntranceVia: "+cfgqst.DefeatEntranceVia)
-		endif 
-		DebugTrace("----------------------------------------------------------------------------------------------------------")
-		DebugTrace("stage 10 #Start#: Defeat Location: "+defqst.GetCurrentLocationName())
-		DebugTrace("stage 10 #Start#: DefeatStateBindings: "+cfgqst.DefeatStateBindings)
-		DebugTrace("stage 10 #Start#: Chapter: "+cfgqst.DefeatStateChapter)
-		if Nym()
-		DebugTrace("stage 10 #Start#: DEBUG STATUS: Nym() "+Nym()+" DebugPunishmentType: "+cfgqst.DebugPunishmentType)
-		
-		DebugTrace("stage 10 #Start#: WaitTime Current "+storqst.WaitTimeTest/2+"seconds")
-		endif 
-		DebugTrace("----------------------------------------------------------------------------------------------------------")
-		;cfgqst.ActionLog("DefeatVia:"+cfgqst.DefeatEntranceVia)
-		
-		;INITITAL STUFF >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		
-		if (!cfgqst.AbortAll)
-		cfgqst.DefeatStatePlayer = "StartofDefeat"
-		cfgqst.Immobilize(true)
-		endif 
-		
-		;WAS NYM()!
-		if cfgqst.DefeatTypeScenario == "Afterlife" && (!cfgqst.AbortAll)
-		Vehicle("SetupForAfterlife")
-		endif 
-
-		if (!cfgqst.AbortAll)
-		InitialMaintenance()
-		InitialMaintenance_Followers()
-		endif
-		
-		;/
-		NymTrace("RapersACount: "+RapersACount)
-		NymTrace("RapersBCount: "+RapersBCount)
-		NymTrace("RapersCCount: "+RapersCCount)
-		NymTrace("CreaturesACount: "+CreaturesACount)
-		NymTrace("CreaturesBCount: "+CreaturesBCount)
-		NymTrace("CreaturesCCount: "+CreaturesCCount)
-		NymTrace("CreaturesDCount: "+CreaturesDCount)
-		NymTrace("CreaturesECount: "+CreaturesECount)
-		NymTrace("CreaturesFCount: "+CreaturesFCount)
-		/;
-
-		if Nym() && (cfgqst.DefeatTypeScenario != "AfterLife") && (cfgqst.DefeatTypeScenario != "FastTravel")
-		;STA_CallSpanker()
-		endif 
-		
-		if cfgqst.DefeatViaSlavery
-			if folqst.Actor_Follower01
-			folqst.Actor_Follower01.MoveTo(cfgqst.PlayerRef, -160.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90.0), -160.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()+90.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true) ;
-			endif 
-			if folqst.Actor_Follower02
-			folqst.Actor_Follower02.MoveTo(cfgqst.PlayerRef, 160.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90.0), 160.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()+90.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true) ;
-			endif  
-		endif 
-		
-		cfgqst.Immobilize(true)
-		cfgqst.AddVictimsToCalmFactions(true)
-		
-		
-	;	if !cfgqst.RapeAgain && (cfgqst.DefeatTypeScenario != "Afterlife")
-	;	PlayPoseOnActor(cfgqst.PlayerRef, "Reset", True)
-	;	endif 	
-			
-		;if cfgqst.IsNymrasGame()
-		;STA_CallSpanker()
-		;endif 	
-		
-	;	if cfgqst.DefeatEntranceVia == "Ambush"
-	;	NymTrace("Spawn Ambush")
-	;	SpawnActorGroups("Ambush") ;TEST MOVED EARLIER
-	;	endif 
-			
-		if cfgqst.CivilRapeRunning && !cfgqst.DefeatViaSlavery	;#crime ; need to check here so we account for late crimes committed right before defeat
-		cfgqst.ProcessCrimeGold()		
-		cfgqst.CheckCrimePunishment()	
-		endif 				
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;:::::::::::::::::::::	ARRIVAL SCENE :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;	
-		
-		cfgqst.DefeatStateChapter = "Arrival Scene"
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 :::::: Arrival Scene ::::::")	
-		
-		; xxxxxxxxxxxxxxxxxxxxXXXX --- INITIAL #POSE --- XXXXxxxxxxxxxxxxxxxxxxxx 	
-		
-		if (cfgqst.DefeatEntranceVia == "Prostitution")
-		PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)	
-		PlayPoseOnActor(Victims[0], "Offering", false)
-		PlayPoseOnActor(Victims[1], "Offering", false)
-			
-		;>--- for Slavery --->	 - we arrive at slave location and wait for processing 			
-		elseif cfgqst.DefeatViaSlavery && (cfgqst.DefeatTypeScenario != "Afterlife") && !cfgqst.RapeAgain && (!cfgqst.AbortAll)		
-		;VehiclePlayer = Alias_Vehicle.GetReference() 
-	;	cfgqst.PlayerRef.MoveTo(VehiclePlayer, abMatchRotation = true)
-
-		;if SlaveryLocBeta
-		;do nothing
-		;else
-		;Vehicle("SetupForSlavery")	
-		;endif 
-		PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)			
-		PlayPoseOnActor(Victims[0], "Wait", false)
-		PlayPoseOnActor(Victims[1], "Wait", false)
-	
-		;>--- for Afterlife --->	; we wait for our fate in the afterlife 		
-		elseif cfgqst.DefeatTypeScenario == "Afterlife"
-
-		Vehicle("SetupForAfterlife")
-	
-		PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)		
-		PlayPoseOnActor(Victims[0], "Wait", false)
-		PlayPoseOnActor(Victims[1], "Wait", false)
-				
-		NymTrace("cfgqst.DefeatViaSlavery = false")
-		cfgqst.DefeatViaSlavery = false ;FIX THIS SHIT... needs to be adressed in configquest FIX WHAT?
-		cfgqst.DefeatType = "Hell"
-		cfgqst.DefeatTypeGeneral = "AreHumanoids"
-		cfgqst.Dead = 0 
-		Utility.Wait(2.0)
-		storqst.WaitTimeTest+=4		
-			if cfgqst.BlackFadeStatus == 1
-			cfgqst.FadeToBlack(false)	
-			endif 
-			
-		elseif cfgqst.RapeAgain
-		;we should still play a Pose from before! 
-		endIf
-
-		;------------- WHY IS THIS REQUIRED???----------------------------------------------
-		;improve this. we check Calm and Sort while looking for a spot better? 
-		int waitloops = 0
-		
-		if cfgqst.DefeatTypeScenario == "none"
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 (Waiting Loop)")
-		;if (cfgqst.DefeatTypeScenario != "Afterlife") && cfgqst.DefeatTypeScenario != "FastTravel" 
-			while (cfgqst.DefeatTypeGeneral == "none") && (waitloops < 5) && (!cfgqst.AbortAll) && (cfgqst.ModEnabled)
-			
-		 
-			Utility.Wait(1.0)
-			storqst.WaitTimeTest+=2
-			waitloops += 1
-			EndWhile	
-			
-			if (waitloops == 5) && cfgqst.DefeatTypeGeneral == "none"
-				cfgqst.DefeatType = "Funny"
-				cfgqst.DefeatTypeGeneral = "AreFunny"	
-			endif
-
-		waitloops = 0
-		endif 
-		;---------------------------------------------------------------------------------------
-		
-
-		;>>>>>>>>>>>>>>>>>> #Sequence1 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
-
-		if (!cfgqst.AbortAll)
-		GetMainSequence()	;#Seq1
-		endif
-		;>>>>>>>>>>>>>>>> SPECIAL POSE (not regular) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		; SET PLAYER - Initial - POSE if >>> NOT <<< Regular StartUp --- ;
-				
-		;>--- for FastTravel ---> 		
-		if cfgqst.DefeatTypeScenario == "FastTravel" || (cfgqst.DefeatEntranceVia == "Prostitution")
-		NymMessage("OfferingPose and Vehicle Setup for FastTravel") 
-		Vehicle("setup")	
-			
-			;if cfgqst.IsNymrasGame()
-			;STA_CallSpanker()
-			;endif 	
-				
-		; xxxxxxxxxxxxxxxxxxxxXXXX #POSE XXXXxxxxxxxxxxxxxxxxxxxx 	
-		; we wait for our travel partners? 
-		PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)		
-		PlayPoseOnActor(Victims[0], "Offering", false)
-		PlayPoseOnActor(Victims[1], "Offering", false)
-		 
-		;>--- for Afterlife --->	
-		elseif cfgqst.DefeatTypeScenario == "Afterlife"	
-		; xxxxxxxxxxxxxxxxxxxxXXXX #POSE XXXXxxxxxxxxxxxxxxxxxxxx 	
-		; we wait for our fate in the afterlife 
-		PlayPoseOnActor(cfgqst.PlayerRef, "Wait", true)		
-		PlayPoseOnActor(Victims[0], "Wait", false)
-		PlayPoseOnActor(Victims[1], "Wait", false)
-
-		;Vehicle("SetupForAfterlife") MOVE EARLIER 
-		
-			;if cfgqst.BlackFadeStatus == 1
-			;cfgqst.FadeToBlack(false)	
-			;endif 
-		
-		;>--- for RapeAgain --->
-		elseif cfgqst.RapeAgain
-		;no pose because we still in furniture or posing anyway		
-		endif
-		
-		;---------------------------------------------------------------------------------------------
-			
-		;>>>>>>>>>> CALM & COUNT ACTORS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		;Make this a modevent that plays during the setup scene? Scenario should already be set, no?
-		SendModEvent("Moan")
-		if (!cfgqst.AbortAll)
-		Calm(true, 1)	
-		endif
-		
-		
-		if AllRapersTooFarAway
-		AllRapersTooFarAway = false 
-		ScreenMessage("No Rapers in Range, temporarily increasing Search Radius")
-		IncreasedDistance = 8000
-		else 
-		IncreasedDistance = 0
-		endif 
-		
-		if cfgqst.DefeatWhipProb > 0 && Nym()
-		storqst.StartWhipping_00(8)
-		endif 
-		
-		;>>>>>>>>>> Check if we Abort A >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #Abort
-		;!!! IMPORTANT !!! WE only check actors abort in Non-Spawn Scenarios (so not for FastTravel, Afterlife
-		
-		NeedCreaturesForSex = false
-		
-		if (cfgqst.DefeatTypeScenario == "Afterlife") || (cfgqst.DefeatTypeScenario == "FastTravel") || (cfgqst.DefeatEntranceVia == "Ambush")
-		;dont care, we spawn our stuff anyway 
-				
-		elseif cfgqst.DefeatViaSlavery 	
-		NymTrace("Check for Rapers for Slavery: RapersMale = "+RapersMale+" RapersFemale = "+RapersFemale)
-		;if there are no rapers at the target location we need to spawn some.
-			if (RapersMale == 0) ;&& !cfgqst.FemalesAllowed 
-			NeedRapersForSlavery = true 
-			endif 
-			if (RapersCreatures == 0) && cfgqst.NymSpawning
-			NeedCreaturesForSlavery = true
-			endif 
-				
-		;Human Defeat, can be nobody left -> abort  		
-		elseif cfgqst.DefeatTypeGeneral == "AreHumans" 
-	
-			if (RapersMale == 0) && !cfgqst.FemalesAllowed 
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NoActorsAbort(RapersMale == 0)")	
-		
-				if RapersCreatures == 0
-				ScreenMessage("No male rapers around. You are lucky!")			
-				NoActorsAbort = true 
-				else 
-				ScreenMessage("No male rapers around. Creatures will take care of you.")
-				NoActorsAbort = false 
-				endif 
-				
-			elseif (RapersMale == 0) && (RapersFemale == 0)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NoActorsAbort(RapersMale&Female == 0)")
-			
-				if RapersCreatures == 0
-				ScreenMessage("No humans around to fuck you. You are lucky!")		
-				NoActorsAbort = true 
-				else 
-				ScreenMessage("No humans around to fuck you. But Creatures will take care of you.")
-				NoActorsAbort = false 
-				endif 
-			endif 
-			
-			if !NoActorsAbort && (RapersCreatures == 0) && cfgqst.NymSpawning
-			NeedCreaturesForSex = true
-			endif 
-					
-		;Creature/Animal  Defeat, if nobody left -> abort 	
-		elseif (cfgqst.DefeatTypeGeneral == "AreHumanoids") || (cfgqst.DefeatTypeGeneral == "AreAnimals") 
-		
-			if (RapersCreatures == 0)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NoActorsAbort(RapersCreatures == 0)")
-			ScreenMessage("No creatures nearby to fuck you. You are lucky!")
-			NoActorsAbort = true
-			endif
-		
-		else ;FUNNY; NONE; 
-					
-			NoActorsAbort = true			
-			if NoActorsAbort && cfgqst.FemalesAllowed && RapersFemale > 0  
-			NoActorsAbort = false
-			endif 
-			
-			if NoActorsAbort && RapersMale > 0
-			NoActorsAbort = false
-			endif 
-			
-			if NoActorsAbort && cfgqst.AllowCreatures && RapersCreatures > 0
-			NoActorsAbort = false
-			endif 
-
-		endif 
-		;------------------------------------------------------------------------------------------------------
-
-		;>>>>>>>>>> SORT & SPAWN ACTORS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		if !NoActorsAbort && (!cfgqst.AbortAll)
-		SortActors() 	;#sortActors1
-		
-		SendModEvent("StartRaperExpressions")
-		endif
-		
-		;>>>>>>>>>> Check if we Abort B >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		;!!! IMPORTANT !!! WE only check actors abort in Non-Spawn Scenarios (so not for FastTravel, Afterlife and technically also not slavery (work on that!!!)
-		
-		if (cfgqst.DefeatTypeScenario != "FastTravel") && (cfgqst.DefeatTypeScenario != "Afterlife")
-			If (RapersACount == 0) && (RapersBCount == 0) && (RapersCCount == 0) && (CreaturesACount == 0) && (CreaturesBCount == 0) && (CreaturesCCount == 0) && ((CreaturesDCount == 0) && (CreaturesECount == 0) && (CreaturesFCount == 0))
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ABORT No Humans or Creatures found!")
-			NoActorsAbort = true
-			elseif (cfgqst.DefeatTypeGeneral == "AreHumans") && ((RapersACount == 0) && (RapersBCount == 0) && (RapersCCount == 0))
-			NoActorsAbort = true
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ABORT - AreHumans but no Humans found")
-					if ((CreaturesACount == 0) && (CreaturesBCount == 0) && (CreaturesCCount == 0)) && ((CreaturesDCount == 0) && (CreaturesECount == 0) && (CreaturesFCount == 0))
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ABORT - AreHumans but no Humans and No Creatures available")
-					NoActorsAbort = true
-					else 
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ABORT - AreHumans > no Humans but there are Creatures available")
-					cfgqst.DefeatTypeGeneral = "AreCreatures"
-						if cfgqst.DefeatTypeScenario == "DD"
-						;do NOTHING
-						else
-						cfgqst.DefeatTypeScenario = "none"
-						Allow_Foreplay = false
-						Allow_GoldenShower = false
-						endif
-					NoActorsAbort = false
-					endif 
-			
-			elseif (cfgqst.DefeatTypeGeneral == "AreHumanoids") && ((CreaturesACount == 0) && (CreaturesBCount == 0) && (CreaturesCCount == 0)) && ((CreaturesDCount == 0) && (CreaturesECount == 0) && (CreaturesFCount == 0))
-			NoActorsAbort = true
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ABORT - AreHumanoids but no Creatures found")
-			elseif (cfgqst.DefeatTypeGeneral == "AreAnimals") && ((CreaturesACount == 0) && (CreaturesBCount == 0) && (CreaturesCCount == 0)) && ((CreaturesDCount == 0) && (CreaturesECount == 0) && (CreaturesFCount == 0))
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ABORT - AreAnimals but no Creatures found")
-			NoActorsAbort = true
-			endif 
-		;endif 
-		
-			if NoActorsAbort && cfgqst.DefeatViaSlavery
-			;need spawn rapers for Slavery  ;NymSpawning ????
-			endif 
-			
-			if NoActorsAbort	
-			;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NoActorsAbort")
-			;Debug.Messagebox("No Actors around to fuck you --> Aborting!") 
-			cfgqst.AbortAll = true
-			ResetAllowance()
-			endif 
-			
-		;---------------------------------------------------------------------------------------------
-		
-	
-		;if cfgqst.IsNymrasGame()	;CAN GET STUCK - DANGEROUS: also does not seem to work. maybe use SpankThatAssBridge/Mod
-		;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartCallMolesters Event Sent")
-		;SendModEvent("StartCallMolesters")
-		;endif
-		
-			if Game.IsMovementControlsEnabled() && (!cfgqst.AbortAll)
-			;Debug.Messagebox(", please report to forum!")
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR Player can move! Immobilize now!")
-			cfgqst.Immobilize(true)
-			endif
-			
-		;only PUBLIC PUNISHMENT: disable DefeatTypeGuards (thats only for DEFEAT) ;DO WE NEED THIS STILL????
-			if cfgqst.CivilRapeRunning && (cfgqst.DefeatType == "Guards") && (!cfgqst.AbortAll)
-
-				;check is too late?	
-				;This is only for starters. Later we can track the total crime gold and change the punishment based on that value.
-				if !cfgqst.DefeatViaSlavery && !storqst.IsLocalSlave()
-				cfgqst.CheckCrimePunishment()
-				endif 
-			
-				cfgqst.PlayerSheatheWeapon()
-				;while cfgqst.PlayerRef.IsWeaponDrawn() && (cfgqst.ModEnabled)	;WhileFix 
-				;	cfgqst.PlayerRef.SheatheWeapon() 
-				;	Utility.Wait(0.5)
-				;endWhile
-
-			endif		
-
-			;WIP --- No actors ---> start ambush/slavery			
-		;	if NoActorsAbort && cfgqst.IsNymrasGame()
-		;	
-		;		if (RapersMale == 0) && (RapersFemale > 0)
-		;		NoActors_StartSlavery = true 
-		;		endif 
-		;
-		;	endif 
-		
-			
-			if OnlyAnimals ;#abort 
-				AbortDefeat()
-				cfgqst.AbortAll = true
-				ResetAllowance()
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: skipping because no humans and creatures not allowed")	
-			endif	
-			
-			
-		endif 
-	
-		;>>>>>>>>>>>>>>>>>> Water Check >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		
-		;maybe we should teleport the PC out of the water. Maybe towards the RapersA/CreaturesA?. in general water defeat not ideal.
-		;maybe we prevent the scenario from happening while in water alltogether?		
-			
-		if cfgqst.PlayerRef.IsSwimming() && (!cfgqst.AbortAll)
-			cfgqst.Immobilize(false)	
-			ScreenMessage("You lost the fight, get out of the water you coward!")
-			While cfgqst.PlayerRef.IsSwimming() && cfgqst.ModEnabled ;whileFix 
-			Utility.Wait(1.0)
-			storqst.WaitTimeTest+=2
-			EndWhile
-		endif	
-	
-
-		cfgqst.Immobilize(true)
-
-		if Nym() && (!cfgqst.AbortAll)
-	;	NymTrace("CallSpanker")
-	;	STA_CallSpanker()
-		endif 		
-		
-		if cfgqst.HeelsFix
-		;GENERAL DISBALE 
-		cfgqst.DisableHeelsEffectOnActor(cfgqst.PlayerRef, 114575)
-			if folqst.IsWithUs_Follower(0)
-			cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[0], 114575)
-			endif 
-			if folqst.IsWithUs_Follower(1)
-			cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[1], 114575)
-			endif
-		endif 
-		
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;:::::::::::::::::::::	FIND SPOT	:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 :::::::::::: Find Spot ::::::::::::")
-	
-		cfgqst.Crawl(cfgqst.PlayerRef, true)	;REMOVE DownedFaction
-		
-		cfgqst.DefeatStateChapter = "Find Spot"
-		
-		if Allow_FindSpot && !cfgqst.RapeAgain && (!cfgqst.AbortAll)
-		cfgqst.PlayerSheatheWeapon()
-		cfgqst.StripWeapons()
-		
-		cfgqst.SlowDownPlayer("Start", false)
-		storqst.PlayerPosingVehicle(false)
-		if (!cfgqst.AbortAll)
-		Utility.Wait(1.0)
-		endif 
-		storqst.WaitTimeTest+=2
-		cfgqst.Immobilize(false)
-		Utility.Wait(0.1)
-		cfgqst.ImmobilizeCrawl(true)
-		
-		cfgqst.FadeToBlack(false)
-
-		if (!cfgqst.AbortAll)
-		FindSpot()							;#FindSpot1 #spot1
-		endif 
-		cfgqst.ImmobilizeCrawl(false)
-		if Nym()
-		Vehicle("Setup Early")
-		endif
-		
-		Utility.Wait(0.1)
-		cfgqst.Immobilize(true)
-		cfgqst.SlowDownPlayer("End", false)
-		endif
-			
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;:::::::::::::::::::::	STARTING SCENE	:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 :::::::::::: Starting Scene ::::::::::::")
-		cfgqst.DefeatStateChapter = "Starting Scene"
-
-		; xxxxxxxxxxxxxxxxxxxxXXXX --- STARTING #POSE ----- XXXXxxxxxxxxxxxxxxxxxxxx 
-		;  ---> Slavery/RapeAgain ---> we wait for our fate as slaves or when raped again
-		if (cfgqst.DefeatViaSlavery || cfgqst.RapeAgain) && !cfgqst.AbortAll
-		PlayPoseOnActor(cfgqst.PlayerRef, "wait", false)		
-		PlayPoseOnActor(Victims[0], "wait", false)
-		PlayPoseOnActor(Victims[1], "wait", false)
-		; ---> Defeat ---> we have found our spot and surrender ourselves, raising hands
-		elseif (!cfgqst.AbortAll)
-		PlayPoseOnActor(cfgqst.PlayerRef, "surrender", false)		
-		PlayPoseOnActor(Victims[0], "surrender", false)
-		PlayPoseOnActor(Victims[1],"surrender", false)
-		endIf
-		
-		if (!cfgqst.AbortAll) && ((cfgqst.ShortPunishment < 2) || (cfgqst.ShortPunishment > 3))
-		Utility.Wait(4.0)
-		storqst.WaitTimeTest+=8
-		endif 
-		
-		SendModEvent("Moan")
-		
-		;............ooooooooooooooooOOOOOOOOOOOOO	FADE TO BLACK TRUE OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-		cfgqst.FadeToBlack(true) 									
-		;oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
-	
-		cfgqst.ToggleFaceLight()
-			
-		;Remove Early Whippers again
-		if VoyeursA[0] 
-		VoyeursA[0].RemoveFromFaction(WhippingFaction)
-		endif 
-		if VoyeursA[1] 
-		VoyeursA[1].RemoveFromFaction(WhippingFaction)
-		endif 
-		if VoyeursA[2] 
-		VoyeursA[2].RemoveFromFaction(WhippingFaction)
-		endif 
-		if VoyeursA[3] 
-		VoyeursA[3].RemoveFromFaction(WhippingFaction)
-		endif 
-
-	;if  && (cfgqst.DefeatTypeScenario != "Afterlife") && !cfgqst.DefeatViaSlavery
-		
-		if (!cfgqst.AbortAll)
-		Vehicle("setup") 			;<<<<<----- THIS NEEDS TO HAPPEN if no earlier vehicle setup. Other conditions dont matter!!!
-		endif
-		
-		cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, false) ;???????
-	;	if (!cfgqst.AbortAll) && cfgqst.NymBeta
-	;	SendModEvent("StartVoyeurs")
-	;	endif 
-				
-		;Pay Fine / Pay Crime Gold 
-		if (cfgqst.DefeatType == "Guards") && (!cfgqst.AbortAll)
-		PayCrimeGold()	
-		endif 
-		
-		;>>>>>>>>>>>>>>>>>> Follower Stripping and Positioning >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>			
-		
-		if (VictimCount > 0) && (!cfgqst.AbortAll)
-			if Victims[0];Victims0	
-			StripFollower(0)	
-			folidle01.StartDoingNothing_01(true)	
-			Vehicle_Follower_01("setup")				
-			endif		
-			if Victims[1];Victims1
-			StripFollower(1)		
-			folidle01.StartDoingNothing_02(true)
-			Vehicle_Follower_02("setup")				
-			endif				
-			if Victims[2];Victims2
-			StripFollower(2)
-			folidle01.StartDoingNothing_03(true)
-			endif
-			if Victims[3];Victims3
-			StripFollower(3)
-			folidle01.StartDoingNothing_04(true)
-			endif
-		endif
-		
-		FollowersOnSpot = true
-			
-
-		
-		;>>>>>>>>>>>>>>>>>> Stripping (instant) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	;#stripping1	
-		
-		;DD Move earlier
-		
-		int StrippingScene = 0
-		
-		if !cfgqst.AbortAll	
-		
-		;	if Nym() && ((cfgqst.DefeatTypeGeneral == "AreHumans") || (cfgqst.DefeatTypeGeneral == "AreHumanoids"))
-		
-			;	if (cfgqst.ShortPunishment == 0) && (CountWornSlots() > 2) && (cfgqst.DefeatTypeGeneral == "AreHumans")
-		
-				if (cfgqst.ShortPunishment == 0) && D100(cfgqst.DefeatWhipProb) && (CountWornSlots() > 2) && (cfgqst.DefeatTypeGeneral == "AreHumans") ;|| (cfgqst.DefeatTypeGeneral == "AreHumanoids")) <<<- later
-				NymTrace("Stripping > Stripping Scene")
-				ScreenMessage("They whip your clothes off your body")
-				StrippingScene = 1 ;whip Strip
-				else  
-			
-					if cfgqst.NymStripping
-					cfgqst.Strip(52, cfgqst.PlayerRef)	;Bikini Bottom
-					endif 
-					
-					if cfgqst.NymStripping && D100(95)
-									
-						if cfgqst.BlackFadeStatus == 0
-						cfgqst.FadeToBlack(true)
-						endif
-						
-						if D100(50)
-						NymTrace("Stripping > StripPlayer()")
-						StripPlayer() ;strip main slots and some other
-						elseif storqst.IsLocalSlave()
-						NymTrace("Stripping > PlayerStripCompletely(37,45,0,0,0)")
-						cfgqst.PlayerStripCompletely(37,45,0,0,0) ;ignore boots (37), ignore collar (45)
-						
-						elseif Nym()
-						NymTrace("Stripping > PlayerStripCompletely(37,0,0,0,0)")
-						cfgqst.PlayerStripCompletely(37,0,0,0,0)
-						else	
-						NymTrace("Stripping > PlayerStripCompletely(0,0,0,0,0)")					
-						cfgqst.PlayerStripCompletely(0,0,0,0,0) ;completely naked
-						endif
-					endif
-				endif 
-	
-		cfgqst.GroupStripMaintenance()	
-		endif 
-		
-		if cfgqst.NymBeta	;PLUGS 
-		defqst.RemoveBrutalPlugs()
-		endif 
-		
-		;>>>>>>>>>>>>>>>>>> HairStyleChange (instant) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	;#hair			
-	
-		if (StrippingScene == 0) && !cfgqst.AbortAll && ((cfgqst.ShortPunishment < 2) || (cfgqst.ShortPunishment > 3))
-			if D100(cfgqst.BondageHaircutProb) && !HairChangedOnce 	
-				if cfgqst.BlackFadeStatus == 0
-				cfgqst.FadeToBlack(true)
-				endif	
-				HairChangedOnce = true
-				cfgqst.ChangeHairStyle()
-			endif
-		endif 
-
-		;>>>>>>>>>>>>>>>>>> GetScenario >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>		
-					
-		;Enfore Scenario Selection (Special Sequence)			;MOVE ALL CONDITIONS INTO THE GET DEFEAT SCENARIO FUNCTION 		
-		if (cfgqst.DefeatEntranceVia == "Prostitution") || (cfgqst.DebugPunishmentType > 0)	
-		
-			if cfgqst.DebugPunishmentType > 0
-			Debug.Messagebox("cfgqst.DebugPunishmentType: "+cfgqst.DebugPunishmentType)
-			endif 
-		
-		GetDefeatScenario()	;always gets scenario, work on DDs later
-		
-		elseif (cfgqst.DefeatType == "Guards") && (Allow_SexScenes > 0) && !cfgqst.SkipSex && (!cfgqst.AbortAll)
-		;Guards always use binds. That is what we want to achieve here.	
-			
-			if (cfgqst.DefeatDDChance > 0) && D100(50)
-			GetDDScenario()			;;50% chance for DDs 
-			else
-			GetDefeatScenario()		
-			endif 
-		
-		;Regular Sequence - Scenario Chance%
-		elseif (cfgqst.ShortPunishment == 0) && !cfgqst.RapeAgain && (cfgqst.DefeatTypeGeneral == "AreHumans") && (cfgqst.DefeatTypeScenario == "none") && (Allow_SexScenes > 0) && !cfgqst.SkipSex && (!cfgqst.AbortAll)	
-		;not if short punishment	
-	
-			if CheckHumanGroupsAvailable() 		;CHANGE WHEN WE LATER HAVE MORE SCENARIOS WITH CREATURES 
-			
-				if D100(cfgqst.ScenarioChance) 
-				GetDefeatScenario()	
-				endif  
-
-			endif 
-		endif
-		
-		;#IMPROVE/CHECK 
-		GetDDScenario()	;all exclusions handled internally (no animals, no certain conditions, no trolls, etc.) - if Guards equip DDs, this just wont do much since it only starts when there is no scenario set.
-		
-		if (!cfgqst.AbortAll)
-		GetMainSequenceLastSteps()		;for now skip sex fix
-		endif 
-		
-		if (cfgqst.DefeatTypeGeneral == "AreHumans") && (cfgqst.ShortPunishment == 0)
-		AggressorsReDressed = false
-		StripAllAggressors()
-		endif 
-		
-		;when RAPE AGAIN we change some scenarios
-		if cfgqst.RapeAgain && (cfgqst.DefeatTypeScenario == ("Furniture")) && (!cfgqst.AbortAll)
-		cfgqst.DefeatTypeScenario = "none"
-		Allow_SexScenes = GetSexScenes()
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetSexScenes(RapeAgain B) "+Allow_SexScenes)
-		Allow_Aftermath = "capture"
-		cfgqst.Allow_EscapeDifficulty = "Random"
-		endif
-		
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: DefeatTypeScenario: "+cfgqst.DefeatTypeScenario)
-		;-------------------------------------------------------------------------------------
-		
-		;>>>>>>>>>>>>>>>>>> ADD DEFEAT BINDS/COLLAR >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
-		;WIP---> animated equip with enemy?
-		
-		if ((cfgqst.ShortPunishment < 2) || (cfgqst.ShortPunishment > 3))
-		
-			if (!cfgqst.AbortAll)
-					;	else 
-				if Allow_AddCollar
-				cfgqst.AddDefeatCollar("Random")	
-				endif 
-				Utility.Wait(1.0)
-				storqst.WaitTimeTest+=2
-				AddDefeatBinds()	;player is bound with cuffs/yoke/etc.
-			;	endif 
-			endif 	
-			
-			if (VictimCount > 0) && !cfgqst.RapeAgain && (!cfgqst.AbortAll);&& BindsEquiped
-			;RAPEAGAIN - we still have binds? 
-				if Victims[0]	
-				AddDefeatBindsToActor(Victims[0], "add")
-				StripFollower(0)
-				endif				
-				if Victims[1]
-				AddDefeatBindsToActor(Victims[1], "add")
-				StripFollower(1)
-				endif					
-				if Victims[2]
-				AddDefeatBindsToActor(Victims[2], "add")
-				StripFollower(2)
-				endif					
-				if Victims[3]
-				AddDefeatBindsToActor(Victims[3], "add")
-				StripFollower(3)
-				endif
-			FollowersAreBound = true
-			endif
-			;endif 	
-			
-			if cfgqst.DefeatTypeScenario == "Execution" && (!cfgqst.AbortAll)	;EXECUTION EARLY ROBBERY
-					if cfgqst.DefeatRobberyProb > 0
-					StartPlayerRobbed()
-					endif
-			endif 
-		endif 
-		
-		if (!cfgqst.AbortAll)
-		; xxxxxxxxxxxxxxxxxxxxXXXX --- #POSE --- XXXXxxxxxxxxxxxxxxxxxxxx 	
-		; we are bound or otherwise unhappy and start to struggle 		
-		PlayPoseOnActor(cfgqst.PlayerRef, "struggle", false)		
-		PlayPoseOnActor(Victims[0], "struggle", false)
-		PlayPoseOnActor(Victims[1],"struggle", false)
-		Utility.Wait(1.0)
-		storqst.WaitTimeTest+=2
-		
-		;OOOOOOOOOOOOOoooooooooooooooo............	FADE BLACK OFF 01 ...............................................................................................
-		cfgqst.FadeToBlack(false) 
-		;.............................................................................................................................................................
-		
-		Utility.Wait(3.0)
-		storqst.WaitTimeTest+=6
-		endif 
-		
-		if cfgqst.RapeAgain 
-		Debug.trace("NAKED DEFEAT calmquest RapeAgain: LastAddedDevice")
-		cfgqst.LastAddedDevice.DisableNoWait()
-		cfgqst.LastAddedDevice.Delete()
-		cfgqst.LastAddedDevice = None
-		endif
-		
-		if (!cfgqst.AbortAll)
-		Utility.Wait(1.0)
-		storqst.WaitTimeTest+=2
-		endif
-		
-		Sexlab.ThreadSlots.StopAll()		
-		SolosRunning = 0
-		if (!cfgqst.AbortAll)
-		Utility.Wait(1.0)	
-		storqst.WaitTimeTest+=2
-		endif 
-		
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;:::::::::::::::::::::	STRIPPING SCENE (New)	:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		
-		if StrippingScene == 1
-		
-		WhipStripScene()
-		
-		elseif StrippingScene == 2
-		
-		StartGropeStripFast("Humans", none, none, none)
-		
-		
-		
-		endif
-		
-
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;:::::::::::::::::::::	BATHING SCENE || GOLDEN SHOWER SCENE	:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 :::::: Bathing Scene ::::::")
-		cfgqst.DefeatStateChapter = "Bathing Scene"	
-		
-		;MAKE MOD EVENT for Golden Shower
-		
-		if Allow_ForcedBathing && (!cfgqst.AbortAll)	 
-		SceneForcedBathing("ForcedBathing")	
-		elseif Allow_GoldenShower && (!cfgqst.AbortAll)
-		SceneForcedBathing("GoldenShower")
-		endif
-		 
-		;wait for Scene to finish
-		while (Peeing || IsBathing) && cfgqst.ModEnabled && (!cfgqst.AbortAll) ;while fix
-			if (!cfgqst.AbortAll)
-			Utility.Wait(3.0)	
-			endif
-		EndWhile
-		
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;:::::::::::::::::::::	SEX SCENES	:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-		cfgqst.DefeatStateChapter = "Sex Start"		
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: stage 10 :::::: Sex Scenes ::::::")		
-		
-		;for slavery we check if there are humans present, 
-		if cfgqst.DefeatViaSlavery && ((cfgqst.DefeatTypeGeneral == "AreHumans") && !CheckRaperGroups()) && (!cfgqst.AbortAll) ; || !CheckCreatureGroups())
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NoActorsRestartSlavery ##RESTART##")
-		Debug.Messagebox("Naked Defeat #ERROR Code 5500 - report to forum plz") 
-		
-		SetStage(1000)
-			
-		;checks if ANY rapers are valid
-		elseif (CheckRaperGroups() || CheckCreatureGroups()) && (!cfgqst.AbortAll)
-
-			if Allow_SexScenes == 0
-	;		ScreenMessage("No fucking right now.")
-			SetStage(14)
-			elseif Allow_SexScenes > 0	;allow Sex to Start
-			FuckingRound = 1
-			StartRapeSequence(10)
-			endif
-		
-		else	
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NoActorsAbort (B)")
-		NoActorsAbort = true 
-		SetStage(1000)		;no rapers nearby
-		endif
-	;endif 
-
-		;::::::::::::::::::::::	STAGE 10 END ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::;
-	
-EndFunction	
+Function Fragment_3()
+    debug.trace("::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::", 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 ::::::::::::::::::::::::: ##START## :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::", 0)
+    debug.trace("::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::", 0)
+    CHECK_Stage10_running = true
+    if storqst.IsLocalSlave() && Nym()
+        ScreenMessage("Your sex slave duties are calling!")
+        message.ResetHelpMessage("Sneak")
+        utility.Wait(0.1)
+        storqst.MSG_SexSlaveDutiesStart.ShowAsHelpMessage("Sneak", 4.0, 0.0, 1)
+        message.ResetHelpMessage("empty")
+        storqst.MSG_TutorialEmptyMSG.ShowAsHelpMessage("empty", 1.0, 0.0, 1)
+    endif
+    storqst.IsBlockedAttack = false
+    storqst.Defeat_ID = storqst.Defeat_ID + 1
+    bool Test = false
+    DebugTrace("MODVERSION: " + cfgqst.NakedDefeat_ModVersion)
+    DebugTrace("stage 10 #Start#: DefeatTypeGeneral: " + cfgqst.DefeatTypeGeneral)
+    DebugTrace("stage 10 #Start#: DefeatType: " + cfgqst.DefeatType)
+    DebugTrace("stage 10 #Start#: DefeatTypeScenario: " + cfgqst.DefeatTypeScenario)
+    if cfgqst.RapeAgain
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 #Start#: DefeatEntranceVia (RapeAgain): " + cfgqst.DefeatEntranceVia, 0)
+    else
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 #Start#: DefeatEntranceVia: " + cfgqst.DefeatEntranceVia, 0)
+    endif
+    DebugTrace("----------------------------------------------------------------------------------------------------------")
+    DebugTrace("stage 10 #Start#: Defeat Location: " + defqst.GetCurrentLocationName())
+    DebugTrace("stage 10 #Start#: DefeatStateBindings: " + cfgqst.DefeatStateBindings)
+    DebugTrace("stage 10 #Start#: Chapter: " + cfgqst.DefeatStateChapter)
+    if Nym()
+        DebugTrace("stage 10 #Start#: DEBUG STATUS: Nym() " + Nym() + " DebugPunishmentType: " + cfgqst.DebugPunishmentType)
+        DebugTrace("stage 10 #Start#: WaitTime Current " + storqst.WaitTimeTest / 2 + "seconds")
+    endif
+    DebugTrace("----------------------------------------------------------------------------------------------------------")
+    if !cfgqst.AbortAll
+        cfgqst.DefeatStatePlayer = "StartofDefeat"
+        cfgqst.Immobilize(true)
+    endif
+    if !cfgqst.AbortAll
+        InitialMaintenance()
+        InitialMaintenance_Followers()
+    endif
+    if cfgqst.DefeatTypeScenario == "Afterlife" && !cfgqst.AbortAll
+        NymTrace("!Vehicle Early Setup for Afterlife")
+        Vehicle("SetupForAfterlife")
+        utility.Wait(0.1)
+        SendModEvent("StartSpawnRapers", "", 0.0)
+    endif
+    if cfgqst.DefeatViaSlavery
+        if folqst.Actor_Follower01
+            folqst.Actor_Follower01.MoveTo(cfgqst.PlayerRef, -160.0 * math.Sin(cfgqst.PlayerRef.GetAngleZ() + 90.0), -160.0 * math.Cos(cfgqst.PlayerRef.GetAngleZ() + 90.0), cfgqst.PlayerRef.GetHeight() - 125.0, true)
+        endif
+        if folqst.Actor_Follower02
+            folqst.Actor_Follower02.MoveTo(cfgqst.PlayerRef, 160.0 * math.Sin(cfgqst.PlayerRef.GetAngleZ() + 90.0), 160.0 * math.Cos(cfgqst.PlayerRef.GetAngleZ() + 90.0), cfgqst.PlayerRef.GetHeight() - 125.0, true)
+        endif
+    endif
+    cfgqst.Immobilize(true)
+    cfgqst.AddVictimsToCalmFactions(true)
+    if cfgqst.CivilRapeRunning && !cfgqst.DefeatViaSlavery
+        cfgqst.ProcessCrimeGold()
+        cfgqst.CheckCrimePunishment()
+    endif
+    cfgqst.DefeatStateChapter = "Arrival Scene"
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 :::::: Arrival Scene ::::::", 0)
+    if cfgqst.DefeatEntranceVia == "Prostitution"
+        PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)
+        PlayPoseOnActor(Victims[0], "Offering", false)
+        PlayPoseOnActor(Victims[1], "Offering", false)
+    elseif cfgqst.DefeatViaSlavery && !(cfgqst.DefeatTypeScenario == "Afterlife") && !cfgqst.RapeAgain && !cfgqst.AbortAll
+        PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)
+        PlayPoseOnActor(Victims[0], "Wait", false)
+        PlayPoseOnActor(Victims[1], "Wait", false)
+    elseif cfgqst.DefeatTypeScenario == "Afterlife"
+        NymTrace("!Vehicle LATE Setup for Afterlife")
+        Vehicle("SetupForAfterlife")
+        PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)
+        PlayPoseOnActor(Victims[0], "Wait", false)
+        PlayPoseOnActor(Victims[1], "Wait", false)
+        NymTrace("cfgqst.DefeatViaSlavery = false")
+        cfgqst.DefeatViaSlavery = false
+        cfgqst.DefeatType = "Hell"
+        cfgqst.DefeatTypeGeneral = "AreHumanoids"
+        cfgqst.Dead = 0
+        utility.Wait(2.0)
+        storqst.WaitTimeTest = storqst.WaitTimeTest + 4
+        if storqst.BlackFadeLocked == 666
+            storqst.BlackFadeLocked = 0
+        endif
+        if cfgqst.BlackFadeStatus == 1
+            cfgqst.FadeToBlack(false)
+        endif
+    endif
+    int waitloops = 0
+    if cfgqst.DefeatTypeScenario == "None"
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 (Waiting Loop)", 0)
+        while cfgqst.DefeatTypeGeneral == "None" && waitloops < 5 && !cfgqst.AbortAll && cfgqst.ModEnabled
+            utility.Wait(1.0)
+            storqst.WaitTimeTest = storqst.WaitTimeTest + 2
+            waitloops = waitloops + 1
+        endwhile
+        if waitloops == 5 && cfgqst.DefeatTypeGeneral == "None"
+            cfgqst.DefeatType = "Funny"
+            cfgqst.DefeatTypeGeneral = "AreFunny"
+        endif
+        waitloops = 0
+    endif
+    if !cfgqst.AbortAll
+        GetMainSequence()
+    endif
+    if cfgqst.DefeatTypeScenario == "FastTravel" || cfgqst.DefeatEntranceVia == "Prostitution"
+        NymMessage("OfferingPose and Vehicle Setup for FastTravel")
+        Vehicle("setup")
+        PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)
+        PlayPoseOnActor(Victims[0], "Offering", false)
+        PlayPoseOnActor(Victims[1], "Offering", false)
+    elseif cfgqst.DefeatTypeScenario == "Afterlife"
+        PlayPoseOnActor(cfgqst.PlayerRef, "Wait", true)
+        PlayPoseOnActor(Victims[0], "Wait", false)
+        PlayPoseOnActor(Victims[1], "Wait", false)
+    elseif cfgqst.RapeAgain
+    endif
+    SendModEvent("Moan", "", 0.0)
+    if !cfgqst.AbortAll
+        calm(true, 1)
+    endif
+    NymTrace("cfgqst.DefeatTypeScenario #TEST: " + cfgqst.DefeatTypeScenario)
+    if cfgqst.DefeatTypeScenario == "Afterlife" || cfgqst.DefeatTypeScenario == "FastTravel" || cfgqst.DefeatEntranceVia == "Ambush"
+        NymTrace("TEST why not here?")
+    elseif AllRapersTooFarAway
+        AllRapersTooFarAway = false
+        ScreenMessage("No Rapers in Range, temporarily increasing Search Radius")
+        IncreasedDistance = 8000.0
+    else
+        IncreasedDistance = 0.0
+    endif
+    if cfgqst.DefeatWhipProb > 0.0 && Nym()
+        LastHitterAsWhipper()
+        storqst.StartWhipping_00(8.0)
+    endif
+    NeedCreaturesForSex = false
+    if cfgqst.DefeatTypeScenario == "Afterlife" || cfgqst.DefeatTypeScenario == "FastTravel" || cfgqst.DefeatEntranceVia == "Ambush"
+    elseif cfgqst.DefeatViaSlavery
+        NymTrace("Check for Rapers for Slavery: RapersMale = " + RapersMale + " RapersFemale = " + RapersFemale)
+        if RapersMale == 0
+            NeedRapersForSlavery = true
+        endif
+        if RapersCreatures == 0 && cfgqst.NymSpawning
+            NeedCreaturesForSlavery = true
+        endif
+    elseif cfgqst.DefeatTypeGeneral == "AreHumans"
+        if RapersMale == 0 && !cfgqst.FemalesAllowed
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NoActorsAbort(RapersMale == 0)", 0)
+            if RapersCreatures == 0
+                ScreenMessage("No male humnans around (females not allowed). You are lucky!")
+                NoActorsAbort = true
+            else
+                ScreenMessage("No male humans around (females not allowed). Creatures will take care of you.")
+                NoActorsAbort = false
+                cfgqst.DefeatTypeGeneral == "AreFunny"
+                cfgqst.DefeatTypeGeneral == "Funny"
+            endif
+        elseif RapersMale == 0 && RapersFemale == 0
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NoActorsAbort(RapersMale&Female == 0)", 0)
+            if RapersCreatures == 0
+                ScreenMessage("No humans around to fuck you. You are lucky!")
+                NoActorsAbort = true
+            else
+                ScreenMessage("No humans around to fuck you. But Creatures will take care of you.")
+                NoActorsAbort = false
+                cfgqst.DefeatTypeGeneral == "AreFunny"
+                cfgqst.DefeatTypeGeneral == "Funny"
+            endif
+        endif
+        if !NoActorsAbort && RapersCreatures == 0 && cfgqst.NymSpawning
+            NeedCreaturesForSex = true
+        endif
+    elseif cfgqst.DefeatTypeGeneral == "AreHumanoids" || cfgqst.DefeatTypeGeneral == "AreAnimals"
+        if RapersCreatures == 0
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NoActorsAbort(RapersCreatures == 0)", 0)
+            ScreenMessage("No creatures nearby to fuck you. You are lucky!")
+            NoActorsAbort = true
+        endif
+    else
+        NoActorsAbort = true
+        if NoActorsAbort && cfgqst.FemalesAllowed && RapersFemale > 0
+            NoActorsAbort = false
+        endif
+        if NoActorsAbort && RapersMale > 0
+            NoActorsAbort = false
+        endif
+        if NoActorsAbort && cfgqst.AllowCreatures && RapersCreatures > 0
+            NoActorsAbort = false
+        endif
+    endif
+    if !NoActorsAbort && !cfgqst.AbortAll
+        SortActors()
+        if cfgqst.DefeatTypeGeneral == "AreHumans"
+            cfgqst.DefeatType = FillDefeatTypeFaction()
+        endif
+        SendModEvent("StartRaperExpressions", "", 0.0)
+    endif
+    if cfgqst.DefeatTypeGeneral == "AreHumans" || cfgqst.DefeatTypeGeneral == "AreFunny"
+        if RapersACount == 0 && RapersBCount == 0 && RapersCCount == 0
+            if storqst.GetAreOnlyAnimals(CreaturesARace, CreaturesBRace, CreaturesCRace, CreaturesDRace, CreaturesERace, CreaturesFRace)
+                cfgqst.DefeatTypeGeneral = "AreAnimals"
+                cfgqst.DefeatType = "Funny"
+            else
+                cfgqst.DefeatTypeGeneral = "AreHumanoids"
+                cfgqst.DefeatType = "Funny"
+            endif
+        endif
+    endif
+    if cfgqst.DefeatTypeScenario == "FastTravel" || cfgqst.DefeatTypeScenario == "Afterlife"
+    else
+        if RapersACount == 0 && RapersBCount == 0 && RapersCCount == 0 && CreaturesACount == 0 && CreaturesBCount == 0 && CreaturesCCount == 0 && (CreaturesDCount == 0 && CreaturesECount == 0 && CreaturesFCount == 0)
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ABORT No Humans or Creatures found!", 0)
+            NoActorsAbort = true
+        elseif cfgqst.DefeatTypeGeneral == "AreHumans" && (RapersACount == 0 && RapersBCount == 0 && RapersCCount == 0)
+            NoActorsAbort = true
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ABORT - AreHumans but no Humans found", 0)
+            if CreaturesACount == 0 && CreaturesBCount == 0 && CreaturesCCount == 0 && (CreaturesDCount == 0 && CreaturesECount == 0 && CreaturesFCount == 0)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ABORT - AreHumans but no Humans and No Creatures available", 0)
+                NoActorsAbort = true
+            else
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ABORT - AreHumans > no Humans but there are Creatures available", 0)
+                cfgqst.DefeatTypeGeneral = "AreCreatures" 	;#P+ patch: was "==" (a no-op comparison)
+                if cfgqst.DefeatTypeScenario == "DD"
+                else
+                    cfgqst.DefeatTypeScenario = "none"
+                    Allow_Foreplay = false
+                    Allow_GoldenShower = false
+                endif
+                NoActorsAbort = false
+            endif
+        elseif cfgqst.DefeatTypeGeneral == "AreHumanoids" && (CreaturesACount == 0 && CreaturesBCount == 0 && CreaturesCCount == 0) && (CreaturesDCount == 0 && CreaturesECount == 0 && CreaturesFCount == 0)
+            NoActorsAbort = true
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ABORT - AreHumanoids but no Creatures found", 0)
+        elseif cfgqst.DefeatTypeGeneral == "AreAnimals" && (CreaturesACount == 0 && CreaturesBCount == 0 && CreaturesCCount == 0) && (CreaturesDCount == 0 && CreaturesECount == 0 && CreaturesFCount == 0)
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ABORT - AreAnimals but no Creatures found", 0)
+            NoActorsAbort = true
+        endif
+        if NoActorsAbort && cfgqst.DefeatViaSlavery
+        endif
+        if NoActorsAbort && cfgqst.DefeatTypeScenario == "Afterlife"
+            NymBox("#ERRROR NoactorsAbort HERE!!!!")
+            NoActorsAbort = false
+        endif
+        if NoActorsAbort
+            cfgqst.AbortAll = true
+            ResetAllowance()
+        endif
+        if game.IsMovementControlsEnabled() && !cfgqst.AbortAll
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR Player can move! Immobilize now!", 0)
+            cfgqst.Immobilize(true)
+        endif
+        if cfgqst.CivilRapeRunning && cfgqst.DefeatType == "Guards" && !cfgqst.AbortAll
+            if !cfgqst.DefeatViaSlavery && !storqst.IsLocalSlave()
+                cfgqst.CheckCrimePunishment()
+            endif
+            cfgqst.PlayerSheatheWeapon()
+        endif
+        if OnlyAnimals
+            AbortDefeat()
+            cfgqst.AbortAll = true
+            ResetAllowance()
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: skipping because no humans and creatures not allowed", 0)
+        endif
+    endif
+    if cfgqst.PlayerRef.IsSwimming() && !cfgqst.AbortAll
+        cfgqst.Immobilize(false)
+        ScreenMessage("You lost the fight, get out of the water you coward!")
+        while cfgqst.PlayerRef.IsSwimming() && cfgqst.ModEnabled
+            utility.Wait(1.0)
+            storqst.WaitTimeTest = storqst.WaitTimeTest + 2
+        endwhile
+    endif
+    cfgqst.Immobilize(true)
+    if Nym() && !cfgqst.AbortAll
+    endif
+    if cfgqst.HeelsFix
+        cfgqst.DisableHeelsEffectOnActor(cfgqst.PlayerRef, "114575")
+        if folqst.IsWithUs_Follower(0)
+            cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[0], "114575")
+        endif
+        if folqst.IsWithUs_Follower(1)
+            cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[1], "114576")
+        endif
+        if folqst.IsWithUs_Follower(2)
+            cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[2], "114577")
+        endif
+        if folqst.IsWithUs_Follower(3)
+            cfgqst.DisableHeelsEffectOnActor(folqst.NakedFollower[3], "114578")
+        endif
+    endif
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 :::::::::::: Find Spot ::::::::::::", 0)
+    cfgqst.Crawl(cfgqst.PlayerRef, true)
+    cfgqst.DefeatStateChapter = "Find Spot"
+    if Allow_FindSpot && !cfgqst.RapeAgain && !cfgqst.AbortAll
+        cfgqst.PlayerSheatheWeapon()
+        cfgqst.StripWeapons()
+        cfgqst.SlowDownPlayer("Start", false)
+        storqst.PlayerPosingVehicle(false)
+        if !cfgqst.AbortAll
+            utility.Wait(1.0)
+        endif
+        storqst.WaitTimeTest = storqst.WaitTimeTest + 2
+        cfgqst.Immobilize(false)
+        utility.Wait(0.1)
+        cfgqst.ImmobilizeCrawl(true)
+        cfgqst.FadeToBlack(false)
+        if !cfgqst.AbortAll
+            FindSpot()
+        endif
+        cfgqst.ImmobilizeCrawl(false)
+        utility.Wait(0.1)
+        cfgqst.Immobilize(true)
+        cfgqst.SlowDownPlayer("End", false)
+    endif
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 :::::::::::: Starting Scene ::::::::::::", 0)
+    cfgqst.DefeatStateChapter = "Starting Scene"
+    if (cfgqst.DefeatViaSlavery || cfgqst.RapeAgain) && !cfgqst.AbortAll
+        PlayPoseOnActor(cfgqst.PlayerRef, "Wait", false)
+        PlayPoseOnActor(Victims[0], "Wait", false)
+        PlayPoseOnActor(Victims[1], "Wait", false)
+    elseif !cfgqst.AbortAll
+        PlayPoseOnActor(cfgqst.PlayerRef, "surrender", false)
+        PlayPoseOnActor(Victims[0], "surrender", false)
+        PlayPoseOnActor(Victims[1], "surrender", false)
+    endif
+    if !cfgqst.AbortAll && (cfgqst.ShortPunishment < 2 || cfgqst.ShortPunishment > 3)
+        utility.Wait(4.0)
+        storqst.WaitTimeTest = storqst.WaitTimeTest + 8
+    endif
+    SendModEvent("Moan", "", 0.0)
+    cfgqst.FadeToBlack(true)
+    playscr.TogglePlayerLight()
+    if !cfgqst.AbortAll
+        Vehicle("setup")
+    endif
+    cfgqst.DisableCollisionOnActor(cfgqst.PlayerRef, false)
+    if cfgqst.DefeatType == "Guards" && !cfgqst.AbortAll
+        PayCrimeGold()
+    endif
+    if VictimCount > 0 && !cfgqst.AbortAll
+        if Victims[0]
+            StripFollower(0)
+            folidle01.StartDoingNothing_01(true)
+            Vehicle_Follower_01("setup")
+        endif
+        if Victims[1]
+            StripFollower(1)
+            folidle01.StartDoingNothing_02(true)
+            Vehicle_Follower_02("setup")
+        endif
+        if Victims[2]
+            StripFollower(2)
+            folidle01.StartDoingNothing_03(true)
+        endif
+        if Victims[3]
+            StripFollower(3)
+            folidle01.StartDoingNothing_04(true)
+        endif
+    endif
+    FollowersOnSpot = true
+    int StrippingScene = 0
+    if !cfgqst.AbortAll
+        bool AllowStripScene = false
+        if cfgqst.ShortPunishment == 0 && CountWornSlots() > 2 && cfgqst.DefeatTypeGeneral == "AreHumans"
+            AllowStripScene = true
+        endif
+        if AllowStripScene && D100(cfgqst.DefeatWhipProb)
+            NymTrace("Stripping > Stripping Scene")
+            ScreenMessage("They whip your clothes off your body")
+            StrippingScene = 1
+        else
+            if cfgqst.NymStripping
+                if storqst.IsSlotOccupied(cfgqst.PlayerRef, 52)
+                    cfgqst.Strip(52, cfgqst.PlayerRef)
+                    defqst.PlaySoundStripCloth()
+                endif
+            endif
+            if cfgqst.NymStripping && D100(95.0)
+                if cfgqst.BlackFadeStatus == 0
+                    cfgqst.FadeToBlack(true)
+                endif
+                if D100(50.0)
+                    NymTrace("Stripping > StripPlayer()")
+                    StripPlayer()
+                elseif storqst.IsLocalSlave()
+                    NymTrace("Stripping9 > PlayerStripCompletely(37,45,0,0,0)")
+                    cfgqst.PlayerStripCompletely(37, 45, 0, 0, 0)
+                elseif Nym()
+                    NymTrace("Stripping > PlayerStripCompletely(37,0,0,0,0)")
+                    cfgqst.PlayerStripCompletely(37, 0, 0, 0, 0)
+                else
+                    NymTrace("Stripping > PlayerStripCompletely(0,0,0,0,0)")
+                    cfgqst.PlayerStripCompletely(0, 0, 0, 0, 0)
+                endif
+            endif
+        endif
+        cfgqst.GroupStripMaintenance()
+    endif
+    if cfgqst.NymBeta
+        defqst.RemoveBrutalPlugs()
+    endif
+    if StrippingScene == 0 && !cfgqst.AbortAll && (cfgqst.ShortPunishment < 2 || cfgqst.ShortPunishment > 3)
+        if D100(cfgqst.BondageHaircutProb) && !HairChangedOnce
+            if cfgqst.BlackFadeStatus == 0
+                cfgqst.FadeToBlack(true)
+            endif
+            HairChangedOnce = true
+            cfgqst.ChangeHairStyle("Standard")
+        endif
+    endif
+    if cfgqst.DefeatEntranceVia == "Prostitution" || cfgqst.DebugPunishmentType > 0.0
+        if cfgqst.DebugPunishmentType > 0.0
+            debug.Messagebox("cfgqst.DebugPunishmentType: " + cfgqst.DebugPunishmentType)
+        endif
+        GetDefeatScenario()
+    elseif cfgqst.DefeatType == "Guards" && Allow_SexScenes > 0 && !cfgqst.SkipSex && !cfgqst.AbortAll
+        if cfgqst.DefeatDDChance > 0.0 && D100(50.0)
+            GetDDScenario()
+        else
+            GetDefeatScenario()
+        endif
+    elseif cfgqst.ShortPunishment == 0 && !cfgqst.RapeAgain && cfgqst.DefeatTypeGeneral == "AreHumans" && cfgqst.DefeatTypeScenario == "None" && Allow_SexScenes > 0 && !cfgqst.SkipSex && !cfgqst.AbortAll
+        if CheckHumanGroupsAvailable()
+            if D100(cfgqst.ScenarioChance)
+                GetDefeatScenario()
+            endif
+        endif
+    endif
+    GetDDScenario()
+    if !cfgqst.AbortAll
+        GetMainSequenceLastSteps()
+    endif
+    if cfgqst.DefeatTypeGeneral == "AreHumans" && cfgqst.ShortPunishment == 0
+        AggressorsReDressed = false
+        StripAllAggressors()
+    endif
+    if cfgqst.RapeAgain && cfgqst.DefeatTypeScenario == "Furniture" && !cfgqst.AbortAll
+        cfgqst.DefeatTypeScenario = "None"
+        Allow_SexScenes = GetSexScenes()
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GetSexScenes(RapeAgain B) " + Allow_SexScenes, 0)
+        Allow_Aftermath = "Capture"
+        cfgqst.Allow_EscapeDifficulty = "Random"
+    endif
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: DefeatTypeScenario: " + cfgqst.DefeatTypeScenario, 0)
+    if cfgqst.ShortPunishment < 2 || cfgqst.ShortPunishment > 3
+        if !cfgqst.AbortAll
+            if Allow_AddCollar
+                cfgqst.AddDefeatCollar("Random")
+            endif
+            utility.Wait(1.0)
+            storqst.WaitTimeTest = storqst.WaitTimeTest + 2
+            AddDefeatBinds()
+        endif
+        if VictimCount > 0 && !cfgqst.RapeAgain && !cfgqst.AbortAll
+            if Victims[0]
+                AddDefeatBindsToActor(Victims[0], "add")
+                StripFollower(0)
+            endif
+            if Victims[1]
+                AddDefeatBindsToActor(Victims[1], "add")
+                StripFollower(1)
+            endif
+            if Victims[2]
+                AddDefeatBindsToActor(Victims[2], "add")
+                StripFollower(2)
+            endif
+            if Victims[3]
+                AddDefeatBindsToActor(Victims[3], "add")
+                StripFollower(3)
+            endif
+            FollowersAreBound = true
+        endif
+        if cfgqst.DefeatTypeScenario == "Execution" && !cfgqst.AbortAll
+            if cfgqst.DefeatRobberyProb > 0.0
+                StartPlayerRobbed()
+            endif
+        endif
+    endif
+    if !cfgqst.AbortAll
+        PlayPoseOnActor(cfgqst.PlayerRef, "struggle", false)
+        PlayPoseOnActor(Victims[0], "struggle", false)
+        PlayPoseOnActor(Victims[1], "struggle", false)
+        utility.Wait(1.0)
+        storqst.WaitTimeTest = storqst.WaitTimeTest + 2
+        cfgqst.FadeToBlack(false)
+        utility.Wait(3.0)
+        storqst.WaitTimeTest = storqst.WaitTimeTest + 6
+    endif
+    if cfgqst.RapeAgain
+        debug.trace("NAKED DEFEAT calmquest RapeAgain: LastAddedDevice", 0)
+        cfgqst.LastAddedDevice.DisableNoWait(false)
+        cfgqst.LastAddedDevice.Delete()
+        cfgqst.LastAddedDevice = None
+    endif
+    if !cfgqst.AbortAll
+        utility.Wait(1.0)
+        storqst.WaitTimeTest = storqst.WaitTimeTest + 2
+    endif
+    SexLab.ThreadSlots.StopAll()
+    SolosRunning = 0
+    if !cfgqst.AbortAll
+        utility.Wait(1.0)
+        storqst.WaitTimeTest = storqst.WaitTimeTest + 2
+    endif
+    if StrippingScene == 1
+        WhipStripScene()
+        cfgqst.GroupStripMaintenance()
+    elseif StrippingScene == 2
+        if Allow_Foreplay && cfgqst.DefeatTypeGeneral == "AreHumans" && D100(cfgqst.DefeatForeplayChance)
+            ForePlayStripping = true
+        endif
+    endif
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 :::::: Bathing Scene ::::::", 0)
+    cfgqst.DefeatStateChapter = "Bathing Scene"
+    if Allow_ForcedBathing && !cfgqst.AbortAll
+        SceneForcedBathing("ForcedBathing")
+    elseif Allow_GoldenShower && !cfgqst.AbortAll
+        SceneForcedBathing("GoldenShower")
+    endif
+    while (Peeing || IsBathing) && cfgqst.ModEnabled && !cfgqst.AbortAll
+        if !cfgqst.AbortAll
+            utility.Wait(3.0)
+        endif
+    endwhile
+    cfgqst.DefeatStateChapter = "Sex Start"
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: stage 10 :::::: Sex Scenes ::::::", 0)
+    if cfgqst.DefeatViaSlavery && (cfgqst.DefeatTypeGeneral == "AreHumans" && !CheckRaperGroups()) && !cfgqst.AbortAll
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NoActorsRestartSlavery ##RESTART##", 0)
+        debug.Messagebox("Naked Defeat #ERROR Code 5500 - report to forum plz")
+        CHECK_Stage10_running = false
+        SetStage(1000)
+    elseif (CheckRaperGroups() || CheckCreatureGroups()) && !cfgqst.AbortAll
+        CHECK_Stage10_running = false
+        if Allow_SexScenes == 0
+            SetStage(14)
+        elseif Allow_SexScenes > 0
+            FuckingRound = 1
+            StartRapeSequence(10)
+        endif
+    else
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NoActorsAbort (B)", 0)
+        NoActorsAbort = true
+        CHECK_Stage10_running = false
+        SetStage(1000)
+    endif
+EndFunction
 
 
 Bool Function CheckHumanGroupsAvailable()
@@ -5029,23 +4349,85 @@ Function StripPlayer()
 NymTrace("StripPlayer()")
 				;slot 53 (arm cuffs) slot 59 (leg cuffs) are NOT to be stripped --> SexlabNoStrip Keyword should solve this
 				;slot 52 (fuck belt) also dont use
-				if !Nym()
-				cfgqst.Strip(37, cfgqst.PlayerRef)	;boots
-				endif 
-				cfgqst.Strip(33, cfgqst.PlayerRef)	;gauntlets
-				cfgqst.Strip(32, cfgqst.PlayerRef)	;body 
 				
-				cfgqst.Strip(57, cfgqst.PlayerRef) 	;pauldron
-				cfgqst.Strip(53, cfgqst.PlayerRef)	;steel thigh armor	-> dont use (why not?)	--> SexlabNoStrip Keyword should solve this
-				cfgqst.Strip(35, cfgqst.PlayerRef)	;amulett
-				cfgqst.Strip(42, cfgqst.PlayerRef)	;circlet	
-				cfgqst.Strip(46, cfgqst.PlayerRef)	;harness
+				bool bSecondaryStrip = false
+				
+				if !Nym()
+					if storqst.IsSlotOccupied(cfgqst.PlayerRef, 37)
+					cfgqst.Strip(37, cfgqst.PlayerRef)	;boots
+					defqst.PlaySoundStripCloth()
+					Utility.Wait(0.5)
+					endif 
+				endif 
+			
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 31)
+				cfgqst.Strip(31, cfgqst.PlayerRef)	;Head
+				defqst.PlaySoundStripCloth()
+				Utility.Wait(0.5)
+				endif 
+				
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 33)
+				cfgqst.Strip(33, cfgqst.PlayerRef)	;gauntlets
+				defqst.PlaySoundStripCloth()
+				Utility.Wait(0.5)
+				endif 
+	
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 32)
+				cfgqst.Strip(32, cfgqst.PlayerRef)	;body
+				defqst.PlaySoundStripCloth()
+				Utility.Wait(0.5)
+				endif 
+				
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 52)
 				cfgqst.Strip(52, cfgqst.PlayerRef)	;bikini bottom	-> dont use (why not?) --> SexlabNoStrip Keyword should solve this
+				defqst.PlaySoundStripCloth()
+				Utility.Wait(0.5)
+				Endif
+				
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 49)
 				cfgqst.Strip(49, cfgqst.PlayerRef)	;savage bikini thong
+				defqst.PlaySoundStripCloth()
+				Utility.Wait(0.5)
+				Endif				
+
+	
+			;	cfgqst.Strip(33, cfgqst.PlayerRef)	;gauntlets
+			;	cfgqst.Strip(32, cfgqst.PlayerRef)	;body 
+			
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 57)
+				cfgqst.Strip(57, cfgqst.PlayerRef) 	;pauldron
+				bSecondaryStrip = true
+				endif 
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 53)
+				cfgqst.Strip(53, cfgqst.PlayerRef) 	;steel thigh armor	-> dont use (why not?)	--> SexlabNoStrip Keyword should solve this
+				bSecondaryStrip = true
+				endif 
+				if Nym() && D100(50)
+					if storqst.IsSlotOccupied(cfgqst.PlayerRef, 42)
+					cfgqst.Strip(42, cfgqst.PlayerRef) 	;circlet
+					bSecondaryStrip = true
+					endif 
+				endif 
+				
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 46)
+				cfgqst.Strip(46, cfgqst.PlayerRef) 	;harness
+				bSecondaryStrip = true
+				endif 
+
+				if bSecondaryStrip
+				defqst.PlaySoundStripCloth()
+				endif 
+			;	cfgqst.Strip(53, cfgqst.PlayerRef)	;steel thigh armor	-> dont use (why not?)	--> SexlabNoStrip Keyword should solve this
+			;	cfgqst.Strip(35, cfgqst.PlayerRef)	;amulett
+			;	cfgqst.Strip(42, cfgqst.PlayerRef)	;circlet	
+			;	cfgqst.Strip(46, cfgqst.PlayerRef)	;harness
+
+				
 				
 				;GroupStripMaintenance()
 				
 EndFunction
+
 			
 	Bool CalmRunning = False
 			
@@ -5083,51 +4465,28 @@ endif
 EndFunction					
 
 
-Function CalmSpawnedActor(actor ActorToCalm)			
-NymTrace("CalmSpawnedActor: "+ActorToCalm)
-
-if Nym()
-;ActorToCalm.ModAv("Health", 1000000)
-;NymTrace("ActorToCalm.ModAv(Health, 1000000)")
-;NymTrace("ActorToCalm.Health = "+ActorToCalm.GetAV("Health"))
-endif 
-	
-	if ActorToCalm
-	SPE_Actor.SetActorCalmed(ActorToCalm, true)
-
-	ActorToCalm.EvaluatePackage()
-
-	ActorToCalm.StopCombat()		
-	ActorToCalm.StopCombatAlarm()	
-
-	ActorToCalm.RemoveFromAllFactions()
-	ActorToCalm.AddToFaction(CalmFaction)
-	ActorToCalm.AddToFaction(AllegianceFaction)
-	ActorToCalm.AddToFaction(DefeatFaction)
-	ActorToCalm.AddToFaction(NakedGhostFaction)
-
-
-	ActorToCalm.RemoveAllItems(none, false, true) ;STRIP ALL DAMNIT
-
-	;NymTrace("ActorAggressionA: "+ActorToCalm.GetActorValue("Aggression"))
-	;ActorToCalm.ModAv("Aggression", -2)
-	;NymTrace("ActorAggressionB: "+ActorToCalm.GetActorValue("Aggression"))
-
-	if ActorToCalm.IsAlerted()
-	ActorToCalm.SetAlert(False)
-	endif
-
-	ActorToCalm.StopCombat()		
-	ActorToCalm.StopCombatAlarm()	
-	else 
-	NymTrace("CalmSpawnedActor: #ERROR 5009 - No ACtor to calm?!")
-	endif 
-
-;cant hurt doing it twice (maybe it can)
-;ActorToCalm.StopCombat()		
-;ActorToCalm.StopCombatAlarm()	
-;---------------------
-EndFunction		
+Function CalmSpawnedActor(actor ActorToCalm)
+    NymTrace("CalmSpawnedActor: " + ActorToCalm)
+    if ActorToCalm
+        spe_actor.SetActorCalmed(ActorToCalm, true)
+        ActorToCalm.EvaluatePackage()
+        ActorToCalm.StopCombat()
+        ActorToCalm.StopCombatAlarm()
+        ActorToCalm.RemoveFromAllFactions()
+        ActorToCalm.AddToFaction(CalmFaction)
+        ActorToCalm.AddToFaction(AllegianceFaction)
+        ActorToCalm.AddToFaction(DefeatFaction)
+        ActorToCalm.AddToFaction(NakedGhostFaction)
+        ActorToCalm.RemoveAllItems(None, false, true)
+        if ActorToCalm.IsAlerted()
+            ActorToCalm.SetAlert(false)
+        endif
+        ActorToCalm.StopCombat()
+        ActorToCalm.StopCombatAlarm()
+    else
+        NymTrace("CalmSpawnedActor: #ERROR 5009 - No ACtor to calm?!")
+    endif
+EndFunction
 
 ;/
 anger 0
@@ -5484,7 +4843,9 @@ EndFunction
 
 Function StripAllAggressors()				;#StripAllAggressors()
 
-	if Nym()
+	Bool Enable = false
+
+	if Nym() && Enable
 	;if storqst.StripRapers
 		;NO No
 		;1. we only need to handle Rapers for now 
@@ -5518,7 +4879,9 @@ Function DressAllAggressors()		;#DressAllAggressors()
 	int i = 26
 	int j = 0
 	
-	if Nym()
+	Bool Enable = false
+
+	if Nym() && Enable
 	;if storqst.StripRapers	
 		while i > 0
 		i -= 1
@@ -5850,39 +5213,7 @@ Function Calm(Bool doCalm = true, Int Round = 1)			;#calm
 				PresentRobber = a
 				endif 
 				
-				;Enemies 			
-			;	if (a != Victims[0]) && (a != Victims[1])
 				
-				; BETA >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-				;get Voyeurs. They will stand and masturbate next to the PC
-				;remove for now 
-				;/
-				if VoyeursACount == 0
-				VoyeursA = new Actor[4]					
-				VoyeursA[0] = None						
-				VoyeursA[1] = None						
-				VoyeursA[2] = None						
-				VoyeursA[3] = None	
-				VoyeursACount = 0
-				endif
-				
-				if VoyeursACount < 4
-					;if guard is male or is female AND females are allowed as rapers
-					if (a_TempGender == 0) || ((a_TempGender == 1) && cfgqst.FemalesAllowed)
-					
-						VoyeursA[VoyeursACount] = a	 
-						VoyeursA[VoyeursACount].AddToFaction(WhippingFaction)						
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: VoyeursA #"+VoyeursACount+": "+cfgqst.GetActorInfo(VoyeursA[VoyeursACount]))
-							else
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: VoyeursA #"+VoyeursACount+": "+((VoyeursA[VoyeursACount]).GetBaseObject().GetName()))
-							endif
-						VoyeursACount += 1
-						;cfgqst.DefeatType = "Guards"
-					endif
-				endif
-				/;
-		
 				;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 				; ------ GUARD HANDLING ------ ;
@@ -5910,7 +5241,7 @@ Function Calm(Bool doCalm = true, Int Round = 1)			;#calm
 							if (a_TempGender == 0) || ((a_TempGender == 1) && cfgqst.FemalesAllowed)
 							
 								RapersA[RapersACount] = a	 		
-								
+								a.Addtofaction(storqst.NakedRaperFaction)
 								Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GUARD RapersACount #"+RapersACount)
 								RapersACount += 1
 							;	cfgqst.DefeatType = "Guards"
@@ -6027,6 +5358,10 @@ Function Calm(Bool doCalm = true, Int Round = 1)			;#calm
 				a.RemoveFromFaction(DefeatFaction)
 				endif
 				
+				if a.IsInFaction(storqst.NakedRaperFaction)
+				a.RemoveFromFaction(storqst.NakedRaperFaction)
+				endif								
+				
 				if SPE_Actor.IsActorCalmed(a)
 				SPE_Actor.SetActorCalmed(a, false)
 				endif 
@@ -6043,10 +5378,12 @@ Function Calm(Bool doCalm = true, Int Round = 1)			;#calm
 				a.RemoveFromFaction(CalmFaction)
 				endif
 				
+				storqst.ProtectActor(a, false)
+				
 				;------- clean up ghosts -------------- ;maybe do NOT remove non-ghost actors later (test more)
 				if a.IsInFaction(NakedGhostFaction)	
-				a.disable()
-				a.delete()
+				a.DisableNowait()
+				a.Delete()
 				endif
 				;--------------------------------------
 				
@@ -6082,7 +5419,104 @@ EndFunction
 ;-----------------------------------------------------------------------------------------------------------------------------------------
 
 Function RemoveSpawnedRapers()
-		NymTrace("RemoveSpawnedRapers(DISABLED)")
+		NymTrace("RemoveSpawnedRapers()")
+
+	;I Need this because in Calm Function the actors (a) are from the game world. The Spawned Actors are NOT detected/recognized by the Calm Function!!!!9
+		
+			if Nym()
+			NymTrace("RemoveSpawnedRapers(Duplo_CleanUpActors)")
+			defqst.Duplo_CleanUpActors("Ambushers")
+			endif 
+			
+			int i = 4	
+	        while i > 0
+            i -= 1
+                if RapersA[i] && RapersA[i].IsInFaction(cfgqst.NakedGhostFaction)
+                RapersA[i].DisableNoWait()
+                RapersA[i].delete()
+				RapersA[i] = none
+                endif 
+            endwhile 
+			
+			i = 4	
+            while i > 0
+            i -= 1
+                if RapersB[i] && RapersB[i].IsInFaction(cfgqst.NakedGhostFaction)
+                RapersB[i].DisableNoWait()
+                RapersB[i].delete()
+				RapersB[i] = none
+                endif 
+            endwhile 
+			
+			i = 4
+            while i > 0
+            i -= 1
+                if RapersC[i] && RapersC[i].IsInFaction(cfgqst.NakedGhostFaction)
+                RapersC[i].DisableNoWait()
+                RapersC[i].delete()
+				RapersC[i] = none
+                endif 
+            endwhile 
+			
+			i = 4
+			while i > 0
+                i -= 1
+                if CreaturesA[i] && CreaturesA[i].IsInFaction(cfgqst.NakedGhostFaction)
+                    CreaturesA[i].DisableNoWait()
+                    CreaturesA[i].delete()
+                    CreaturesA[i] = none
+                endif 
+            endwhile 
+			
+			i = 4
+            while i > 0
+                i -= 1
+                if CreaturesB[i] && CreaturesB[i].IsInFaction(cfgqst.NakedGhostFaction)
+                    CreaturesB[i].DisableNoWait()
+                    CreaturesB[i].delete()
+                    CreaturesB[i] = none
+                endif 
+            endwhile 
+			
+			i = 4
+            while i > 0
+                i -= 1
+                if CreaturesC[i] && CreaturesC[i].IsInFaction(cfgqst.NakedGhostFaction)
+                    CreaturesC[i].DisableNoWait()
+                    CreaturesC[i].delete()
+                    CreaturesC[i] = none
+                endif 
+            endwhile 
+			
+			i = 4
+            while i > 0
+                i -= 1
+                if CreaturesD[i] && CreaturesD[i].IsInFaction(cfgqst.NakedGhostFaction)
+                    CreaturesD[i].DisableNoWait()
+                    CreaturesD[i].delete()
+                    CreaturesD[i] = none
+                endif 
+            endwhile 
+			
+			i = 4
+            while i > 0
+                i -= 1
+                if CreaturesE[i] && CreaturesE[i].IsInFaction(cfgqst.NakedGhostFaction)
+                    CreaturesE[i].DisableNoWait()
+                    CreaturesE[i].delete()
+                    CreaturesE[i] = none
+                endif 
+            endwhile 
+			
+			i = 4
+            while i > 0
+                i -= 1
+                if CreaturesF[i] && CreaturesF[i].IsInFaction(cfgqst.NakedGhostFaction)
+                    CreaturesF[i].DisableNoWait()
+                    CreaturesF[i].delete()
+                    CreaturesF[i] = none
+                endif 
+            endwhile
 			
 	;/
 		
@@ -6329,9 +5763,12 @@ int SpawnedGender = 0
 string tempraceID = "empty"
 
 String Function GetRaceKey(Actor akActor = None)
-tempraceID = MiscUtil.GetActorRaceEditorID(akActor) 
-return sslCreatureAnimationSlots.GetRaceKeyByID(tempraceID)
-tempraceID = "empty"
+
+	return storqst.GetRaceKeyFast(akActor)
+	
+	;tempraceID = MiscUtil.GetActorRaceEditorID(akActor) 
+	;return sslCreatureAnimationSlots.GetRaceKeyByID(tempraceID)
+	;tempraceID = "empty"
 Endfunction
 
 
@@ -6399,33 +5836,77 @@ endif
 EndFunction 
 
 
-Function HarmonizeSpawnedActorGroup()
-
-if (SpawnedActor[0])
-(SpawnedActor[0]).AddToFaction(cfgqst.BanditFaction)
-(SpawnedActor[0]).AddToFaction(cfgqst.NakedDuplicantFaction)
-NymTrace("AMBUSH: Actor 0 added to NakedDuplicantFaction")
-endif 
-
-if (SpawnedActor[1])
-(SpawnedActor[1]).AddToFaction(cfgqst.BanditFaction)
-(SpawnedActor[1]).AddToFaction(cfgqst.NakedDuplicantFaction)
-NymTrace("AMBUSH: Actor 0 added to NakedDuplicantFaction")
-endif 
-
-if (SpawnedActor[2])
-(SpawnedActor[2]).AddToFaction(cfgqst.BanditFaction)
-(SpawnedActor[2]).AddToFaction(cfgqst.NakedDuplicantFaction)
-NymTrace("AMBUSH: Actor 0 added to NakedDuplicantFaction")
-endif 
-
-if (SpawnedActor[3])
-(SpawnedActor[3]).AddToFaction(cfgqst.BanditFaction)
-(SpawnedActor[3]).AddToFaction(cfgqst.NakedDuplicantFaction)
-NymTrace("AMBUSH: Actor 0 added to NakedDuplicantFaction")
-endif 
-
-EndFunction 
+Function HarmonizeSpawnedActorGroup(string sType)
+    if SpawnedActor[0]
+        SpawnedActor[0].AddToFaction(cfgqst.NakedDuplicantFaction)
+        SpawnedActor[0].AddToFaction(storqst.NakedRaperFaction)
+        if sType == "Canines"
+            SpawnedActor[0].AddToFaction(cfgqst.BanditFaction)
+            if SpawnedActor[0].GetAV("Aggression") < 2.0
+                SpawnedActor[0].SetAV("Aggression", 1.0)
+                SpawnedActor[0].SetAV("Aggression", 2.0)
+            endif
+        endif
+        zOffset = SpawnedActor[0].GetHeadingAngle(cfgqst.PlayerRef)
+        SpawnedActor[0].SetAngle(0.0, 0.0, SpawnedActor[0].GetAngleZ() + zOffset)
+        defqst.AmbushersA[0] = SpawnedActor[0]
+        defqst.AmbushersACount = defqst.AmbushersACount + 1
+        NymTrace("AMBUSH: Actor 0 (" + cfgqst.GetActorName(SpawnedActor[0]) + ") added to NakedDuplicantFaction")
+    endif
+    if SpawnedActor[1]
+        SpawnedActor[1].AddToFaction(cfgqst.NakedDuplicantFaction)
+        SpawnedActor[1].AddToFaction(storqst.NakedRaperFaction)
+        if sType == "Canines"
+            SpawnedActor[1].AddToFaction(cfgqst.BanditFaction)
+            if SpawnedActor[1].GetAV("Aggression") < 2.0
+                SpawnedActor[1].SetAV("Aggression", 1.0)
+                SpawnedActor[1].SetAV("Aggression", 2.0)
+            endif
+        endif
+        NymTrace("AMBUSH: Actor 1 (" + cfgqst.GetActorName(SpawnedActor[1]) + ") added to NakedDuplicantFaction")
+        zOffset = SpawnedActor[1].GetHeadingAngle(cfgqst.PlayerRef)
+        SpawnedActor[1].SetAngle(0.0, 0.0, SpawnedActor[1].GetAngleZ() + zOffset)
+        defqst.AmbushersA[1] = SpawnedActor[1]
+        defqst.AmbushersACount = defqst.AmbushersACount + 1
+    endif
+    if SpawnedActor[2]
+        SpawnedActor[2].AddToFaction(cfgqst.NakedDuplicantFaction)
+        SpawnedActor[2].AddToFaction(storqst.NakedRaperFaction)
+        if sType == "Canines"
+            SpawnedActor[2].AddToFaction(cfgqst.BanditFaction)
+            if SpawnedActor[2].GetAV("Aggression") < 2.0
+                SpawnedActor[2].SetAV("Aggression", 1.0)
+                SpawnedActor[2].SetAV("Aggression", 2.0)
+            endif
+        endif
+        NymTrace("AMBUSH: Actor 2 (" + cfgqst.GetActorName(SpawnedActor[2]) + ") added to NakedDuplicantFaction")
+        zOffset = SpawnedActor[2].GetHeadingAngle(cfgqst.PlayerRef)
+        SpawnedActor[2].SetAngle(0.0, 0.0, SpawnedActor[2].GetAngleZ() + zOffset)
+        defqst.AmbushersA[2] = SpawnedActor[2]
+        defqst.AmbushersACount = defqst.AmbushersACount + 1
+    endif
+    if SpawnedActor[3]
+        SpawnedActor[3].AddToFaction(cfgqst.NakedDuplicantFaction)
+        SpawnedActor[3].AddToFaction(storqst.NakedRaperFaction)
+        if sType == "Canines"
+            SpawnedActor[3].AddToFaction(cfgqst.BanditFaction)
+            if SpawnedActor[3].GetAV("Aggression") < 2.0
+                SpawnedActor[3].SetAV("Aggression", 1.0)
+                SpawnedActor[3].SetAV("Aggression", 2.0)
+            endif
+        endif
+        zOffset = SpawnedActor[3].GetHeadingAngle(cfgqst.PlayerRef)
+        SpawnedActor[3].SetAngle(0.0, 0.0, SpawnedActor[3].GetAngleZ() + zOffset)
+        NymTrace("AMBUSH: Actor 3 (" + cfgqst.GetActorName(SpawnedActor[3]) + ") added to NakedDuplicantFaction")
+        defqst.AmbushersA[3] = SpawnedActor[3]
+        defqst.AmbushersACount = defqst.AmbushersACount + 1
+        SpawnedActor[0] = None
+        SpawnedActor[1] = None
+        SpawnedActor[2] = None
+        SpawnedActor[3] = None
+        SpawnedGender = 0
+    endif
+EndFunction
 
 Function CalmSpawnedActorGroup()  ;#CalmSpawnedActorGroup
 armor TempArmor
@@ -6435,6 +5916,7 @@ int VerifiedSpawnCount = 0
 if (SpawnedActor[0])
 NymTrace("CalmSpawnedActorGroup[0]") 
 CalmSpawnedActor(SpawnedActor[0])
+(SpawnedActor[0]).AddToFaction(storqst.NakedRaperFaction)
 VerifiedSpawnCount += 1
 	TempArmor = (SpawnedActor[0].GetWornForm(0x00000004)) as armor	;32 - BODY	
 	if TempArmor
@@ -6450,6 +5932,7 @@ endif
 if (SpawnedActor[1])
 NymTrace("CalmSpawnedActorGroup[1]") 
 CalmSpawnedActor(SpawnedActor[1])
+(SpawnedActor[1]).AddToFaction(storqst.NakedRaperFaction)
 VerifiedSpawnCount += 1
 	TempArmor = (SpawnedActor[1].GetWornForm(0x00000004)) as armor	;32 - BODY	
 	if TempArmor
@@ -6464,6 +5947,7 @@ endif
 if (SpawnedActor[2])
 NymTrace("CalmSpawnedActorGroup[2]") 
 CalmSpawnedActor(SpawnedActor[2])
+(SpawnedActor[2]).AddToFaction(storqst.NakedRaperFaction)
 VerifiedSpawnCount += 1
 	TempArmor = (SpawnedActor[2].GetWornForm(0x00000004)) as armor	;32 - BODY	
 	if TempArmor
@@ -6479,6 +5963,7 @@ SpawnedActor[2].UnequipAll()
 if (SpawnedActor[3])
 NymTrace("CalmSpawnedActorGroup[3]") 
 CalmSpawnedActor(SpawnedActor[3])
+(SpawnedActor[3]).AddToFaction(storqst.NakedRaperFaction)
 VerifiedSpawnCount += 1
 	TempArmor = (SpawnedActor[3].GetWornForm(0x00000004)) as armor	;32 - BODY	
 	if TempArmor
@@ -6572,7 +6057,7 @@ EndFunction
 Function FillCreaturesA()
 ;Transfer Spawned Actor into Target Group RapersA
 CreaturesAcount = RandomSpawnCount
-CreaturesARace = RandomSpawnType
+CreaturesARace = storqst.GetRaceKeyFast(SpawnedActor[0])
 
 if SpawnedActor[0]
 CreaturesA[0] = SpawnedActor[0]
@@ -6594,7 +6079,7 @@ EndFunction
 Function FillCreaturesB()
 ;Transfer Spawned Actor into Target Group RapersA
 CreaturesBcount = RandomSpawnCount
-CreaturesBRace = RandomSpawnType
+CreaturesBRace = storqst.GetRaceKeyFast(SpawnedActor[0])
 
 if SpawnedActor[0]
 CreaturesB[0] = SpawnedActor[0]
@@ -6616,7 +6101,7 @@ EndFunction
 Function FillCreaturesC()
 ;Transfer Spawned Actor into Target Group RapersA
 CreaturesCcount = RandomSpawnCount
-CreaturesCRace = RandomSpawnType
+CreaturesCRace = storqst.GetRaceKeyFast(SpawnedActor[0])
 
 if SpawnedActor[0]
 CreaturesC[0] = SpawnedActor[0]
@@ -6638,7 +6123,7 @@ EndFunction
 Function FillCreaturesD()
 ;Transfer Spawned Actor into Target Group RapersA
 CreaturesDcount = RandomSpawnCount
-CreaturesDRace = RandomSpawnType
+CreaturesDRace = storqst.GetRaceKeyFast(SpawnedActor[0])
 
 if SpawnedActor[0]
 CreaturesD[0] = SpawnedActor[0]
@@ -6660,7 +6145,7 @@ EndFunction
 Function FillCreaturesE()
 ;Transfer Spawned Actor into Target Group RapersA
 CreaturesEcount = RandomSpawnCount
-CreaturesERace = RandomSpawnType
+CreaturesERace = storqst.GetRaceKeyFast(SpawnedActor[0])
 
 if SpawnedActor[0]
 CreaturesE[0] = SpawnedActor[0]
@@ -6683,7 +6168,9 @@ EndFunction
 Function FillCreaturesF()
 ;Transfer Spawned Actor into Target Group RapersA
 CreaturesFcount = RandomSpawnCount
-CreaturesFRace = RandomSpawnType
+CreaturesFRace = storqst.GetRaceKeyFast(SpawnedActor[0])
+
+SpawnedActor[0]
 
 if SpawnedActor[0]
 CreaturesF[0] = SpawnedActor[0]
@@ -6708,7 +6195,7 @@ Function PlaySummonEffect(actor akactor)
 EffectShader Summonshader
 
 	Summonshader = (Game.GetFormFromFile(0x000280C0, "Skyrim.esm") as EffectShader) ;DragonPowerAbsorbFXS ;Blue and Yellow Energy. TEST FOR SUMMON
-	Summonshader.Play(akactor, Utility.RandomFloat(3.0, 6.0))	
+	Summonshader.Play(akactor, Utility.RandomFloat(2.0, 3.5))	
 
 EndFunction 
 
@@ -6984,236 +6471,192 @@ EndFunction
 			;04 CalmSpawnedActorGroup()
 		;05 FillRapers/FillCreatures	
 			;06 ResetSpawnedActors()
-Function SpawnActorGroups(String sScenario) 		;#spawn2		;#SpawnActorGroups()
+Function SpawnActorGroups(string sScenario)
+    int iTempDistance
+    SpawningActorsActive = true
+    NymTrace("SpawnActorGroups")
+    int GroupCount = 1
+    SpawnedActor = new actor[4]
+    SpawnedActor[0] = None
+    SpawnedActor[1] = None
+    SpawnedActor[2] = None
+    SpawnedActor[3] = None
+    if sScenario == "FastTravel"
+        cfgqst.StartPunishmentEffect("Shock")
+        iTempDistance = 300
+        GroupCount = 3
+        storqst.SOUND_RitualStart.Play(cfgqst.PlayerRef)
+        defqst.PlaceExplosion(cfgqst.PlayerRef, "Ritual Summoning 1")
+        if GroupCount > 0
+            GetRandomMonsterType(false)
+            SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
+            cfgqst.StartPunishmentEffect("Shock")
+            if SpawnedGender < 2
+                FillRapersA()
+            elseif SpawnedGender == 2
+                FillCreaturesA()
+            endif
+        endif
+        if GroupCount > 1
+            GetRandomMonsterType(false)
+            SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
+            cfgqst.StartPunishmentEffect("Shock")
+            if SpawnedGender < 2
+                FillRapersB()
+            elseif SpawnedGender == 2
+                FillCreaturesB()
+            endif
+        endif
+        if GroupCount > 2
+            GetRandomMonsterType(false)
+            SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
+            cfgqst.StartPunishmentEffect("Shock")
+            if SpawnedGender < 2
+                FillRapersC()
+            elseif SpawnedGender == 2
+                FillCreaturesC()
+            endif
+        endif
+        PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)
+    elseif sScenario == "Afterlife"
+        if AfterLifeStairsLocation
+            iTempDistance = -300
+        else
+            iTempDistance = -800
+        endif
+        SpawnActors("Human Ghosts", 4, iTempDistance)
+        FillRapersA()
+        utility.Wait(1.0)
+        SpawnActors("Human Ghosts", 4, iTempDistance)
+        FillRapersB()
+        utility.Wait(1.0)
+        SpawnActors("Dremora", 4, iTempDistance)
+        FillRapersC()
+        if cfgqst.AllowCreatures
+            GroupCount = 3
+            if GroupCount > 0
+                GetRandomMonsterType(true)
+                SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
+                FillCreaturesA()
+            endif
+            utility.Wait(1.0)
+            if GroupCount > 1
+                GetRandomMonsterType(true)
+                SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
+                FillCreaturesB()
+            endif
+            utility.Wait(1.0)
+            if GroupCount > 2
+                GetRandomMonsterType(true)
+                SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
+                FillCreaturesC()
+            endif
+        endif
+    elseif sScenario == "Ambush"
+        GetAmbushType()
+        SpawnActors(RandomSpawnType, 4, -250)
+        FillCreaturesA()
+        SpawnActors(RandomSpawnType02, 2, -250)
+        FillCreaturesB()
+        SpawnActors(RandomSpawnType03, 1, -250)
+        FillCreaturesC()
+    elseif sScenario == "Slave Owners"
+        GroupCount = GroupCount + VictimCount
+        GetSlaveOwnerType()
+        if GroupCount > 0
+            SpawnActors(RandomSpawnType, utility.RandomInt(1, 4), 250)
+            FillRapersA()
+        endif
+        if GroupCount > 1
+            SpawnActors(RandomSpawnType, utility.RandomInt(1, 4), 250)
+            FillRapersB()
+        endif
+        if GroupCount > 2
+            SpawnActors(RandomSpawnType, utility.RandomInt(1, 4), 250)
+            FillRapersB()
+        endif
+        GetRandom_Animal_Rape_Type()
+        SpawnActors(RandomSpawnType, RandomSpawnCount, 250)
+        FillCreaturesA()
+    elseif sScenario == "Extra Animals"
+        GetRandom_Animal_Rape_Type()
+        SpawnActors(RandomSpawnType, RandomSpawnCount, 250)
+        FillCreaturesA()
+    elseif sScenario == "Extra Wild Animals"
+        GetRandom_Animal_Wild_Type()
+        SpawnActors(RandomSpawnType, RandomSpawnCount, 250)
+        FillCreaturesF()
+    elseif sScenario == "Extra Rapers"
+        GetRandomExtraRaperType()
+        bool RunTest = false
+        if RunTest
+            RandomSpawnType = "Test"
+            RandomSpawnCount = 4
+            NymTrace("sType: " + RandomSpawnType + " Count: " + RandomSpawnCount)
+            SpawnActors(RandomSpawnType, RandomSpawnCount, 125)
+            FillRapersC()
+        else
+            SpawnActors(RandomSpawnType, RandomSpawnCount, 250)
+            FillRapersC()
+        endif
+    elseif sScenario == "Extra Hagravens"
+        RandomSpawnType = "Forsworn"
+        SpawnActors(RandomSpawnType, utility.RandomInt(1, 4), 250)
+        FillRapersC()
+        RandomSpawnType = "Spriggan Burnt"
+        SpawnActors(RandomSpawnType, 1, 250)
+        FillCreaturesF()
+    elseif sScenario == "Extra Undead"
+        int i = utility.RandomInt(1, 8)
+        if i < 3
+            RandomSpawnType = "Skeletons"
+            SpawnActors(RandomSpawnType, utility.RandomInt(2, 4), 250)
+            FillCreaturesF()
+        elseif i == 3
+            RandomSpawnType = "Gargoyles"
+            SpawnActors(RandomSpawnType, utility.RandomInt(1, 2), 250)
+            FillCreaturesF()
+        elseif i == 4
+            RandomSpawnType = "DragonPriests"
+            SpawnActors(RandomSpawnType, 1, 250)
+            FillCreaturesF()
+        elseif i == 5
+            RandomSpawnType = "CorruptedShadeSkeletons"
+            SpawnActors(RandomSpawnType, utility.RandomInt(1, 2), 250)
+            FillCreaturesF()
+        elseif i == 6
+            RandomSpawnType = "DeathHounds"
+            SpawnActors(RandomSpawnType, 4, 250)
+            FillCreaturesF()
+        elseif i > 6
+            RandomSpawnType = "DeathHounds"
+            SpawnActors(RandomSpawnType, 4, 250)
+            FillCreaturesF()
+        endif
+    elseif sScenario == "Extra Giants"
+        RandomSpawnType = "Giants Male"
+        SpawnActors(RandomSpawnType, utility.RandomInt(2, 100), 250)
+        FillCreaturesE()
+        RandomSpawnType = "Giants Male"
+        SpawnActors(RandomSpawnType, 2, 250)
+        FillCreaturesF()
+    elseif sScenario == "Extra Falmers"
+        if D100(50.0)
+            RandomSpawnType = "Chaurus"
+            SpawnActors(RandomSpawnType, utility.RandomInt(1, 2), 250)
+            FillCreaturesF()
+        else
+            RandomSpawnType = "Chaurus Reapers"
+            SpawnActors(RandomSpawnType, utility.RandomInt(1, 2), 250)
+            FillCreaturesF()
+        endif
+    endif
+    SpawningActorsActive = false
+EndFunction
 
-NymTrace("SpawnActorGroups")
 
-int GroupCount = 1	
-int iTempDistance
 
-	SpawnedActor = new Actor[4]					
-	SpawnedActor[0] = None						 
-	SpawnedActor[1] = None						 
-	SpawnedActor[2] = None						 
-	SpawnedActor[3] = None	
-	
 
-	if (sScenario == "FastTravel")	
-	;spawns FULL set of Rapers and considers Followers
-	;GroupCount = GroupCount + VictimCount
-	cfgqst.StartPunishmentEffect("Shock")
-	iTempDistance = 300
-
-	GroupCount = 3 ;--- always spawn 3 groups, even when we are alone (more variety)
-		
-		storqst.SOUND_RitualStart.Play(cfgqst.PlayerRef)
-		
-		if GroupCount > 0
-		GetRandomMonsterType(false) ;Fills String RandomSpawnType and RandomSpawnCount
-		SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
-		cfgqst.StartPunishmentEffect("Shock")
-			if SpawnedGender < 2		;Important Extra Step since we dont know if spawned actors are Creatures or Humans
-			FillRapersA()
-			elseif SpawnedGender == 2
-			FillCreaturesA()
-			endif
-		endif 
-		if GroupCount > 1
-		GetRandomMonsterType(false) ;Fills String RandomSpawnType and RandomSpawnCount
-		SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
-		cfgqst.StartPunishmentEffect("Shock")
-			if SpawnedGender < 2		;Important Extra Step since we dont know if spawned actors are Creatures or Humans
-			FillRapersB()
-			elseif SpawnedGender == 2
-			FillCreaturesB()
-			endif
-		endif
-		if GroupCount > 2
-		GetRandomMonsterType(false) ;Fills String RandomSpawnType and RandomSpawnCount
-		SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
-		cfgqst.StartPunishmentEffect("Shock")
-			if SpawnedGender < 2		;Important Extra Step since we dont know if spawned actors are Creatures or Humans
-			FillRapersC()
-			elseif SpawnedGender == 2
-			FillCreaturesC()
-			endif
-		endif
-		storqst.BlockPosing = false
-		PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)
-		
-	elseif (sScenario == "Afterlife")		
-	;spawns FULL set of Rapers and considers Followers
-	;GroupCount = GroupCount + VictimCount
-
-	if AfterLifeStairsLocation
-	iTempDistance = -350
-	else 
-	iTempDistance = -800
-	endif 
-	SpawnActors("Human Ghosts", 4, iTempDistance)
-	FillRapersA()
-	SpawnActors("Human Ghosts", 4, iTempDistance)
-	FillRapersB()
-	SpawnActors("Dremora", 4, iTempDistance)
-	FillRapersC()
-		
-		if cfgqst.AllowCreatures
-		GroupCount = 3 ;--- always spawn 3 groups, even when we are alone (more variety)
-			if GroupCount > 0
-			GetRandomMonsterType(true) ;Fills String RandomSpawnType and RandomSpawnCount
-			SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
-				
-			FillCreaturesA()
-		
-			endif 
-			if GroupCount > 1
-			GetRandomMonsterType(true) ;Fills String RandomSpawnType and RandomSpawnCount
-			SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
-		
-			FillCreaturesB()
-			
-			endif
-			if GroupCount > 2
-			GetRandomMonsterType(true) ;Fills String RandomSpawnType and RandomSpawnCount
-			SpawnActors(RandomSpawnType, RandomSpawnCount, iTempDistance)
-
-			FillCreaturesC()
-			
-			endif	
-		endif 	
-	
-	elseif (sScenario == "Ambush")	
-	;GroupCount = GroupCount + VictimCount	
-		
-		GetAmbushType()	
-		
-		SpawnActors(RandomSpawnType, 4, -250)
-		FillCreaturesA()
-		
-		SpawnActors(RandomSpawnType02, 2, -250)
-		FillCreaturesB()	
-
-		SpawnActors(RandomSpawnType03, 1, -250)
-		FillCreaturesC()	
-		
-
-		
-		
-	elseif (sScenario == "Slave Owners")
-	;spawns FULL set of Rapers and considers Followers -- nothing found at Location
-	GroupCount = GroupCount + VictimCount
-	GetSlaveOwnerType() ;Fills String sRandomTypes and iRandomCount
-		if GroupCount > 0
-		SpawnActors(RandomSpawnType, Utility.RandomInt(1,4), 250)
-		FillRapersA()
-		endif
-		if GroupCount > 1
-		SpawnActors(RandomSpawnType, Utility.RandomInt(1,4), 250)
-		FillRapersB()
-		endif
-		if GroupCount > 2
-		SpawnActors(RandomSpawnType, Utility.RandomInt(1,4), 250)
-		FillRapersB()
-		endif
-		;Slavery Creatures Extra
-		GetRandom_Animal_Rape_Type()
-		SpawnActors(RandomSpawnType, RandomSpawnCount, 250)
-		FillCreaturesA()
-
-	elseif (sScenario == "Extra Animals") ;&& cfgqst.NymSpawning	
-		;NymTrace("(sScenario == Extra Animal, GetRandomExtraAnimalType()s)")
-		GetRandom_Animal_Rape_Type()
-		;NymTrace("(sScenario == Extra Animals, Spawn Actors)")
-		SpawnActors(RandomSpawnType, RandomSpawnCount, 250)	;RandomSpawnCount = 1
-		;NymTrace("(sScenario == Extra Animals, FillCreaturesA())")
-		FillCreaturesA()
-
-	elseif (sScenario == "Extra Wild Animals") ;&& cfgqst.NymSpawning	
-		GetRandom_Animal_Wild_Type()
-		SpawnActors(RandomSpawnType, RandomSpawnCount, 250)	;RandomSpawnCount = 1
-		FillCreaturesF()
-
-	elseif (sScenario == "Extra Rapers") ;&& cfgqst.NymSpawning
-		;NymTrace("(sScenario == Extra Rapers, GetRandomExtraRaperType())")
-		GetRandomExtraRaperType()
-		
-		bool RunTest = false 
-		if RunTest
-		RandomSpawnType = "TEST"
-		RandomSpawnCount = 4
-		;iDistance = 125
-		NymTrace("sType: "+RandomSpawnType+" Count: "+RandomSpawnCount)
-		SpawnActors(RandomSpawnType, RandomSpawnCount, 125)
-		FillRapersC()
-		else 
-		SpawnActors(RandomSpawnType, RandomSpawnCount, 250)
-		FillRapersC()
-		endif 
-	elseif (sScenario == "Extra Hagravens") ;&& cfgqst.NymSpawning
-		;GetRandomExtraRaperType()
-		RandomSpawnType = "Forsworn"
-		SpawnActors(RandomSpawnType, Utility.RandomInt(1,4), 250)
-		FillRapersC()	
-		
-		RandomSpawnType = "Spriggan Burnt"
-		SpawnActors(RandomSpawnType, 1, 250)
-		FillCreaturesF()
-		
-	elseif (sScenario == "Extra Undead") ;&& cfgqst.NymSpawning
-		;GetRandomExtraRaperType()
-		int i = Utility.RandomInt(1,8)
-		
-		if i < 3
-		RandomSpawnType = "Skeletons"
-		SpawnActors(RandomSpawnType, Utility.RandomInt(2,4), 250)
-		FillCreaturesF()	
-		elseif i == 3
-		RandomSpawnType = "Gargoyles"
-		SpawnActors(RandomSpawnType, Utility.RandomInt(1,2), 250)
-		FillCreaturesF()
-		elseif i == 4
-		RandomSpawnType = "DragonPriests"
-		SpawnActors(RandomSpawnType, 1, 250)
-		FillCreaturesF()	
-		elseif i == 5
-		RandomSpawnType = "CorruptedShadeSkeletons"
-		SpawnActors(RandomSpawnType, Utility.RandomInt(1,2), 250)
-		FillCreaturesF()	
-		elseif i == 6
-		RandomSpawnType = "DeathHounds"
-		SpawnActors(RandomSpawnType, 4, 250)
-		FillCreaturesF()			
-		elseif i > 6
-		RandomSpawnType = "DeathHounds"
-		SpawnActors(RandomSpawnType, 4, 250)
-		FillCreaturesF()	
-		endif	
-		
-		;RapersUndead	 "Skeletons"	"Gargoyles" "DragonPriests"	 "CorruptedShadeSkeletons" "DeathHounds" "Ashspawn"
-		
-		
-	;	RandomSpawnType = "Skeletons"		
-	;	SpawnActors(RandomSpawnType, Utility.RandomInt(2,4), 250)
-	;	FillCreaturesE()	
-
-	elseif (sScenario == "Extra Giants") ;&& cfgqst.NymSpawning
-		;GetRandomExtraRaperType()
-		
-		RandomSpawnType = "Giants Male"
-		SpawnActors(RandomSpawnType, Utility.RandomInt(2), 250)
-		FillCreaturesE()	
-		
-		RandomSpawnType = "Giants Male"
-		SpawnActors(RandomSpawnType, 2, 250)
-		FillCreaturesF()	
-	;	RandomSpawnType = "Skeletons"		
-	;	SpawnActors(RandomSpawnType, Utility.RandomInt(2,4), 250)
-	;	FillCreaturesE()	
-	
-		
-	endif 
-
-EndFunction			
 	
 bool spawned_END = false	
 
@@ -7222,1115 +6665,916 @@ bool spawned_END = false
 ;	return GetBaseObject() as ActorBase
 ;EndFunction
 	
-Function SpawnActors(String sType, int iRaperCount, int iDistanceBase)			;#lib		#SpawnActors
-
-int iDistance = iDistanceBase
-
-;/
-if Nym()
-
-iDistance = 0 - iDistance
-
-NymTrace("iDistance: "+iDistance) 
-
-endif 
-/;
-
-NymTrace("SpawnActors: "+sType)
-;fills SpawnedActors[0]
-;provies ALL Actors as strings and Groups up to 4
-;ObjectReference SpawnedActor
-
-
-;WEREBEAR TEST LOL!	 040322B1 
-
-;EBONY WARRIOR : 040285C3
-
-;SPRIGGAN COMPATNION 0001E7C6 TEST
-;SPRIGGAN GUARD 00022837 TEST
-;SPRIGGAN COMPATNION SNOW 00025D3B TEST
-;SPRIGGARN 0002B710
-
-;Hagraven Companion
-;0004B473 - TEST
-
-;VAMPIRES:
-;Vampire BossBretonM 0002E1DC 
-;Vapire BossNordM 0002E1E2 
-;Vampire dark Elf Boss 0002E1F8
-;Vampire BOSS  high helf 0002EA9C
-
-;normal Vampire: 0002F9E1 
-;normal Vampire Booss: 0002F9E2 
-
-;WEREWOLF 0001E7CC 
-;CHAUSURS 0001FA28
-
-;DRAUGR MELEE 0001FB8F
-;DRAUGR MELEE 0001FB90
-
-;Giant02 00030437
-;Giant03 00030438
-;LvLGiant 0003053F
-
-;Falmer MeleeGuard 0003E080
-;FalmerShaman 0003E081
-;FalmerBoss 0003E082
-
-	;Painted Cow 000C39F1
-	
-		;WEREWOLF
-		;000A1980
-		;00023ABC
-		
-		;ICE WRAITH
-		;00084095
-		
-		;TROLL FROST
-		;000F4C90
-		
-		;FAST TRAVEL ---- 
-		;SPRIGGAN (Dawngarud)			;02013B74 Dawnguard.esm 
-
-		;Netch? (betty netch) 			;0401B649 Dragonborn.esm	
-		;Netch? (bull netch) 			;0402857E Dragonborn.esm
-		;Netch				 			;0402173B Dragonborn.esm
-	
-		;INTERRACIAL HUMAN ACTORS:
-		
-		;SKyrim.esm: 
-		
-		;REDGIARD ALIRK COCKS ALIRK ENCOUNTER 
-		;00067641
-		;00067642
-		;00067645
-		;00067648
-	
-		;BOUNTY HUNTERS 
-		;WEBountyHunterBoss "Bounty Hunter" [NPC_:000BC09F]
-		;WEBountyHunterMissile "Bounty Hunter" [NPC_:000BC0A0]
-		;WEBountyHunterWizard "Bounty Hunter" [NPC_:000BC0A1]
-
-		;Glowing Spider (Dragonborn)	;04027495 Dragonborn.esm
-	;------
-		
-	;rieeklings are Dragonborn ESM 
-		
-		;Ashhopper 04028E89 	Dragonborn.esm
-
-		;GIANT ;0008BEE6
-		;Giant NON Aggro 0010157F
-				
-		;Dwarven Sphere 0010EC92
-		;Drawen Spider 0010EC91
-		;Dwarven Automaton 0010EC93
-		;Dwarven Centurion  0010FCE6	
-
-;ICEwraith 00084095
-
-; AFFLICTED?
-;Afflicted  00064A4A
-;Affliced2 00064A48
-;Affliced2 00064A80
-;Affliced2 00064A47
-
-
-;Alirk Melee (Arabs?) 00067672
-
-;Thalmor  00072883
-;Thalmor  000728AE Magic
-
-;/
-;LIST:
-;	"Human Ghosts"
-; --- Foul Creatures --- ;
-;	"Gargoyles"
-;	"DragonPriests"
-;	 "CorruptedShadeSkeletons"
-;	 "DeathHounds"
-;	 "Atronach Frost"
-;	 "Atronach Storm"
-;	 "Atronach Flame"
-;	 "Seekers"
-;	 "Lurkers"
-;	"Dremora"
-;	"Skeletons"
-
-; --- Extra Cocks ----;
-;	 "Orcs"
-;	 "Forsworn"
-;	 "Couriers"
-;	 "Farmers"
-;	 "Nobles"
-;	 "Redguards"
-;	 "Bandits"
-;	 "Khajiits"
-;	 "Argonians"
-
-;	 "Canines" - should be Dogs
-;	 "Skeevers"
-;	 "Goat"
-;	 "Horse"
-;	 "Magic Anomaly"
-
-;		"Rieklings"
-;	"Rieklings Mounted"
-
-;	"Ashhoppers
-; 	"Spriggan Burnt"
-
-;--- Wild ANIMALS--- M
-;	 "Bears"
-;	 "Deer"
-;	 "Wolves"
-;	 "Sabrecats"
-;	 "Boars"
-;	 "aa"
-;	 "aa"
-;	 "aa"
-
-/;
-if sType == "Human Ghosts"		;Groupsize 1-4
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B1F96, "Skyrim.esm"), 1)		;LvlBanditGhostMelee1HMale
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B1F97, "Skyrim.esm"), 1)		;LvlBanditGhostMelee2HMale
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B1F98, "Skyrim.esm"), 1)		;LvlBanditGhostMeleeBerserkerMale
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B1F99, "Skyrim.esm"), 1)		;LvlBanditGhostMeleeTankMale
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-	
-elseif sType == "Chaurus"		;Groupsize 1-2
-	;LVLChaurus Ambush 0007932F
-	iRaperCount = Utility.RandomInt(1,2)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001FA28, "Skyrim.esm"), 1)		;LVLChaurus 0001FA28
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001FA28, "Skyrim.esm"), 1)		;LVLChaurus 0001FA28
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Sabrecats"		;Groupsize 1-2
-
-	;SabreCatLeveled 000FE2D6
-
-	iRaperCount = Utility.RandomInt(1,2)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0003D278, "Skyrim.esm"), 1)		;Sabrecat Ravenscar - TEST
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0003D278, "Skyrim.esm"), 1)		;Sabrecat Ravenscar Ambush- TEST
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Spriggan Burnt"		;Groupsize 1
-
-	iRaperCount = 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04035E6E, "Dragonborn.esm"), 1)		;DLC2EncSprigganBurnt
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-	
-elseif sType == "Bears"		;Groupsize 1-2
-
-	iRaperCount = Utility.RandomInt(1,2)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00042265, "Skyrim.esm"), 1)		;LVLBearAll
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001E7A4, "Skyrim.esm"), 1)		;LVLBearNoTSnow
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-
-elseif sType == "Deer"		;Groupsize 1-2
-	iRaperCount = Utility.RandomInt(1,2)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000ABEE0, "Skyrim.esm"), 1)		;Deer
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000ABEE0, "Skyrim.esm"), 1)		;Deer
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Rieklings"		;Groupsize 2-4
-	;iRaperCount = Utility.RandomInt(2,4)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0201B650, "Dragonborn.esm"), 1)		;Riekling Missile		
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0201B651, "Dragonborn.esm"), 1)		;Riekling Missile
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0201B652, "Dragonborn.esm"), 1)		;Riekling Missile
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0201B656, "Dragonborn.esm"), 1)		;Riekling Melee
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Rieklings Mounted"		;Groupsize 1-2
-	iRaperCount = Utility.RandomInt(1,2)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04025E18, "Dragonborn.esm"), 1)		;LVLMountedRiekling
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04025E11, "Dragonborn.esm"), 1)		;LVLMountedRiekling BOSS
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Ashhoppers"		;Groupsize 2-4
-	;iRaperCount = Utility.RandomInt(1,2)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04028E89, "Dragonborn.esm"), 1)		;EncAshhopperExtra
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04028E89, "Dragonborn.esm"), 1)		;EncAshhopperExtra
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04028E89, "Dragonborn.esm"), 1)		;EncAshhopperExtra
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04028E89, "Dragonborn.esm"), 1)		;EncAshhopperExtra
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-elseif sType == "Boars"		;Groupsize 2-4  Boars for Rieklings
-	;iRaperCount = Utility.RandomInt(2,4)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0202403B, "Dragonborn.esm"), 1)		;DLC2EncBoar01  
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0202403B, "Dragonborn.esm"), 1)		;DLC2EncBoar01
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0202403B, "Dragonborn.esm"), 1)		;DLC2EncBoar01
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0202403B, "Dragonborn.esm"), 1)		;DLC2EncBoar01
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-	
-elseif sType == "Werewolves"		;Groupsize 1-2
-	
-	if iRaperCount == 4
-	
-	else 
-	iRaperCount = Utility.RandomInt(1,2)
-	endif 
-	
-	;LvLWerewolfBoss 000A1980
-
-	Form WerewolfForm = game.GetFormFromFile(0x0001E7CC, "Skyrim.esm")		;LvlWerewolf - resolve once, not per spawn
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(WerewolfForm, 1)
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(WerewolfForm, 1)
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(WerewolfForm, 1)
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(WerewolfForm, 1)
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-elseif sType == "Wolves"		;Groupsize 2-4
-	
-	if iRaperCount == 4
-	else 
-	iRaperCount = Utility.RandomInt(2,4)
-	endif 
-	
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B83C1, "Skyrim.esm"), 1)		;LvlWolves
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B83C1, "Skyrim.esm"), 1)		;LvlWolves
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B83C1, "Skyrim.esm"), 1)		;LvlWolves
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B83C1, "Skyrim.esm"), 1)		;LvlWolves
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Skeletons"		;Groupsize 2-4			;RapersUndead	 "Skeletons"	"Gargoyles" "DragonPriests"	 "CorruptedShadeSkeletons" "DeathHounds" "Ashspawn"
-
-	;FOR AMBUSH: LvLSkeletonMeleeMxed 000BCCC7 
-
-	iRaperCount = Utility.RandomInt(2,4)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00052543, "Skyrim.esm"), 1)		;SKELETONS MELEE 2H
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00052543, "Skyrim.esm"), 1)		;SKELETONS MELEE 2H
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00052543, "Skyrim.esm"), 1)		;SKELETONS MELEE 2H
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00052543, "Skyrim.esm"), 1)		;SKELETONS MELEE 2H
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-elseif sType == "Gargoyles"		;Groupsize 1-2
-	iRaperCount = Utility.RandomInt(1,2)
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0200A2CC, "Dawnguard.esm"), 1)		;LvlBanditGhostMelee1HMale
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0200A2CC, "Dawnguard.esm"), 1)		;LvlBanditGhostMelee2HMale
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0200A2CC, "Dawnguard.esm"), 1)		;LvlBanditGhostMeleeBerserkerMale
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0200A2CC, "Dawnguard.esm"), 1)		;LvlBanditGhostMeleeTankMale
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "DragonPriests"		;Groupsize 1
-	iRaperCount = 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0008A1C8, "Skyrim.esm"), 1)		;EncDragonPriestAmbushSarcFire
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0008A1C9, "Skyrim.esm"), 1)		;EncDragonPriestAmbushSarcShock
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0008DC3E, "Skyrim.esm"), 1)		;EncDragonPriestStaff
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0008DC3E, "Skyrim.esm"), 1)		;EncDragonPriestStaff
-	SpawnedActor[31] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-elseif sType == "CorruptedShadeSkeletons"		;Groupsize 1-4 DA08 Necro Skeleton effect
-
-	
-		if iRaperCount > 0
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00006AF0, "Dawnguard.esm"), 1) ;SHADE - no Legs	
-		SpawnedActor[0] = TempAnActor as actor
-		SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 1
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00006AF1, "Dawnguard.esm"), 1) ;SHADE - only arms	
-		SpawnedActor[1] = TempAnActor as actor
-		SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 2
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00006AF0, "Dawnguard.esm"), 1) ;SHADE - no Legs	
-		SpawnedActor[2] = TempAnActor as actor
-		SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 3
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00006AF1, "Dawnguard.esm"), 1) ;SHADE - only arms	
-		SpawnedActor[3] = TempAnActor as actor
-		SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-	
-	 ;/
-		if iRaperCount > 0
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000EB870, "Skyrim.esm"), 1)		;
-		SpawnedActor[0] = TempAnActor as actor
-		SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 1
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000EB876, "Skyrim.esm"), 1)		;
-		SpawnedActor[1] = TempAnActor as actor
-		SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 2
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000EBA05, "Skyrim.esm"), 1)		;
-		SpawnedActor[2] = TempAnActor as actor
-		SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 3
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000F5BB9, "Skyrim.esm"), 1)		;
-		SpawnedActor[3] = TempAnActor as actor
-		SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif	
- /;
-
-elseif sType == "Ashspawn"		;Groupsize 1-4
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x040322BC, "Dragonborn.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x040322BE, "Dragonborn.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x040322BC, "Dragonborn.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x040322BE, "Dragonborn.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "DeathHounds"	;Groupsize 1-4
-
-	
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x02017EC2, "Dawnguard.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x02017EC2, "Dawnguard.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x02017EC2, "Dawnguard.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x02017EC2, "Dawnguard.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-
-elseif sType == "Atronach Frost"	;Groupsize 1 
-	
-	iRaperCount	= 1	
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AA7, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-elseif sType == "Atronach Storm"	;Groupsize 1 
-	
-	iRaperCount	= 1	
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AA8, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AA8, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AA8, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AA8, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-elseif sType == "Seekers"	;Groupsize 1 
-	
-	iRaperCount	= 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04028E88, "Dragonborn.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04028E88, "Dragonborn.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04028E88, "Dragonborn.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x04028E88, "Dragonborn.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-elseif sType == "Lurkers"		;Groupsize 1  
-
-	iRaperCount	= 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0402B0EA, "Dragonborn.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0402B0EA, "Dragonborn.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0402B0EA, "Dragonborn.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0402B0EA, "Dragonborn.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-elseif sType == "Dremora"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001E7AF, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0010CCEA, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001E7AF, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0010CCEA, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Orcs"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000D9447, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000D9447, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00062128, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00062128, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-
-elseif sType == "Forsworn"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0004430A, "Skyrim.esm"), 1)		;Forsworn Briarheart Magic
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00043BEE, "Skyrim.esm"), 1)		;Forsworn Forager Melee
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00044263, "Skyrim.esm"), 1)		;Forsworn Looter Melee
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00044287, "Skyrim.esm"), 1)		;Forsworn Ravager Melee
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif		
-	
-elseif sType == "Couriers"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00039F83, "Skyrim.esm"), 1)		;Courier Whiterun
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x001065EE, "Skyrim.esm"), 1)		;Courier WoodElf
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x001065EF, "Skyrim.esm"), 1)		;Courier Nord
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x001065E0, "Skyrim.esm"), 1)		;Courier Imperial
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-elseif sType == "Farmers"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000BD75E, "Skyrim.esm"), 1)		;Farmer Male
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x001034E4, "Skyrim.esm"), 1)		;Farmer Male
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00106A61, "Skyrim.esm"), 1)		;Farmer Male Twins
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00106A61, "Skyrim.esm"), 1)		;Farmer Male Twins
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-
-elseif sType == "Nobles"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00102D62, "Skyrim.esm"), 1)		;Noble Male
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0005A92D, "Skyrim.esm"), 1)		;Nobleman
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0005A930, "Skyrim.esm"), 1)		;Old Noble
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00102D62, "Skyrim.esm"), 1)		;Noble Male
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-
-elseif sType == "Redguards"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000C6016, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00073FC0, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0005A92F, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00073FC0, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-
-elseif sType == "Bandits"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001AF77, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001B0D5, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00015BE5, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0001B0BC, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-elseif sType == "Khajiits"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00105553, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00109A7F, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00105551, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00103515, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-elseif sType == "Argonians"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00105554, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00105561, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0010612D, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00105552, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-
-elseif sType == "Canines"		;Groupsize 1-4 
-
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023A92, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023A92, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023A92, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023A92, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-elseif sType == "Thiefs"		;Groupsize 1-4 
-	;Thief Ranged: 001051F1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x001034E7, "Skyrim.esm"), 1)		;LvLWEThief
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x001034E7, "Skyrim.esm"), 1)		;LvLWEThief
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x001034E7, "Skyrim.esm"), 1)		;LvLWEThief
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x001034E7, "Skyrim.esm"), 1)		;LvLWEThief
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-elseif sType == "Skeevers"		;Groupsize 1-4 
-
-	
-		if iRaperCount > 0
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000490F2, "Skyrim.esm"), 1)		;VenomFang Skeever (Lvl 7 unleveled)
-		SpawnedActor[0] = TempAnActor as actor
-		SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 1
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000490F2, "Skyrim.esm"), 1)		;VenomFang Skeever (Lvl 7 unleveled)
-		SpawnedActor[1] = TempAnActor as actor
-		SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 2
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000490F2, "Skyrim.esm"), 1)		;VenomFang Skeever (Lvl 7 unleveled)
-		SpawnedActor[2] = TempAnActor as actor
-		SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 3
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000490F2, "Skyrim.esm"), 1)		;VenomFang Skeever (Lvl 7 unleveled)
-		SpawnedActor[3] = TempAnActor as actor
-		SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif	
-		
-		;/
-		if iRaperCount > 0
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AB7, "Skyrim.esm"), 1)		;Skeever LvL 1 unleveled
-		SpawnedActor[0] = TempAnActor as actor
-		SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 1
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AB7, "Skyrim.esm"), 1)		;Skeever LvL 1 unleveled
-		SpawnedActor[1] = TempAnActor as actor
-		SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 2
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AB7, "Skyrim.esm"), 1)		;Skeever LvL 1 unleveled
-		SpawnedActor[2] = TempAnActor as actor
-		SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif
-		if iRaperCount > 3
-		TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00023AB7, "Skyrim.esm"), 1)		;Skeever LvL 1 unleveled
-		SpawnedActor[3] = TempAnActor as actor
-		SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-		endif	
-	endif 	
-	/;
-
-elseif sType == "Goat"		;Groupsize 1
-
-	iRaperCount	= 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0004359C, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-elseif sType == "Horse"		;Groupsize 1
-	iRaperCount	= 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00068D71, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00068D71, "Skyrim.esm"), 1)		;
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 2
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00068D71, "Skyrim.esm"), 1)		;
-	SpawnedActor[2] = TempAnActor as actor
-	SpawnedActor[2].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	if iRaperCount > 3
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00068D71, "Skyrim.esm"), 1)		;
-	SpawnedActor[3] = TempAnActor as actor
-	SpawnedActor[3].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-
-elseif sType == "Magic Anomaly"		;Groupsize 1
-	iRaperCount	= 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x000B6F94, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Atronach Flame"		;Groupsize 1
-	iRaperCount	= 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0009F33E, "Skyrim.esm"), 1)		;
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-	
-elseif sType == "Giants Male"		;Groupsize 1
-	;iRaperCount	= 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00000847, "CreatureSummoner.esp"), 1)		;Giant
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x00000848, "CreatureSummoner.esp"), 1)	;Giant 1
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-	
-elseif sType == "Giants Female"		;Groupsize 1
-	;iRaperCount	= 1
-	if iRaperCount > 0
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0000084A, "CreatureSummoner.esp"), 1)		;Giantess
-	SpawnedActor[0] = TempAnActor as actor
-	SpawnedActor[0].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif	
-	
-	if iRaperCount > 1
-	TempAnActor	= cfgqst.playerref.PlaceAtMe(game.GetFormFromFile(0x0000084A, "CreatureSummoner.esp"), 1)	;Giantess
-	SpawnedActor[1] = TempAnActor as actor
-	SpawnedActor[1].Moveto(cfgqst.PlayerRef, iDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, abMatchRotation = false)
-	endif
-
-endif 
-
-Float zOffsetB
-
-if !IsAmbush
-	if SpawnedActor[0]
-	
-		while !SpawnedActor[0].Is3DLoaded() && cfgqst.ModEnabled
-		Utility.Wait(0.1)
-		endwhile 
-	
-		zOffsetB = SpawnedActor[0].GetHeadingAngle(cfgqst.PlayerRef)
-		SpawnedActor[0].SetAngle(0.0, 0.0, SpawnedActor[0].GetAngleZ() + zOffsetB)
-	
-	PlaySummonEffect(SpawnedActor[0])
-	endif
-	if SpawnedActor[1]
-	
-		while !SpawnedActor[1].Is3DLoaded() && cfgqst.ModEnabled
-		Utility.Wait(0.1)
-		endwhile 
-		
-		zOffsetB = SpawnedActor[1].GetHeadingAngle(cfgqst.PlayerRef)
-		SpawnedActor[1].SetAngle(0.0, 0.0, SpawnedActor[1].GetAngleZ() + zOffsetB)
-	
-	PlaySummonEffect(SpawnedActor[1])
-	endif
-	if SpawnedActor[2]
-	
-		while !SpawnedActor[2].Is3DLoaded() && cfgqst.ModEnabled
-		Utility.Wait(0.1)
-		endwhile 
-		
-		zOffsetB = SpawnedActor[2].GetHeadingAngle(cfgqst.PlayerRef)
-		SpawnedActor[2].SetAngle(0.0, 0.0, SpawnedActor[2].GetAngleZ() + zOffsetB)
-	PlaySummonEffect(SpawnedActor[2])
-	endif
-	if SpawnedActor[3]
-		while !SpawnedActor[3].Is3DLoaded() && cfgqst.ModEnabled
-		Utility.Wait(0.1)
-		endwhile 
-		
-		zOffsetB = SpawnedActor[3].GetHeadingAngle(cfgqst.PlayerRef)
-		SpawnedActor[3].SetAngle(0.0, 0.0, SpawnedActor[3].GetAngleZ() + zOffsetB)
-		
-	PlaySummonEffect(SpawnedActor[3])
-	endif
-endif
-
-if IsAmbush 
-NymTrace("AMBUSH: is Ambush")
-HarmonizeSpawnedActorGroup()
-else 
-NymTrace("AMBUSH: NO Ambsush")
-CalmSpawnedActorGroup()
-endif 
-
-EndFunction 
+Function SpawnActors(string sType, int iRaperCount, int iDistanceBase)
+    float zOffsetB
+    int iDistance = iDistanceBase
+    NymTrace("SpawnActors: " + sType)
+    if sType == "Human Ghosts"
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(728982, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(728983, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(728984, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(728985, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Miners"
+    elseif sType == "Chaurus"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 3)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(129576, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(129576, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(129576, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Chaurus Reapers"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 3)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146063, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146063, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146063, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Sabrecats"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 2)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(250488, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(250488, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Spriggan Burnt"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67329646, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Bears"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 2)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(270949, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(124836, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Deer"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 2)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(704224, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(704224, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Rieklings"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(2, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33666640, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33666641, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33666642, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33666646, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Rieklings Mounted"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 2)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67264024, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67264017, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Ashhoppers"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 2)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67276425, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67276425, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67276425, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67276425, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Boars"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 2)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33701947, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33701947, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33701947, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33701947, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Werewolves"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 2)
+        endif
+        Form WerewolfForm = game.GetFormFromFile(124876, "Skyrim.esm")		;LvlWerewolf - resolve once, not per spawn
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(WerewolfForm, 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(WerewolfForm, 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(WerewolfForm, 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(WerewolfForm, 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Wolves"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(754625, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(754625, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(754625, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(754625, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Skeletons"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(2, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(337219, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(337219, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(337219, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(337219, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Gargoyles"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 2)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33596108, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33596108, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33596108, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33596108, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "DragonPriests"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(565704, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(565705, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(580670, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(580670, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[31] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "CorruptedShadeSkeletons"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(2, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(27376, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(27377, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(27376, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(27377, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Ashspawn"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(2, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67314364, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67314366, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67314364, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67314366, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "DeathHounds"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(2, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33652418, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33652418, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33652418, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(33652418, "Dawnguard.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Atronach Frost"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146087, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Atronach Storm"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146088, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146088, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146088, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146088, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Seekers"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67276424, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67276424, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67276424, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67276424, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Lurkers"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67285226, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67285226, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67285226, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(67285226, "Dragonborn.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Dremora"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(124847, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1101034, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(124847, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1101034, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Orcs"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(889927, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(889927, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(401704, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(401704, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Forsworn"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(279306, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(277486, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(279139, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(279175, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Couriers"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(237443, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1074670, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1074671, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1074656, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Farmers"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(776030, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1062116, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1075809, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1075809, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Nobles"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1060194, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(370989, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(370992, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1060194, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Redguards"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(811030, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(475072, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(370991, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(475072, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Bandits"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(110455, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(110805, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(89061, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(110780, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Khajiits"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1070419, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1088127, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1070417, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1062165, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Argonians"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(1, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1070420, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1070433, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1073453, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1070418, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Canines"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(2, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146066, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146066, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146066, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(146066, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Thiefs"
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1062119, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1062119, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1062119, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(1062119, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Skeevers"
+        if !iRaperCount
+            iRaperCount = utility.RandomInt(2, 4)
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(299250, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(299250, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(299250, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(299250, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Goat"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(275868, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Horse"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(429425, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(429425, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 2
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(429425, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[2] = (TempAnActor as actor)
+            SpawnedActor[2].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 3
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(429425, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[3] = (TempAnActor as actor)
+            SpawnedActor[3].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Magic Anomaly"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(749460, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Atronach Flame"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(652094, "Skyrim.esm"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Giants Male"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(2119, "CreatureSummoner.esp"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(2120, "CreatureSummoner.esp"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    elseif sType == "Giants Female"
+        if !iRaperCount
+            iRaperCount = 1
+        endif
+        if iRaperCount > 0
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(2122, "CreatureSummoner.esp"), 1, false, false)
+            SpawnedActor[0] = (TempAnActor as actor)
+            SpawnedActor[0].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+        if iRaperCount > 1
+            TempAnActor = cfgqst.PlayerRef.PlaceAtMe(game.GetFormFromFile(2122, "CreatureSummoner.esp"), 1, false, false)
+            SpawnedActor[1] = (TempAnActor as actor)
+            SpawnedActor[1].MoveTo(cfgqst.PlayerRef, iDistance * math.Sin(cfgqst.PlayerRef.GetAngleZ()), iDistance * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - storqst.GlobalSpawnHeight, false)
+        endif
+    endif
+    if !IsAmbush
+        if SpawnedActor[0]
+            while !SpawnedActor[0].Is3DLoaded() && cfgqst.ModEnabled
+                NymTrace("This is Happening(A)")
+                utility.Wait(0.1)
+            endwhile
+            zOffsetB = SpawnedActor[0].GetHeadingAngle(cfgqst.PlayerRef)
+            SpawnedActor[0].SetAngle(0.0, 0.0, SpawnedActor[0].GetAngleZ() + zOffsetB)
+            PlaySummonEffect(SpawnedActor[0])
+        endif
+        if SpawnedActor[1]
+            while !SpawnedActor[1].Is3DLoaded() && cfgqst.ModEnabled
+                NymTrace("This is Happening(B)")
+                utility.Wait(0.1)
+            endwhile
+            zOffsetB = SpawnedActor[1].GetHeadingAngle(cfgqst.PlayerRef)
+            SpawnedActor[1].SetAngle(0.0, 0.0, SpawnedActor[1].GetAngleZ() + zOffsetB)
+            PlaySummonEffect(SpawnedActor[1])
+        endif
+        if SpawnedActor[2]
+            while !SpawnedActor[2].Is3DLoaded() && cfgqst.ModEnabled
+                NymTrace("This is Happening(C)")
+                utility.Wait(0.1)
+            endwhile
+            zOffsetB = SpawnedActor[2].GetHeadingAngle(cfgqst.PlayerRef)
+            SpawnedActor[2].SetAngle(0.0, 0.0, SpawnedActor[2].GetAngleZ() + zOffsetB)
+            PlaySummonEffect(SpawnedActor[2])
+        endif
+        if SpawnedActor[3]
+            while !SpawnedActor[3].Is3DLoaded() && cfgqst.ModEnabled
+                NymTrace("This is Happening(D)")
+                utility.Wait(0.1)
+            endwhile
+            zOffsetB = SpawnedActor[3].GetHeadingAngle(cfgqst.PlayerRef)
+            SpawnedActor[3].SetAngle(0.0, 0.0, SpawnedActor[3].GetAngleZ() + zOffsetB)
+            PlaySummonEffect(SpawnedActor[3])
+        endif
+    endif
+    if IsAmbush
+        NymTrace("AMBUSH: is Ambush")
+        HarmonizeSpawnedActorGroup(sType)
+    else
+        NymTrace("AMBUSH: NO Ambsush")
+        CalmSpawnedActorGroup()
+    endif
+EndFunction
 
 
 bool Property IsAmbush Auto
@@ -8353,1105 +7597,672 @@ Bool CreaturesEBlocked = false
 Bool CreaturesFBlocked = false
 
 
+Function CreateGroups()
+	DebugTrace("CreateGroups()")
+
+	if RapersACount > 0
+	NymBox("RapersACount > 0")
+	endif 
+	if RapersBCount > 0
+	NymTrace("RapersBCount > 0")
+	endif 
+	if RapersCCount > 0
+	NymTrace("RapersCCount > 0")
+	endif 
+
+	if CreaturesACount > 0
+	NymBox("CreaturesACount > 0")
+	endif 
+	if CreaturesBCount > 0
+	NymTrace("CreaturesBCount > 0")
+	endif 
+	if CreaturesCCount > 0
+	NymTrace("CreaturesCCount > 0")
+	endif 
+	if CreaturesDCount > 0
+	NymTrace("CreaturesDCount > 0")
+	endif 
+	if CreaturesECount > 0
+	NymTrace("CreaturesECount > 0")
+	endif 
+	if CreaturesFCount > 0
+	NymBox("CreaturesFCount > 0")
+	endif 
+	
+	RapersA = new Actor[4]					
+	RapersA[0] = None						 
+	RapersA[1] = None						 
+	RapersA[2] = None						 
+	RapersA[3] = None	
+	RapersACount = 0
+			
+	RapersB = new Actor[4]					
+	RapersB[0] = None						 
+	RapersB[1] = None						 
+	RapersB[2] = None						 
+	RapersB[3] = None	
+	RapersBCount = 0
+	
+	RapersC = new Actor[4]					
+	RapersC[0] = None						 
+	RapersC[1] = None						 
+	RapersC[2] = None						 
+	RapersC[3] = None	
+	RapersCCount = 0
+
+	CreaturesA = new Actor[4]					
+	CreaturesA[0] = None						 
+	CreaturesA[1] = None						 
+	CreaturesA[2] = None						 
+	CreaturesA[3] = None	
+	CreaturesACount = 0
+
+	CreaturesB = new Actor[4]					
+	CreaturesB[0] = None						
+	CreaturesB[1] = None						
+	CreaturesB[2] = None						
+	CreaturesB[3] = None	
+	CreaturesBCount = 0
+
+	CreaturesC = new Actor[4]					
+	CreaturesC[0] = None						 
+	CreaturesC[1] = None						 
+	CreaturesC[2] = None						 
+	CreaturesC[3] = None	
+	CreaturesCCount = 0
+
+	CreaturesD = new Actor[4]					
+	CreaturesD[0] = None						 
+	CreaturesD[1] = None						 
+	CreaturesD[2] = None						 
+	CreaturesD[3] = None	
+	CreaturesDCount = 0
+
+	CreaturesE = new Actor[4]					
+	CreaturesE[0] = None						 
+	CreaturesE[1] = None						 
+	CreaturesE[2] = None						 
+	CreaturesE[3] = None	
+	CreaturesECount = 0
+	
+	CreaturesF = new Actor[4]					
+	CreaturesF[0] = None						 
+	CreaturesF[1] = None						 
+	CreaturesF[2] = None						 
+	CreaturesF[3] = None	
+	CreaturesFCount = 0
+
+	SpawnedActor = new Actor[4]					
+	SpawnedActor[0] = None						 
+	SpawnedActor[1] = None						 
+	SpawnedActor[2] = None						 
+	SpawnedActor[3] = None	
+		
+	cfgqst.SpawnedGroups[0] = 0
+	cfgqst.SpawnedGroups[1] = 0
+	cfgqst.SpawnedGroups[2] = 0
+	cfgqst.SpawnedGroups[3] = 0
+	cfgqst.SpawnedGroups[4] = 0
+	cfgqst.SpawnedGroups[5] = 0
+	cfgqst.SpawnedGroups[6] = 0
+	cfgqst.SpawnedGroups[7] = 0
+	cfgqst.SpawnedGroups[8] = 0
+	cfgqst.SpawnedGroups[9] = 0
+	cfgqst.SpawnedGroups[10] = 0
+	cfgqst.SpawnedGroups[11] = 0
+
+EndFunction 
+
 
 ;---------------- SortActors Function ------------------------------
 
-Function SortActors()			;does this mean the numbers from the "call" are reverted to 0?)					#SortActors()
-Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SortActors(START)")
-;ScreenMessage("Your captors need some time to decide who goes first...")
-InfoMessage("If this takes too long, try enabling LagFix in MCM or open console for some seconds")
-	
-;	STAGE 
-	Actor a										;INDEX IS WRONG I THINK
-	bool RapersAareGuards = false
-	
-	;GroupCountHumans = 0
-	;GroupCountCreatures = 0
-	
-	if cfgqst.CivilRapeRunning		;WHAT IS THIS AND WHY?
-		while CalmRunning && cfgqst.ModEnabled 
-		Utility.Wait(2.0)
-		endwhile
-	endif
-		
-	;PUBLIC PUNISHMENT ---> CALM Function searches for Guards and puts them as RapersA...
-	;if no Guards found, we need normal rapers
-	
-	;WAS NYM()
-	if ActorsSpawned
-	;do nothing here or we delete the groups and the Naked Spawned actors remain
-	
-	else 
-		;Bool RapersABlocked = false
-		
-		if cfgqst.SpawnedGroups[0] == 0	
-		
-			if cfgqst.CivilRapeRunning && (RapersACount == 0)
-			RapersA = new Actor[4]					
-			RapersA[0] = None						 
-			RapersA[1] = None						 
-			RapersA[2] = None						 
-			RapersA[3] = None	
-			RapersACount = 0
-			
-			;Guards are now a Group for RapersA
-			elseif cfgqst.CivilRapeRunning && (RapersACount > 0)
-			RapersAareGuards = true
-			;if Not public punishment or no Guards found, we are here
-			else
-			
-			RapersA = new Actor[4]					
-			RapersA[0] = None						 
-			RapersA[1] = None						 
-			RapersA[2] = None						 
-			RapersA[3] = None	
-			RapersACount = 0
-			
-			endif
-		endif 
-		
-		if cfgqst.SpawnedGroups[1] == 0	
-		RapersB = new Actor[4]					
-		RapersB[0] = None						 
-		RapersB[1] = None						 
-		RapersB[2] = None						 
-		RapersB[3] = None	
-		RapersBCount = 0
-		;Bool RapersBBlocked = false
-		endif 
-
-		if cfgqst.SpawnedGroups[2] == 0			
-		RapersC = new Actor[4]					
-		RapersC[0] = None						 
-		RapersC[1] = None						 
-		RapersC[2] = None						 
-		RapersC[3] = None	
-		RapersCCount = 0
-		;Bool RapersCBlocked = false
-		endif		
-		if cfgqst.SpawnedGroups[3] == 0	
-		CreaturesA = new Actor[4]					
-		CreaturesA[0] = None						 
-		CreaturesA[1] = None						 
-		CreaturesA[2] = None						 
-		CreaturesA[3] = None	
-		CreaturesACount = 0
-		;Bool CreaturesABlocked = false
-		endif		
-		if cfgqst.SpawnedGroups[4] == 0	
-		CreaturesB = new Actor[4]					
-		CreaturesB[0] = None						
-		CreaturesB[1] = None						
-		CreaturesB[2] = None						
-		CreaturesB[3] = None	
-		CreaturesBCount = 0
-		;Bool CreaturesBBlocked = false
-		endif		
-		if cfgqst.SpawnedGroups[5] == 0	
-		CreaturesC = new Actor[4]					
-		CreaturesC[0] = None						 
-		CreaturesC[1] = None						 
-		CreaturesC[2] = None						 
-		CreaturesC[3] = None	
-		CreaturesCCount = 0
-		endif
-		;Bool CreaturesCBlocked = false
-		if cfgqst.SpawnedGroups[6] == 0	
-		CreaturesD = new Actor[4]					
-		CreaturesD[0] = None						 
-		CreaturesD[1] = None						 
-		CreaturesD[2] = None						 
-		CreaturesD[3] = None	
-		CreaturesDCount = 0
-		;Bool CreaturesDBlocked = false
-		endif		
-		if cfgqst.SpawnedGroups[7] == 0	
-		CreaturesE = new Actor[4]					
-		CreaturesE[0] = None						 
-		CreaturesE[1] = None						 
-		CreaturesE[2] = None						 
-		CreaturesE[3] = None	
-		CreaturesECount = 0
-		;Bool CreaturesEBlocked = false
-		endif		
-		if cfgqst.SpawnedGroups[8] == 0	
-		CreaturesF = new Actor[4]					
-		CreaturesF[0] = None						 
-		CreaturesF[1] = None						 
-		CreaturesF[2] = None						 
-		CreaturesF[3] = None	
-		CreaturesFCount = 0
-		;Bool CreaturesFBlocked = false
-		endif		
-		if cfgqst.SpawnedGroups[9] == 0	
-		SpawnedActor = new Actor[4]					
-		SpawnedActor[0] = None						 
-		SpawnedActor[1] = None						 
-		SpawnedActor[2] = None						 
-		SpawnedActor[3] = None	
-		endif
-	endif 
-
-	
-	;>>>>>>>>>>>>>>>>> SPAWN RAPERS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		
-	;/
-	
-	1. spawn MORE RAPERS 
-	We add more actors when there are not many (Rapers C empty)
-	
-	2. spawn ANY RAPERS AT ALL 
-	Spawn Rapers in Situations where there SHOULD be some (Slavery, Traps etc.)
-	
-	3. spawn SPECIAL RAPERS 
-	For Scenarios like Fast Travel Ritual, Ork Gangbang or similar.
-	
-	4. spawn CREATURES when we only have boring HumanZ (only outside scenarios for now)
-	
-	PROCEDURE:
-	This "Blocks" Actor Groups from filling with other NPC further down, preventing oddities etc.
-	This means Spawned Actors always have a higher priority.
-	
-	/;
-	
-	
-	Bool NewSpawnSystem = false
-	;bool SpawnStuff = false
-	
-;	if cfgqst.IsNymrasGame()
-	NewSpawnSystem = true
-;	endif 
-
-;#####################################################################################################################################################################
-	if NewSpawnSystem  		;#spawn1
-	;this spawns the groups needed, calms them and sorts them into RapersX and CreaturesX 
-		
-		NymTrace("NeedRapersForSlavery: "+NeedRapersForSlavery+" cfgqst.RapeAgain = "+cfgqst.RapeAgain)
-		
-		if cfgqst.RapeAgain
-		NymTrace("RapeAgain")
-		;DO nothing - we do not spawn new Actors When we do RapeAgain
-		else 
-		
-			;AFTERLIFE FOWL CREATURES
-			if cfgqst.DefeatTypeScenario == "Afterlife" ; ---> ALWAYS SPAWN
-			;NymMessage("Spawn Afterlife")
-			SpawnActorGroups("Afterlife")
-			ActorsSpawned = true
-			;FAST TRAVEL FOWL CREATURES
-			elseif cfgqst.DefeatTypeScenario == "FastTravel" ; ---> ALWAYS SPAWN
-			;NymMessage("Spawn FastTravel")
-			SpawnActorGroups("FastTravel")
-			ActorsSpawned = true
-			elseif cfgqst.DefeatEntranceVia == "Ambush" ; ---> ALWAYS SPAWN
-			NymTrace("Spawn Ambush")
-			SpawnActorGroups("Ambush") ;TEST MOVED EARLIER
-			ActorsSpawned = true
-			
-			;EXTRA RAPERS / CREATURES for Human Scenarios
-			elseif cfgqst.DefeatTypeGeneral == "AreHumans" && cfgqst.DefeatType != "Undead" && cfgqst.DefeatType != "Vampires" && cfgqst.DefeatType != "Necromancers"
-				
-					if NeedRapersForSlavery	; ---> ALWAYS SPAWN
-					NymMessage("Spawn Slave Owners")
-					SpawnActorGroups("Slave Owners")
-					ActorsSpawned = true			
-				
-					elseif cfgqst.NymSpawning
-
-						if NeedCreaturesForSex ;&& D100(75)
-						;NymTrace("Spawn START 1")
-						;NymMessage("Spawn Extra Animals")
-						SpawnActorGroups("Extra Animals")
-						ActorsSpawned = true
-						endif 	
-						Utility.Wait(1.0)
-						if (RapersMale < 3) && D100(25)
-						;NymTrace("Spawn START 2")
-						;NymMessage("Spawn Extra Rapers")
-						SpawnActorGroups("Extra Rapers")	
-						ActorsSpawned = true
-						endif
-					endif 
-			
-			;EXTRA FORSWORN FOR HAGRAVEN SCENARIO
-			elseif cfgqst.DefeatType == "Hagravens" && cfgqst.NymSpawning
-			NymMessage("Spawn Extra Rapers for Hagravens")
-			SpawnActorGroups("Extra Hagravens")
-			ActorsSpawned = true
-			elseif cfgqst.DefeatType == "Spriggans" && cfgqst.NymSpawning
-			NymMessage("Spawn Extra Rapers for Spriggans")
-			SpawnActorGroups("Extra Wild Animals")	
-			ActorsSpawned = true
-			elseif cfgqst.DefeatType == "Undead" && cfgqst.NymSpawning
-			NymMessage("Spawn Extra Rapers for Undead")
-			SpawnActorGroups("Extra Undead")	
-			ActorsSpawned = true
-			
-			elseif cfgqst.DefeatType == "Giants" && cfgqst.NymSpawning
-			NymMessage("Spawn Extra Rapers for Giants")
-			SpawnActorGroups("Extra Giants")	
-			ActorsSpawned = true
-			
-			;SLAVE OWNERS 
-			elseif NeedRapersForSlavery ; ---> ALWAYS SPAWN
-			SpawnActorGroups("Slave Owners")	;improve to fit scenario better
-			ActorsSpawned = true
-			
-			endif 
-		endif 
-	endif 
-
-	;#####################################################################################################################################################################
-
-
-		;DOG 0x00023A92
-
-		
-	;<<<<<<<<<<<<<<<< SPAWN RAPERS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<	
-		
-		
-	; >>>>>> CALM ALL ACTORS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>	
-	;we do NOT do this for FastTravel or AfterLife - in that case we want a set type of actors only 
-	
-	;search for #whippers
-;	Whippers = new Actor[3]					
-;	Whippers[0] = None
-;	Whippers[1] = None
-;	Whippers[2] = None
-
-	;int i = NPC.Length 							;############ I think this is wrong. Index needs to reduce AggressourCount directly not NPC Lenght ###########
-	int i = ActorArray.Length 
-	
-	String aName
-	Bool aIsValid = false 
-	Bool NewWhile = true 
-	
-	;int j = 12
-	
-	;if neither afterlife nor fast travel 
-	if (cfgqst.DefeatTypeScenario != "Afterlife") && (cfgqst.DefeatTypeScenario != "FastTravel")
-	
-;-------- NEW WHILE
- 
-		if NewWhile 
-		
-			while i							
-				i -= 1		
-				a = ActorArray[i].GetReference() as Actor
-				aIsValid = false 	
-
-				int aGender 
-				bool ThisWomanIsWhipper = false
-				;1 = female
-				;0 = male
-				;2 = creature
-
-				if a
-				aGender = SexLab.GetGender(a)
-				else 
-				;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CALM - No Actor!")  
-				aGender = 404
-				endif 
-				
-				if aGender == 2	;get creature Name
-				aName = cfgqst.GetLeveledActorBaseName(a)
-				elseif aGender < 2 	;get human name
-				aName = a.GetBaseObject().GetName()
-				endif 
-				
-				if folqst.IsPresentFollower(a) 
-				
-					if a.IsInFaction(WhippingFaction)
-					a.RemoveFromFaction(WhippingFaction)
-					endif 
-				elseif !WhipperFound && !storqst.NeedaWhipper && aGender == 1 && !folqst.IsPresentFollower(a) && (cfgqst.DefeatWhipProb > 0) 
-
-				a.Addtofaction(WhippingFaction)
-				storqst.NeedaWhipper = false
-				WhipperFound = true
-				ThisWomanIsWhipper = true 
-				endif 
-			
-				;::::::::::: SORT FEMALES :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-				if (aGender == 1) && cfgqst.FemalesAllowed && !ThisWomanIsWhipper																																									
-
-					if cfgqst.AllowActor(a, 1, aName)	;disallowed Actors are Traced in the AllowActorFunction
-					
-	
-						;get a Raper to Group B for Follower01 - ONLY IF GROUP IS EMPTY 
-						if NeedARaper && RapersACount > 0 && RapersBCount == 0 && !RapersABlocked
-						RapersB[RapersBCount] = a	 		
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+cfgqst.GetActorInfo(RapersB[RapersBCount]))
-							else
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+aName)
-							endif
-						RapersBCount += 1
-						RapersBFemaleCount += 1
-						
-						NeedARaper = false	
-						;get a Raper to Group C for Follower02 - ONLY IF GROUP IS EMPTY! 
-						elseif NeedAnotherRaper && RapersBCount > 0 && RapersCCount == 0 && !RapersCBlocked																				
-						RapersC[RapersCCount] = a	 		
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+cfgqst.GetActorInfo(RapersC[RapersCCount]))
-							else
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+aName)
-							endif
-						RapersCCount += 1
-						RapersCFemaleCount += 1
-						
-						NeedAnotherRaper = false
-						elseif RapersACount < 4	&& !RapersABlocked
-						RapersA[RapersACount] = a	 		
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+cfgqst.GetActorInfo(RapersA[RapersACount]))
-							else
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+aName)
-							endif
-
-						RapersACount += 1
-						RapersAFemaleCount += 1
-						
-						elseif RapersBCount < 4 && !RapersBBlocked							
-						RapersB[RapersBCount] = a	 		
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+cfgqst.GetActorInfo(RapersB[RapersBCount]))
-							else
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+aName)
-							endif
-						RapersBCount += 1
-						RapersBFemaleCount += 1
-						
-						elseif RapersCCount < 4	&& !RapersCBlocked						
-						RapersC[RapersCCount] = a	 							
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+cfgqst.GetActorInfo(RapersC[RapersCCount]))
-							else
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+aName)
-							endif
-						RapersCCount += 1
-						RapersCFemaleCount += 1
-						endif
-
-					endif	
-					
-					
-				;::::::::::: SORT MALES :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-				elseif aGender == 0 ;&& cfgqst.MalesAllowed 	
-
-					if cfgqst.AllowActor(a, 1, aName) ;disallowed Actors are Traced in the AllowActorFunction
-					
-						;get a Raper to Group B for Follower01
-						if NeedARaper && RapersACount > 0 && RapersBCount == 0 && !RapersABlocked
-						RapersB[RapersBCount] = a	 		
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+cfgqst.GetActorInfo(RapersB[RapersBCount]))
-							else
-							;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+((RapersB[RapersBCount]).GetBaseObject().GetName()))
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+aName)
-							endif
-						RapersBCount += 1
-						NeedARaper = false
-						;get a Raper to Group C for Follower02
-						elseif NeedAnotherRaper && RapersBCount > 0	&& RapersCCount == 0 && !RapersBBlocked																			
-						RapersC[RapersCCount] = a	 		
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+cfgqst.GetActorInfo(RapersC[RapersCCount]))
-							else
-							;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+((RapersC[RapersCCount]).GetBaseObject().GetName()))
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+aName)
-							endif
-						RapersCCount += 1
-						NeedAnotherRaper = false
-						;sort RapersA (if no guards found)
-						elseif !RapersAareGuards && RapersACount < 4 && !RapersABlocked
-						RapersA[RapersACount] = a	 		
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+cfgqst.GetActorInfo(RapersA[RapersACount]))
-							else
-							;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+((RapersA[RapersACount]).GetBaseObject().GetName()))
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+aName)
-							endif
-						RapersACount += 1
-						elseif RapersBCount < 4 && !RapersBBlocked						
-						RapersB[RapersBCount] = a	 		
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+cfgqst.GetActorInfo(RapersB[RapersBCount]))
-							else
-							;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+((RapersB[RapersBCount]).GetBaseObject().GetName()))
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+aName)
-							endif
-						RapersBCount += 1
-						elseif RapersCCount < 4	&& !RapersCBlocked					
-						RapersC[RapersCCount] = a	
-							if cfgqst.ShowDebugMessages
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+cfgqst.GetActorInfo(RapersC[RapersCCount]))
-							else	
-							;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+((RapersC[RapersCCount]).GetBaseObject().GetName()))		
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+aName)	
-							endif
-						RapersCCount += 1	
-
-						endif	
-
-					endif								
-										
-				;::::::::::: SORT CREATURES :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::																
-				elseif (aGender == 2) && cfgqst.AllowCreatures 
-				
-					if !a.IsInFaction(PlayerFaction) ; && AllowActor(a) ;<----- new hitter detection
-						;asign a racekey to each group based on scanned Creatures - each group gets ONE Racekey asigned and is then false
-						if cfgqst.AllowActor(a, 2, aName)	
-						
-	
-							if CreaturesARace == "empty"
-							CreaturesARace = GetRaceKey(a) 								;fill in RacesA
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesARace #"+CreaturesARace)
-							elseif (CreaturesBRace == "empty") && (CreaturesARace != GetRaceKey(a))
-							CreaturesBRace = GetRaceKey(a) 								;fill in RacesB
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesBRace #"+CreaturesBRace)
-							elseif (CreaturesCRace == "empty") && (CreaturesARace != GetRaceKey(a)) && (CreaturesBRace != GetRaceKey(a))
-							CreaturesCRace = GetRaceKey(a)  							;fill in RacesC
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesCRace #"+CreaturesCRace)
-							
-							elseif (CreaturesDRace == "empty") && (CreaturesARace != GetRaceKey(a)) && (CreaturesBRace != GetRaceKey(a)) && (CreaturesCRace != GetRaceKey(a))
-							CreaturesDRace = GetRaceKey(a) 								;fill in RacesB
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesDRace #"+CreaturesDRace)
-							elseif (CreaturesERace == "empty") && (CreaturesARace != GetRaceKey(a)) && (CreaturesBRace != GetRaceKey(a)) && (CreaturesCRace != GetRaceKey(a)) && (CreaturesDRace != GetRaceKey(a))
-							CreaturesERace = GetRaceKey(a)  							;fill in RacesC
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesERace #"+CreaturesERace)
-							elseif (CreaturesFRace == "empty") && (CreaturesARace != GetRaceKey(a)) && (CreaturesBRace != GetRaceKey(a)) && (CreaturesCRace != GetRaceKey(a)) && (CreaturesDRace != GetRaceKey(a)) && (CreaturesERace != GetRaceKey(a))	
-							CreaturesFRace = GetRaceKey(a)  							;fill in RacesC
-							Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesFRace #"+CreaturesFRace)
-																					
-							endif	
-					
-							;asign a Creature to Group B for Follower01
-							;overwrites the above racekey
-							if NeedARaper && CreaturesACount > 0
-							CreaturesB[CreaturesBCount] = a		
-									if cfgqst.ShowDebugMessages
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper CreaturesB #"+CreaturesBCount+": "+cfgqst.GetActorInfo(CreaturesB[CreaturesBCount]))
-									else
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper CreaturesB #"+CreaturesBCount+": "+aName)		
-									endif								
-
-							CreaturesBCount += 1
-							NeedARaper = false
-							CreaturesBRace = GetRaceKey(a) 
-					
-							;asign a Creature to Group C for Follower02
-							;overwrites the above racekey
-							elseif NeedAnotherRaper && CreaturesBCount > 0																				
-							CreaturesC[CreaturesCCount] = a	 		
-									if cfgqst.ShowDebugMessages
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper CreaturesC #"+CreaturesCCount+": "+cfgqst.GetActorInfo(CreaturesC[CreaturesCCount]))
-									else
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper CreaturesC #"+CreaturesCCount+": "+aName)													
-									endif		
-							CreaturesCCount += 1
-							NeedAnotherRaper = false
-							CreaturesCRace = GetRaceKey(a) 
-					
-							;asign a creature to a group based on matching RaceKeys
-							elseif (GetRaceKey(a) == CreaturesARace) && (CreaturesACount < 4)
-							CreaturesA[CreaturesACount] = a	 		
-									if cfgqst.ShowDebugMessages
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesA #"+CreaturesACount+": "+cfgqst.GetActorInfo(CreaturesA[CreaturesACount]))
-									else		
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesA #"+CreaturesACount+": "+aName)			
-									endif
-							CreaturesACount += 1
-							;tempraceID = "empty"
-
-							elseif (GetRaceKey(a) == CreaturesBRace) && (CreaturesBCount < 4)
-							CreaturesB[CreaturesBCount] = a	 		
-									if cfgqst.ShowDebugMessages
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesB #"+CreaturesBCount+": "+cfgqst.GetActorInfo(CreaturesB[CreaturesBCount]))
-									else
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesB #"+CreaturesBCount+": "+aName)		
-									endif
-							CreaturesBCount += 1
-							;tempraceID = "empty"
-							
-							elseif (GetRaceKey(a) == CreaturesCRace) && (CreaturesCCount < 4)
-							CreaturesC[CreaturesCCount] = a	 		
-									if cfgqst.ShowDebugMessages
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesC #"+CreaturesCCount+": "+cfgqst.GetActorInfo(CreaturesC[CreaturesCCount]))
-									else
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesC #"+CreaturesCCount+": "+aName)													
-									endif
-							CreaturesCCount += 1	
-							
-							elseif (GetRaceKey(a) == CreaturesDRace) && (CreaturesDCount < 4)
-							CreaturesD[CreaturesDCount] = a	 		
-									if cfgqst.ShowDebugMessages
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesD #"+CreaturesDCount+": "+cfgqst.GetActorInfo(CreaturesD[CreaturesDCount]))
-									else
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesD #"+CreaturesDCount+": "+aName)													
-									endif
-							CreaturesDCount += 1														
-							elseif (GetRaceKey(a) == CreaturesERace) && (CreaturesECount < 4)
-							CreaturesE[CreaturesECount] = a	 		
-									if cfgqst.ShowDebugMessages
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesE #"+CreaturesECount+": "+cfgqst.GetActorInfo(CreaturesE[CreaturesECount]))
-									else
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesE #"+CreaturesECount+": "+aName)													
-									endif
-							CreaturesECount += 1															
-							elseif (GetRaceKey(a) == CreaturesFRace) && (CreaturesFCount < 4)
-							CreaturesF[CreaturesFCount] = a	 		
-									if cfgqst.ShowDebugMessages
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesF #"+CreaturesFCount+": "+cfgqst.GetActorInfo(CreaturesF[CreaturesFCount]))
-									else
-									Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesF #"+CreaturesFCount+": "+aName)													
-									endif
-							CreaturesFCount += 1															
-					
-							endif
-						endif	
-					endif	
-				endif
-			endwhile
-		
-		else 
-			;/
-			while i							
-			i -= 1		
-			a = ActorArray[i].GetReference() as Actor
-			aIsValid = false 	
-				if a	
-					
-					aName = a.GetBaseObject().GetName()
-					if !aName
-					aName = cfgqst.GetLeveledActorBaseName(a)
-					endif 
-					;SORT OUT: too far away ; sorted by interior distance and exterior distance
-					;if (cfgqst.PlayerRef.IsInInterior() && cfgqst.PlayerRef.GetDistance(a) <= cfgqst.SearchRadiusInterior) || (!cfgqst.PlayerRef.IsInInterior() && cfgqst.PlayerRef.GetDistance(a) <= cfgqst.SearchRadius)
-					if a.IsInFaction(cfgqst.EnemyFaction) 
-					;Enemy Faction is not scanned for Distance
-					
-					elseif cfgqst.PlayerRef.GetDistance(a) <= Distance
-						if cfgqst.ShowDebugMessages
-						Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: "+aName+": "+cfgqst.PlayerRef.GetDistance(a))
-						endif
-					
-						;SORT OUT GUARDS (they are already "sorted" in calm)
-						;if !cfgqst.IsGuard(a)		
-							;SORT OUT unwanted actors
-							;if !(a.GetBaseObject().GetName() == "FEC : Load Screen Detector")							
-								;SORT OUT Dragons (WIP #todo)
-								if !cfgqst.IsDragon(a)  	 
-									;SORT OUT commanded actors (not really working tho)
-									;if !a.IsCommandedActor()	
-										;if (VictimCount > 0) && ((a != Victims[0]) || (a != Victims[1]) || (a != Victims[2]) || (a != Victims[3]) || (a != Victims[4]))
-											
-											
-											;HUMAN female o+									
-											if (SexLab.GetGender(a) == 1) && cfgqst.FemalesAllowed  					;IF FEMALE 																																									
-												;if !a.IsPlayerTeammate() && !a.IsInFaction(CurrentFollowerFaction) && cfgqst.FemalesAllowed	 	;IF FEMALES Allowed -> aggressor
-												;if !a.IsInFaction(CurrentFollowerFaction) && !a.IsInFaction(PlayerFaction) && cfgqst.FemalesAllowed && !(a.GetBaseObject().GetName() == "Sofia")					 	;IF FEMALES Allowed -> aggressor					
-											;	if !IsFollower(a) && cfgqst.FemalesAllowed			
-																		
-													if cfgqst.AllowActor(a, 1, aName)	
-														;get a Raper to Group B for Follower01 - ONLY IF GROUP IS EMPTY 
-														if NeedARaper && RapersACount > 0 && RapersBCount == 0 && !RapersABlocked
-														RapersB[RapersBCount] = a	 		
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+cfgqst.GetActorInfo(RapersB[RapersBCount]))
-															else
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+((RapersB[RapersBCount]).GetBaseObject().GetName()))
-															endif
-														RapersBCount += 1
-														NeedARaper = false		
-														;get a Raper to Group C for Follower02 - ONLY IF GROUP IS EMPTY! 
-														elseif NeedAnotherRaper && RapersBCount > 0 && RapersCCount == 0 && !RapersCBlocked																				
-														RapersC[RapersCCount] = a	 		
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+cfgqst.GetActorInfo(RapersC[RapersCCount]))
-															else
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+((RapersC[RapersCCount]).GetBaseObject().GetName()))
-															endif
-														RapersCCount += 1
-														NeedAnotherRaper = false
-														elseif RapersACount < 4	&& !RapersABlocked
-														RapersA[RapersACount] = a	 		
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+cfgqst.GetActorInfo(RapersA[RapersACount]))
-															else
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+((RapersA[RapersACount]).GetBaseObject().GetName()))
-															endif
-
-														RapersACount += 1
-														elseif RapersBCount < 4 && !RapersBBlocked							
-														RapersB[RapersBCount] = a	 		
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+cfgqst.GetActorInfo(RapersB[RapersBCount]))
-															else
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+((RapersB[RapersBCount]).GetBaseObject().GetName()))
-															endif
-														RapersBCount += 1
-														elseif RapersCCount < 4	&& !RapersCBlocked						
-														RapersC[RapersCCount] = a	 							
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+cfgqst.GetActorInfo(RapersC[RapersCCount]))
-															else
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+((RapersC[RapersCCount]).GetBaseObject().GetName()))
-															endif
-														RapersCCount += 1
-														endif
-
-												endif	
-												
-												;-----------------------------------------------------------------------------------------------	
-												
-											;HUMAN male  o->
-											elseif (SexLab.GetGender(a) == 0) 
-													
-													if cfgqst.AllowActor(a, 1, aName)
-														;get a Raper to Group B for Follower01
-														if NeedARaper && RapersACount > 0 && RapersBCount == 0 && !RapersABlocked
-														RapersB[RapersBCount] = a	 		
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+cfgqst.GetActorInfo(RapersB[RapersBCount]))
-															else
-															;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+((RapersB[RapersBCount]).GetBaseObject().GetName()))
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersB #"+RapersBCount+": "+(cfgqst.GetLeveledActorBaseName(RapersB[RapersBCount])))
-															endif
-														RapersBCount += 1
-														NeedARaper = false
-														;get a Raper to Group C for Follower02
-														elseif NeedAnotherRaper && RapersBCount > 0	&& RapersCCount == 0 && !RapersBBlocked																			
-														RapersC[RapersCCount] = a	 		
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+cfgqst.GetActorInfo(RapersC[RapersCCount]))
-															else
-															;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+((RapersC[RapersCCount]).GetBaseObject().GetName()))
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper RapersC #"+RapersCCount+": "+(cfgqst.GetLeveledActorBaseName(RapersC[RapersCCount])))
-															endif
-														RapersCCount += 1
-														NeedAnotherRaper = false
-														;sort RapersA (if no guards found)
-														elseif !RapersAareGuards && RapersACount < 4 && !RapersABlocked
-														RapersA[RapersACount] = a	 		
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+cfgqst.GetActorInfo(RapersA[RapersACount]))
-															else
-															;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+((RapersA[RapersACount]).GetBaseObject().GetName()))
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersA #"+RapersACount+": "+(cfgqst.GetLeveledActorBaseName(RapersA[RapersACount])))
-															endif
-														RapersACount += 1
-														elseif RapersBCount < 4 && !RapersBBlocked						
-														RapersB[RapersBCount] = a	 		
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+cfgqst.GetActorInfo(RapersB[RapersBCount]))
-															else
-															;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+((RapersB[RapersBCount]).GetBaseObject().GetName()))
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersB #"+RapersBCount+": "+(cfgqst.GetLeveledActorBaseName(RapersB[RapersBCount])))
-															endif
-														RapersBCount += 1
-														elseif RapersCCount < 4	&& !RapersCBlocked					
-														RapersC[RapersCCount] = a	
-															if cfgqst.ShowDebugMessages
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+cfgqst.GetActorInfo(RapersC[RapersCCount]))
-															else
-															;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+((RapersC[RapersCCount]).GetBaseObject().GetName()))		
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersC #"+RapersCCount+": "+(cfgqst.GetLeveledActorBaseName(RapersC[RapersCCount])))	
-															endif
-														RapersCCount += 1	
-
-														endif	
-
-												endif								
-												;-----------------------------------------------------------------------------------------------
-														
-											;CREATURES															
-											elseif (SexLab.GetGender(a) == 2) 
-											
-												if !a.IsInFaction(PlayerFaction) ; && AllowActor(a) ;<----- new hitter detection
-													;asign a racekey to each group based on scanned Creatures - each group gets ONE Racekey asigned and is then false
-													if cfgqst.AllowCreatures		
-														if cfgqst.AllowActor(a, 2, aName)	
-														
-															if CreaturesARace == "empty"
-															CreaturesARace = GetRaceKey(a) 								;fill in RacesA
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesARace #"+CreaturesARace)
-															elseif (CreaturesBRace == "empty") && (CreaturesARace != GetRaceKey(a))
-															CreaturesBRace = GetRaceKey(a) 								;fill in RacesB
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesBRace #"+CreaturesBRace)
-															elseif (CreaturesCRace == "empty") && (CreaturesARace != GetRaceKey(a)) && (CreaturesBRace != GetRaceKey(a))
-															CreaturesCRace = GetRaceKey(a)  							;fill in RacesC
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesCRace #"+CreaturesCRace)
-															
-															elseif (CreaturesDRace == "empty") && (CreaturesARace != GetRaceKey(a)) && (CreaturesBRace != GetRaceKey(a)) && (CreaturesCRace != GetRaceKey(a))
-															CreaturesDRace = GetRaceKey(a) 								;fill in RacesB
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesDRace #"+CreaturesDRace)
-															elseif (CreaturesERace == "empty") && (CreaturesARace != GetRaceKey(a)) && (CreaturesBRace != GetRaceKey(a)) && (CreaturesCRace != GetRaceKey(a)) && (CreaturesDRace != GetRaceKey(a))
-															CreaturesERace = GetRaceKey(a)  							;fill in RacesC
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesERace #"+CreaturesERace)
-															elseif (CreaturesFRace == "empty") && (CreaturesARace != GetRaceKey(a)) && (CreaturesBRace != GetRaceKey(a)) && (CreaturesCRace != GetRaceKey(a)) && (CreaturesDRace != GetRaceKey(a)) && (CreaturesERace != GetRaceKey(a))	
-															CreaturesFRace = GetRaceKey(a)  							;fill in RacesC
-															Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesFRace #"+CreaturesFRace)
-																													
-															endif	
-													
-															;asign a Creature to Group B for Follower01
-															;overwrites the above racekey
-															if NeedARaper && CreaturesACount > 0
-															CreaturesB[CreaturesBCount] = a		
-																	if cfgqst.ShowDebugMessages
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper CreaturesB #"+CreaturesBCount+": "+cfgqst.GetActorInfo(CreaturesB[CreaturesBCount]))
-																	else
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper CreaturesB #"+CreaturesBCount+": "+(cfgqst.GetLeveledActorBaseName(CreaturesB[CreaturesBCount])))		
-																	endif								
-
-															CreaturesBCount += 1
-															NeedARaper = false
-															CreaturesBRace = GetRaceKey(a) 
-													
-															;asign a Creature to Group C for Follower02
-															;overwrites the above racekey
-															elseif NeedAnotherRaper && CreaturesBCount > 0																				
-															CreaturesC[CreaturesCCount] = a	 		
-																	if cfgqst.ShowDebugMessages
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper CreaturesC #"+CreaturesCCount+": "+cfgqst.GetActorInfo(CreaturesC[CreaturesCCount]))
-																	else
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: NeedARaper CreaturesC #"+CreaturesCCount+": "+(cfgqst.GetLeveledActorBaseName(CreaturesC[CreaturesCCount])))													
-																	endif		
-															CreaturesCCount += 1
-															NeedAnotherRaper = false
-															CreaturesCRace = GetRaceKey(a) 
-													
-															;asign a creature to a group based on matching RaceKeys
-															elseif (GetRaceKey(a) == CreaturesARace) && (CreaturesACount < 4)
-															CreaturesA[CreaturesACount] = a	 		
-																	if cfgqst.ShowDebugMessages
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesA #"+CreaturesACount+": "+cfgqst.GetActorInfo(CreaturesA[CreaturesACount]))
-																	else		
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesA #"+CreaturesACount+": "+(cfgqst.GetLeveledActorBaseName(CreaturesA[CreaturesACount])))			
-																	endif
-															CreaturesACount += 1
-															;tempraceID = "empty"
-
-															elseif (GetRaceKey(a) == CreaturesBRace) && (CreaturesBCount < 4)
-															CreaturesB[CreaturesBCount] = a	 		
-																	if cfgqst.ShowDebugMessages
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesB #"+CreaturesBCount+": "+cfgqst.GetActorInfo(CreaturesB[CreaturesBCount]))
-																	else
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesB #"+CreaturesBCount+": "+(cfgqst.GetLeveledActorBaseName(CreaturesB[CreaturesBCount])))		
-																	endif
-															CreaturesBCount += 1
-															;tempraceID = "empty"
-															
-															elseif (GetRaceKey(a) == CreaturesCRace) && (CreaturesCCount < 4)
-															CreaturesC[CreaturesCCount] = a	 		
-																	if cfgqst.ShowDebugMessages
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesC #"+CreaturesCCount+": "+cfgqst.GetActorInfo(CreaturesC[CreaturesCCount]))
-																	else
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesC #"+CreaturesCCount+": "+(cfgqst.GetLeveledActorBaseName(CreaturesC[CreaturesCCount])))													
-																	endif
-															CreaturesCCount += 1	
-															
-															elseif (GetRaceKey(a) == CreaturesDRace) && (CreaturesDCount < 4)
-															CreaturesD[CreaturesDCount] = a	 		
-																	if cfgqst.ShowDebugMessages
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesD #"+CreaturesDCount+": "+cfgqst.GetActorInfo(CreaturesD[CreaturesDCount]))
-																	else
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesD #"+CreaturesDCount+": "+(cfgqst.GetLeveledActorBaseName(CreaturesD[CreaturesDCount])))													
-																	endif
-															CreaturesDCount += 1														
-															elseif (GetRaceKey(a) == CreaturesERace) && (CreaturesECount < 4)
-															CreaturesE[CreaturesECount] = a	 		
-																	if cfgqst.ShowDebugMessages
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesE #"+CreaturesECount+": "+cfgqst.GetActorInfo(CreaturesE[CreaturesECount]))
-																	else
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesE #"+CreaturesECount+": "+(cfgqst.GetLeveledActorBaseName(CreaturesE[CreaturesECount])))													
-																	endif
-															CreaturesECount += 1															
-															elseif (GetRaceKey(a) == CreaturesFRace) && (CreaturesFCount < 4)
-															CreaturesF[CreaturesFCount] = a	 		
-																	if cfgqst.ShowDebugMessages
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesF #"+CreaturesFCount+": "+cfgqst.GetActorInfo(CreaturesF[CreaturesFCount]))
-																	else
-																	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesF #"+CreaturesFCount+": "+(cfgqst.GetLeveledActorBaseName(CreaturesF[CreaturesFCount])))													
-																	endif
-															CreaturesFCount += 1															
-															
-															;tempraceID = "empty"														
-															endif
-														else ;ActorNotAllowed
-														Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Actor Sorted out (is not Allowed")
-														endif ;ActorNotAllowed
-													else ;Gender
-													Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Actor Sorted out CreaturesNotAllowed")
-													endif ;Gender
-													
-												endif ;
-											endif ;playerfactioncheck
-										;endif	;followerDoubleCheck
-									;else	
-									;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Actor commanded: "+a.GetBaseObject().GetName())
-									;endif	;commanded actor
-								else	 
-								Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Actor is Dragon: "+a.GetBaseObject().GetName())
-								endif	;dragon
-							;else	
-							;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Actor is not allowed: "+a.GetBaseObject().GetName())
-						;	Debug.Notification("NAKED DEFEAT DEBUG: Actor is not allowed: "+a)
-							;endif	;non valid actors (from mods for example)
-						;else ;IsGuard			
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: IsGuard: "+a.GetBaseObject().GetName())
-						;endif 
-						
-					else ;distance
-						if cfgqst.ShowDebugMessages
-						Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Distance too far: "+cfgqst.PlayerRef.GetDistance(a))
-						Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Actor is too far away: "+a.GetBaseObject().GetName())
-						endif
-					endif
-				endif	;if a (no actor)
-			endwhile
-			/;
-		endif 
-		;OLDWHILE  <<<<<<<<<<<<<<<<<
-		
-	endif
-	
-	if cfgqst.CivilRapeRunning && (RapersACount == 0)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR - no RapersA!")
-	ScreenMessage("#ERROR - no RapersA!")	
-	endif
-	;---------------------------------------------------------------------------------------------------------------------------------------
-	
-	;if cfgqst.IsNymrasGame()
-
-	;reset all groups 	
-	;0 - empty
-	GroupArray = new int[9]	
-	GroupArray[0] = 0	;RapersA
-	GroupArray[1] = 0	;RapersB		
-	GroupArray[2] = 0	;RapersC
-	GroupArray[3] =	0	;CreaturesA	
-	GroupArray[4] =	0	;CreaturesB
-	GroupArray[5] =	0	;CreaturesC
-	GroupArray[6] =	0	;CreaturesD	
-	GroupArray[7] =	0	;CreaturesE
-	GroupArray[8] =	0	;CreaturesF
-
-	;0 -> empty
-	;1 -> available
-	;2 -> in use
-	
-	HumanGroupsAvailable = 0
-	CreatureGroupsAvailable = 0 
-	
-	;sort out strange stuff.... Only if we do NOT spawn
-	If cfgqst.DefeatTypeScenario != "Afterlife" && cfgqst.DefeatTypeScenario != "FastTravel"
-		if (CreaturesACount > 0) && CreaturesARace == "empty" && (cfgqst.SpawnedGroups[3] == 0)
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR-CreaturesA empty race - remove")
-		CreaturesACount = 0
-		endif 
-		if (CreaturesBCount > 0) && CreaturesBRace == "empty" && (cfgqst.SpawnedGroups[4] == 0)
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR-CreaturesB empty race - remove")
-		CreaturesBCount = 0
-		endif 
-		if (CreaturesCCount > 0) && CreaturesCRace == "empty" && (cfgqst.SpawnedGroups[5] == 0)
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR-CreaturesC empty race - remove")
-		CreaturesCCount = 0
-		endif 
-		if (CreaturesDCount > 0) && CreaturesDRace == "empty" && (cfgqst.SpawnedGroups[6] == 0)
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR-CreaturesD empty race - remove")
-		CreaturesDCount = 0
-		endif 
-		if (CreaturesECount > 0) && CreaturesERace == "empty"  && (cfgqst.SpawnedGroups[7] == 0)
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR-CreaturesE empty race - remove")
-		CreaturesECount = 0
-		endif 
-		if (CreaturesFCount > 0) && CreaturesFRace == "empty" && (cfgqst.SpawnedGroups[8] == 0)
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR-CreaturesF empty race - remove")
-		CreaturesFCount = 0
-		endif 
-	endif 
-	
-	;CHECK and Tag available Groups 
-	if RapersACount > 0	
-	GroupArray[0] = 1 	
-	HumanGroupsAvailable += 1
-	endif	
-	if RapersBCount > 0	
-	GroupArray[1] = 1 	
-	HumanGroupsAvailable += 1
-	endif	
-	if RapersCCount > 0	
-	GroupArray[2] = 1 
-	HumanGroupsAvailable += 1	
-	endif
-	if CreaturesACount > 0	
-	GroupArray[3] = 1 
-	CreatureGroupsAvailable += 1	
-	endif	
-	if CreaturesBCount > 0	
-	GroupArray[4] = 1 	
-	CreatureGroupsAvailable += 1	
-	endif	
-	if CreaturesCCount > 0	
-	GroupArray[5] = 1 	
-	CreatureGroupsAvailable += 1	
-	endif	
-	if CreaturesDCount > 0	
-	GroupArray[6] = 1 
-	CreatureGroupsAvailable += 1	
-	endif	
-	if CreaturesECount > 0	
-	GroupArray[7] = 1 	
-	CreatureGroupsAvailable += 1	
-	endif	
-	if CreaturesFCount > 0	
-	GroupArray[8] = 1 	
-	CreatureGroupsAvailable += 1	
-	endif	
-	
-	;/
-	else OLD SORTING / DELETE
-	
-		if RapersACount > 0
-		RapersAvalid = true
-		GroupCountHumans += 1	;no longer in use
-	;	RapersA.AddToFaction(BusyFaction)	;#busy
-	;	RapersA[0].Addtofaction(WhippingFaction)
-		
-		endif
-		if RapersBCount > 0
-		RapersBvalid = true
-		GroupCountHumans += 1	;no longer in use
-		endif
-		if RapersCCount > 0
-		RapersCvalid = true
-		GroupCountHumans += 1 ;no longer in use
-		endif
-		if (CreaturesACount > 0) && cfgqst.AllowCreatures
-		CreaturesAvalid = true
-		GroupCountCreatures += 1	;no longer in use
-		endif
-		if CreaturesBCount > 0 && cfgqst.AllowCreatures
-		CreaturesBvalid = true
-		GroupCountCreatures += 1 ;no longer in use
-		endif
-		if CreaturesCCount > 0 && cfgqst.AllowCreatures
-		CreaturesCvalid = true
-		GroupCountCreatures += 1
-		endif
-	endif
-	/;
-
-	
-	if RapersAareGuards
-	RapersAareGuards = false
-	endif
-	
-;-----------------------------------------	
-	
-	String RapersA_0_Name = "NoName"
-	String RapersA_1_Name = "NoName"
-	String RapersA_2_Name = "NoName"
-	String RapersA_3_Name = "NoName"
-	
-	String RapersB_0_Name = "NoName"
-	String RapersB_1_Name = "NoName"
-	String RapersB_2_Name = "NoName"
-	String RapersB_3_Name = "NoName"
-	
-	String RapersC_0_Name = "NoName"
-	String RapersC_1_Name = "NoName"
-	String RapersC_2_Name = "NoName"
-	String RapersC_3_Name = "NoName"
-	
-	
-	
-	if Nym()
-	
-		if RapersACount > 0
-			if RapersA[0]
-			RapersA_0_Name = RapersA[0].GetBaseObject().GetName()
-			endif 
-			if RapersA[1]
-			RapersA_1_Name = RapersA[1].GetBaseObject().GetName()
-			endif 
-			if RapersA[2]
-			RapersA_2_Name = RapersA[2].GetBaseObject().GetName()
-			endif 
-			if RapersA[3]
-			RapersA_3_Name = RapersA[3].GetBaseObject().GetName()
-			endif 
-		endif 
-		
-		if RapersBCount > 0
-			if RapersB[0]
-			RapersB_0_Name = RapersB[0].GetBaseObject().GetName()
-			endif 
-			if RapersB[1]
-			RapersB_1_Name = RapersB[1].GetBaseObject().GetName()
-			endif 
-			if RapersB[2]
-			RapersB_2_Name = RapersB[2].GetBaseObject().GetName()
-			endif 
-			if RapersB[3]
-			RapersB_3_Name = RapersB[3].GetBaseObject().GetName()
-			endif 
-		endif 
-		
-		if RapersCCount > 0
-			if RapersC[0]
-			RapersC_0_Name = RapersC[0].GetBaseObject().GetName()
-			endif 
-			if RapersC[1]
-			RapersC_1_Name = RapersC[1].GetBaseObject().GetName()
-			endif 
-			if RapersC[2]
-			RapersC_2_Name = RapersC[2].GetBaseObject().GetName()
-			endif 
-			if RapersC[3]
-			RapersC_3_Name = RapersC[3].GetBaseObject().GetName()
-			endif 
-		endif 
-
-	endif 
-	
-	
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: :::::::::::::::::::::: ##RAPERS ::::::::::::::::::::::")
-	
-	if Nym()
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersACount:"+RapersACount+" [0]:"+RapersA_0_Name+" [1]:"+RapersA_1_Name+" [2]:"+RapersA_2_Name+" [3]:"+RapersA_3_Name)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersBCount:"+RapersBCount+" [0]:"+RapersB_0_Name+" [1]:"+RapersB_1_Name+" [2]:"+RapersB_2_Name+" [3]:"+RapersB_3_Name)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersCCount:"+RapersCCount+" [0]:"+RapersC_0_Name+" [1]:"+RapersC_1_Name+" [2]:"+RapersC_2_Name+" [3]:"+RapersC_3_Name)
-	else 
-	
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersACount:"+RapersACount)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersBCount:"+RapersBCount)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: RapersCCount:"+RapersCCount)
-	endif 
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesACount:"+CreaturesACount+" CreaturesARace: "+CreaturesARace)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesBCount:"+CreaturesBCount+" CreaturesBRace: "+CreaturesBRace)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesCCount:"+CreaturesCCount+" CreaturesCRace: "+CreaturesCRace)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesDCount:"+CreaturesDCount+" CreaturesDRace: "+CreaturesDRace)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesECount:"+CreaturesECount+" CreaturesERace: "+CreaturesERace)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesFCount:"+CreaturesFCount+" CreaturesFRace: "+CreaturesFRace)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: VictimCount:"+VictimCount)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: HumanGroupsAvailable:"+HumanGroupsAvailable)
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreatureGroupsAvailable:"+CreatureGroupsAvailable)
-	
-	
-	
-;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesAvalid:"+CreaturesAvalid)
-;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesBvalid:"+CreaturesBvalid)
-;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: CreaturesCvalid:"+CreaturesCvalid)
-	
-	;this is a bool for "AllowActor"
-	note = false
-	
-	;Count Groups
-
+Function SortActors()
+    string aName
+    int aGender
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: SortActors(START)", 0)
+    InfoMessage("If this takes too long, try enabling LagFix in MCM or open console for some seconds")
+    bool RapersAareGuards = false
+    if cfgqst.CivilRapeRunning
+        while CalmRunning && cfgqst.ModEnabled
+            utility.Wait(2.0)
+        endwhile
+    endif
+    if ActorsSpawned
+    else
+        if cfgqst.SpawnedGroups[0] == 0
+            if cfgqst.CivilRapeRunning && RapersACount == 0
+                RapersA = new actor[4]
+                RapersA[0] = None
+                RapersA[1] = None
+                RapersA[2] = None
+                RapersA[3] = None
+                RapersACount = 0
+            elseif cfgqst.CivilRapeRunning && RapersACount > 0
+                RapersAareGuards = true
+            else
+                RapersA = new actor[4]
+                RapersA[0] = None
+                RapersA[1] = None
+                RapersA[2] = None
+                RapersA[3] = None
+                RapersACount = 0
+            endif
+        endif
+        if cfgqst.SpawnedGroups[1] == 0
+            RapersB = new actor[4]
+            RapersB[0] = None
+            RapersB[1] = None
+            RapersB[2] = None
+            RapersB[3] = None
+            RapersBCount = 0
+        endif
+        if cfgqst.SpawnedGroups[2] == 0
+            RapersC = new actor[4]
+            RapersC[0] = None
+            RapersC[1] = None
+            RapersC[2] = None
+            RapersC[3] = None
+            RapersCCount = 0
+        endif
+        if cfgqst.SpawnedGroups[3] == 0
+            CreaturesA = new actor[4]
+            CreaturesA[0] = None
+            CreaturesA[1] = None
+            CreaturesA[2] = None
+            CreaturesA[3] = None
+            CreaturesACount = 0
+        endif
+        if cfgqst.SpawnedGroups[4] == 0
+            CreaturesB = new actor[4]
+            CreaturesB[0] = None
+            CreaturesB[1] = None
+            CreaturesB[2] = None
+            CreaturesB[3] = None
+            CreaturesBCount = 0
+        endif
+        if cfgqst.SpawnedGroups[5] == 0
+            CreaturesC = new actor[4]
+            CreaturesC[0] = None
+            CreaturesC[1] = None
+            CreaturesC[2] = None
+            CreaturesC[3] = None
+            CreaturesCCount = 0
+        endif
+        if cfgqst.SpawnedGroups[6] == 0
+            CreaturesD = new actor[4]
+            CreaturesD[0] = None
+            CreaturesD[1] = None
+            CreaturesD[2] = None
+            CreaturesD[3] = None
+            CreaturesDCount = 0
+        endif
+        if cfgqst.SpawnedGroups[7] == 0
+            CreaturesE = new actor[4]
+            CreaturesE[0] = None
+            CreaturesE[1] = None
+            CreaturesE[2] = None
+            CreaturesE[3] = None
+            CreaturesECount = 0
+        endif
+        if cfgqst.SpawnedGroups[8] == 0
+            CreaturesF = new actor[4]
+            CreaturesF[0] = None
+            CreaturesF[1] = None
+            CreaturesF[2] = None
+            CreaturesF[3] = None
+            CreaturesFCount = 0
+        endif
+        if cfgqst.SpawnedGroups[9] == 0
+            SpawnedActor = new actor[4]
+            SpawnedActor[0] = None
+            SpawnedActor[1] = None
+            SpawnedActor[2] = None
+            SpawnedActor[3] = None
+        endif
+    endif
+    bool NewSpawnSystem = false
+    NewSpawnSystem = true
+    if NewSpawnSystem
+        NymTrace("NeedRapersForSlavery: " + NeedRapersForSlavery + " cfgqst.RapeAgain = " + cfgqst.RapeAgain)
+        if cfgqst.RapeAgain
+            NymTrace("RapeAgain")
+        elseif cfgqst.DefeatTypeScenario == "Afterlife"
+            while SpawningActorsActive && !cfgqst.AbortAll
+                NymTrace("SpawningActorsActive WAIT LOOP")
+                utility.Wait(1.0)
+            endwhile
+            ActorsSpawned = true
+        elseif cfgqst.DefeatTypeScenario == "FastTravel"
+            SpawnActorGroups("FastTravel")
+            ActorsSpawned = true
+        elseif cfgqst.DefeatEntranceVia == "Ambush"
+            NymTrace("Spawn Ambush")
+            SpawnActorGroups("Ambush")
+            ActorsSpawned = true
+        elseif cfgqst.DefeatTypeGeneral == "AreHumans" && !(cfgqst.DefeatType == "Undead") && !(cfgqst.DefeatType == "Vampires") && !(cfgqst.DefeatType == "Necromancers")
+            if NeedRapersForSlavery
+                NymMessage("Spawn Slave Owners")
+                SpawnActorGroups("Slave Owners")
+                ActorsSpawned = true
+            elseif cfgqst.NymSpawning
+                if NeedCreaturesForSex
+                    SpawnActorGroups("Extra Animals")
+                    ActorsSpawned = true
+                endif
+                utility.Wait(1.0)
+                if RapersMale < 3 && D100(25.0)
+                    SpawnActorGroups("Extra Rapers")
+                    ActorsSpawned = true
+                endif
+            endif
+        elseif cfgqst.DefeatType == "Hagravens" && cfgqst.NymSpawning
+            NymMessage("Spawn Extra Rapers for Hagravens")
+            SpawnActorGroups("Extra Hagravens")
+            ActorsSpawned = true
+        elseif cfgqst.DefeatType == "Spriggans" && cfgqst.NymSpawning
+            NymMessage("Spawn Extra Rapers for Spriggans")
+            SpawnActorGroups("Extra Wild Animals")
+            ActorsSpawned = true
+        elseif cfgqst.DefeatType == "Undead" && cfgqst.NymSpawning
+            NymMessage("Spawn Extra Rapers for Undead")
+            SpawnActorGroups("Extra Undead")
+            ActorsSpawned = true
+        elseif cfgqst.DefeatType == "Giants" && cfgqst.NymSpawning
+            NymMessage("Spawn Extra Rapers for Giants")
+            SpawnActorGroups("Extra Giants")
+            ActorsSpawned = true
+        elseif cfgqst.DefeatType == "Falmers" && cfgqst.NymSpawning
+            NymMessage("Spawn Extra Rapers for Falmers")
+            SpawnActorGroups("Extra Falmers")
+            ActorsSpawned = true
+        elseif NeedRapersForSlavery
+            SpawnActorGroups("Slave Owners")
+            ActorsSpawned = true
+        endif
+    endif
+    int i = ActorArray.Length
+    bool aIsValid = false
+    bool NewWhile = true
+    if !(cfgqst.DefeatTypeScenario == "Afterlife") && !(cfgqst.DefeatTypeScenario == "FastTravel")
+        if NewWhile
+            while i
+                i = i - 1
+                actor a = (ActorArray[i].GetReference() as actor)
+                aIsValid = false
+                bool ThisWomanIsWhipper = false
+                if a
+                    aGender = storqst.GetGender(a)
+                    NymTrace("MyGender: " + aGender + " SexlabGender: " + SexLab.GetGender(a))
+                else
+                    aGender = 404
+                    NymTrace("MyGender: 404 - Actor gone missing")
+                endif
+                if aGender == 2
+                    aName = cfgqst.GetLeveledActorBaseName(a)
+                elseif aGender < 2
+                    aName = a.GetBaseObject().GetName()
+                endif
+                if folqst.IsPresentFollower(a)
+                    if a.IsInFaction(WhippingFaction)
+                        a.RemoveFromFaction(WhippingFaction)
+                    endif
+                elseif !WhipperFound && !storqst.NeedAwhipper && aGender == 1 && !folqst.IsPresentFollower(a) && cfgqst.DefeatWhipProb > 0.0
+                endif
+                if aGender == 1 && cfgqst.FemalesAllowed && !ThisWomanIsWhipper
+                    if a && cfgqst.AllowActor(a, 1, aName)
+                        a.AddToFaction(storqst.NakedRaperFaction)
+                        if NeedARaper && RapersACount > 0 && RapersBCount == 0 && !RapersABlocked
+                            RapersB[RapersBCount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NeedARaper Female RapersB #" + RapersBCount + ": " + cfgqst.GetActorInfo(RapersB[RapersBCount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NeedARaper Female RapersB #" + RapersBCount + ": " + aName, 0)
+                            endif
+                            RapersBCount = RapersBCount + 1
+                            RapersBFemaleCount = RapersBFemaleCount + 1
+                            NeedARaper = false
+                        elseif NeedAnotherRaper && RapersBCount > 0 && RapersCCount == 0 && !RapersCBlocked
+                            RapersC[RapersCCount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Female NeedARaper RapersC #" + RapersCCount + ": " + cfgqst.GetActorInfo(RapersC[RapersCCount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Female NeedARaper RapersC #" + RapersCCount + ": " + aName, 0)
+                            endif
+                            RapersCCount = RapersCCount + 1
+                            RapersCFemaleCount = RapersCFemaleCount + 1
+                            NeedAnotherRaper = false
+                        elseif RapersACount < 4 && !RapersABlocked
+                            RapersA[RapersACount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Female RapersA #" + RapersACount + ": " + cfgqst.GetActorInfo(RapersA[RapersACount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Female RapersA #" + RapersACount + ": " + aName, 0)
+                            endif
+                            RapersACount = RapersACount + 1
+                            RapersAFemaleCount = RapersAFemaleCount + 1
+                        elseif RapersBCount < 4 && !RapersBBlocked
+                            RapersB[RapersBCount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Female RapersB #" + RapersBCount + ": " + cfgqst.GetActorInfo(RapersB[RapersBCount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Female RapersB #" + RapersBCount + ": " + aName, 0)
+                            endif
+                            RapersBCount = RapersBCount + 1
+                            RapersBFemaleCount = RapersBFemaleCount + 1
+                        elseif RapersCCount < 4 && !RapersCBlocked
+                            RapersC[RapersCCount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Female RapersC #" + RapersCCount + ": " + cfgqst.GetActorInfo(RapersC[RapersCCount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Female RapersC #" + RapersCCount + ": " + aName, 0)
+                            endif
+                            RapersCCount = RapersCCount + 1
+                            RapersCFemaleCount = RapersCFemaleCount + 1
+                        endif
+                    endif
+                elseif aGender == 0
+                    if a && cfgqst.AllowActor(a, 1, aName)
+                        a.AddToFaction(storqst.NakedRaperFaction)
+                        if NeedARaper && RapersACount > 0 && RapersBCount == 0 && !RapersABlocked
+                            RapersB[RapersBCount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male NeedARaper RapersB #" + RapersBCount + ": " + cfgqst.GetActorInfo(RapersB[RapersBCount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male NeedARaper RapersB #" + RapersBCount + ": " + aName, 0)
+                            endif
+                            RapersBCount = RapersBCount + 1
+                            NeedARaper = false
+                        elseif NeedAnotherRaper && RapersBCount > 0 && RapersCCount == 0 && !RapersBBlocked
+                            RapersC[RapersCCount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male NeedARaper RapersC #" + RapersCCount + ": " + cfgqst.GetActorInfo(RapersC[RapersCCount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male NeedARaper RapersC #" + RapersCCount + ": " + aName, 0)
+                            endif
+                            RapersCCount = RapersCCount + 1
+                            NeedAnotherRaper = false
+                        elseif !RapersAareGuards && RapersACount < 4 && !RapersABlocked
+                            RapersA[RapersACount] = a
+                            a.AddToFaction(storqst.NakedRaperFaction)
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male RapersA #" + RapersACount + ": " + cfgqst.GetActorInfo(RapersA[RapersACount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male RapersA #" + RapersACount + ": " + aName, 0)
+                            endif
+                            RapersACount = RapersACount + 1
+                        elseif RapersBCount < 4 && !RapersBBlocked
+                            RapersB[RapersBCount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male RapersB #" + RapersBCount + ": " + cfgqst.GetActorInfo(RapersB[RapersBCount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male RapersB #" + RapersBCount + ": " + aName, 0)
+                            endif
+                            RapersBCount = RapersBCount + 1
+                        elseif RapersCCount < 4 && !RapersCBlocked
+                            RapersC[RapersCCount] = a
+                            if cfgqst.ShowDebugMessages
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male RapersC #" + RapersCCount + ": " + cfgqst.GetActorInfo(RapersC[RapersCCount]), 0)
+                            else
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Male RapersC #" + RapersCCount + ": " + aName, 0)
+                            endif
+                            RapersCCount = RapersCCount + 1
+                        endif
+                    endif
+                elseif aGender == 2 && cfgqst.AllowCreatures
+                    if !a.IsInFaction(PlayerFaction)
+                        if a && cfgqst.AllowActor(a, 2, aName)
+                            a.AddToFaction(storqst.NakedRaperFaction)
+                            if CreaturesARace == "empty"
+                                CreaturesARace = GetRaceKey(a)
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesARace #" + CreaturesARace, 0)
+                            elseif CreaturesBRace == "empty" && !(CreaturesARace == GetRaceKey(a))
+                                CreaturesBRace = GetRaceKey(a)
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesBRace #" + CreaturesBRace, 0)
+                            elseif CreaturesCRace == "empty" && !(CreaturesARace == GetRaceKey(a)) && !(CreaturesBRace == GetRaceKey(a))
+                                CreaturesCRace = GetRaceKey(a)
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesCRace #" + CreaturesCRace, 0)
+                            elseif CreaturesDRace == "empty" && !(CreaturesARace == GetRaceKey(a)) && !(CreaturesBRace == GetRaceKey(a)) && !(CreaturesCRace == GetRaceKey(a))
+                                CreaturesDRace = GetRaceKey(a)
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesDRace #" + CreaturesDRace, 0)
+                            elseif CreaturesERace == "empty" && !(CreaturesARace == GetRaceKey(a)) && !(CreaturesBRace == GetRaceKey(a)) && !(CreaturesCRace == GetRaceKey(a)) && !(CreaturesDRace == GetRaceKey(a))
+                                CreaturesERace = GetRaceKey(a)
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesERace #" + CreaturesERace, 0)
+                            elseif CreaturesFRace == "empty" && !(CreaturesARace == GetRaceKey(a)) && !(CreaturesBRace == GetRaceKey(a)) && !(CreaturesCRace == GetRaceKey(a)) && !(CreaturesDRace == GetRaceKey(a)) && !(CreaturesERace == GetRaceKey(a))
+                                CreaturesFRace = GetRaceKey(a)
+                                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesFRace #" + CreaturesFRace, 0)
+                            endif
+                            if NeedARaper && CreaturesACount > 0
+                                CreaturesB[CreaturesBCount] = a
+                                if cfgqst.ShowDebugMessages
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NeedARaper CreaturesB #" + CreaturesBCount + ": " + cfgqst.GetActorInfo(CreaturesB[CreaturesBCount]), 0)
+                                else
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NeedARaper CreaturesB #" + CreaturesBCount + ": " + aName, 0)
+                                endif
+                                CreaturesBCount = CreaturesBCount + 1
+                                NeedARaper = false
+                                CreaturesBRace = GetRaceKey(a)
+                            elseif NeedAnotherRaper && CreaturesBCount > 0
+                                CreaturesC[CreaturesCCount] = a
+                                if cfgqst.ShowDebugMessages
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NeedARaper CreaturesC #" + CreaturesCCount + ": " + cfgqst.GetActorInfo(CreaturesC[CreaturesCCount]), 0)
+                                else
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: NeedARaper CreaturesC #" + CreaturesCCount + ": " + aName, 0)
+                                endif
+                                CreaturesCCount = CreaturesCCount + 1
+                                NeedAnotherRaper = false
+                                CreaturesCRace = GetRaceKey(a)
+                            elseif GetRaceKey(a) == CreaturesARace && CreaturesACount < 4
+                                CreaturesA[CreaturesACount] = a
+                                if cfgqst.ShowDebugMessages
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesA #" + CreaturesACount + ": " + cfgqst.GetActorInfo(CreaturesA[CreaturesACount]), 0)
+                                else
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesA #" + CreaturesACount + ": " + aName, 0)
+                                endif
+                                CreaturesACount = CreaturesACount + 1
+                            elseif GetRaceKey(a) == CreaturesBRace && CreaturesBCount < 4
+                                CreaturesB[CreaturesBCount] = a
+                                if cfgqst.ShowDebugMessages
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesB #" + CreaturesBCount + ": " + cfgqst.GetActorInfo(CreaturesB[CreaturesBCount]), 0)
+                                else
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesB #" + CreaturesBCount + ": " + aName, 0)
+                                endif
+                                CreaturesBCount = CreaturesBCount + 1
+                            elseif GetRaceKey(a) == CreaturesCRace && CreaturesCCount < 4
+                                CreaturesC[CreaturesCCount] = a
+                                if cfgqst.ShowDebugMessages
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesC #" + CreaturesCCount + ": " + cfgqst.GetActorInfo(CreaturesC[CreaturesCCount]), 0)
+                                else
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesC #" + CreaturesCCount + ": " + aName, 0)
+                                endif
+                                CreaturesCCount = CreaturesCCount + 1
+                            elseif GetRaceKey(a) == CreaturesDRace && CreaturesDCount < 4
+                                CreaturesD[CreaturesDCount] = a
+                                if cfgqst.ShowDebugMessages
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesD #" + CreaturesDCount + ": " + cfgqst.GetActorInfo(CreaturesD[CreaturesDCount]), 0)
+                                else
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesD #" + CreaturesDCount + ": " + aName, 0)
+                                endif
+                                CreaturesDCount = CreaturesDCount + 1
+                            elseif GetRaceKey(a) == CreaturesERace && CreaturesECount < 4
+                                CreaturesE[CreaturesECount] = a
+                                if cfgqst.ShowDebugMessages
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesE #" + CreaturesECount + ": " + cfgqst.GetActorInfo(CreaturesE[CreaturesECount]), 0)
+                                else
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesE #" + CreaturesECount + ": " + aName, 0)
+                                endif
+                                CreaturesECount = CreaturesECount + 1
+                            elseif GetRaceKey(a) == CreaturesFRace && CreaturesFCount < 4
+                                CreaturesF[CreaturesFCount] = a
+                                if cfgqst.ShowDebugMessages
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesF #" + CreaturesFCount + ": " + cfgqst.GetActorInfo(CreaturesF[CreaturesFCount]), 0)
+                                else
+                                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesF #" + CreaturesFCount + ": " + aName, 0)
+                                endif
+                                CreaturesFCount = CreaturesFCount + 1
+                            endif
+                        endif
+                    endif
+                endif
+            endwhile
+        endif
+    endif
+    if cfgqst.CivilRapeRunning && RapersACount == 0
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR - no RapersA!", 0)
+        ScreenMessage("#ERROR - no RapersA!")
+    endif
+    GroupArray = new int[9]
+    GroupArray[0] = 0
+    GroupArray[1] = 0
+    GroupArray[2] = 0
+    GroupArray[3] = 0
+    GroupArray[4] = 0
+    GroupArray[5] = 0
+    GroupArray[6] = 0
+    GroupArray[7] = 0
+    GroupArray[8] = 0
+    HumanGroupsAvailable = 0
+    CreatureGroupsAvailable = 0
+    if !(cfgqst.DefeatTypeScenario == "Afterlife") && !(cfgqst.DefeatTypeScenario == "FastTravel")
+        if CreaturesACount > 0 && CreaturesARace == "empty" && cfgqst.SpawnedGroups[3] == 0
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR-CreaturesA empty race - remove", 0)
+            CreaturesACount = 0
+        endif
+        if CreaturesBCount > 0 && CreaturesBRace == "empty" && cfgqst.SpawnedGroups[4] == 0
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR-CreaturesB empty race - remove", 0)
+            CreaturesBCount = 0
+        endif
+        if CreaturesCCount > 0 && CreaturesCRace == "empty" && cfgqst.SpawnedGroups[5] == 0
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR-CreaturesC empty race - remove", 0)
+            CreaturesCCount = 0
+        endif
+        if CreaturesDCount > 0 && CreaturesDRace == "empty" && cfgqst.SpawnedGroups[6] == 0
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR-CreaturesD empty race - remove", 0)
+            CreaturesDCount = 0
+        endif
+        if CreaturesECount > 0 && CreaturesERace == "empty" && cfgqst.SpawnedGroups[7] == 0
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR-CreaturesE empty race - remove", 0)
+            CreaturesECount = 0
+        endif
+        if CreaturesFCount > 0 && CreaturesFRace == "empty" && cfgqst.SpawnedGroups[8] == 0
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR-CreaturesF empty race - remove", 0)
+            CreaturesFCount = 0
+        endif
+    endif
+    if RapersACount > 0
+        GroupArray[0] = 1
+        HumanGroupsAvailable = HumanGroupsAvailable + 1
+    endif
+    if RapersBCount > 0
+        GroupArray[1] = 1
+        HumanGroupsAvailable = HumanGroupsAvailable + 1
+    endif
+    if RapersCCount > 0
+        GroupArray[2] = 1
+        HumanGroupsAvailable = HumanGroupsAvailable + 1
+    endif
+    if CreaturesACount > 0
+        GroupArray[3] = 1
+        CreatureGroupsAvailable = CreatureGroupsAvailable + 1
+    endif
+    if CreaturesBCount > 0
+        GroupArray[4] = 1
+        CreatureGroupsAvailable = CreatureGroupsAvailable + 1
+    endif
+    if CreaturesCCount > 0
+        GroupArray[5] = 1
+        CreatureGroupsAvailable = CreatureGroupsAvailable + 1
+    endif
+    if CreaturesDCount > 0
+        GroupArray[6] = 1
+        CreatureGroupsAvailable = CreatureGroupsAvailable + 1
+    endif
+    if CreaturesECount > 0
+        GroupArray[7] = 1
+        CreatureGroupsAvailable = CreatureGroupsAvailable + 1
+    endif
+    if CreaturesFCount > 0
+        GroupArray[8] = 1
+        CreatureGroupsAvailable = CreatureGroupsAvailable + 1
+    endif
+    if RapersAareGuards
+        RapersAareGuards = false
+    endif
+    string RapersA_0_Name = "NoName"
+    string RapersA_1_Name = "NoName"
+    string RapersA_2_Name = "NoName"
+    string RapersA_3_Name = "NoName"
+    string RapersB_0_Name = "NoName"
+    string RapersB_1_Name = "NoName"
+    string RapersB_2_Name = "NoName"
+    string RapersB_3_Name = "NoName"
+    string RapersC_0_Name = "NoName"
+    string RapersC_1_Name = "NoName"
+    string RapersC_2_Name = "NoName"
+    string RapersC_3_Name = "NoName"
+    if Nym()
+        if RapersACount > 0
+            if RapersA[0]
+                RapersA_0_Name = RapersA[0].GetBaseObject().GetName()
+            endif
+            if RapersA[1]
+                RapersA_1_Name = RapersA[1].GetBaseObject().GetName()
+            endif
+            if RapersA[2]
+                RapersA_2_Name = RapersA[2].GetBaseObject().GetName()
+            endif
+            if RapersA[3]
+                RapersA_3_Name = RapersA[3].GetBaseObject().GetName()
+            endif
+        endif
+        if RapersBCount > 0
+            if RapersB[0]
+                RapersB_0_Name = RapersB[0].GetBaseObject().GetName()
+            endif
+            if RapersB[1]
+                RapersB_1_Name = RapersB[1].GetBaseObject().GetName()
+            endif
+            if RapersB[2]
+                RapersB_2_Name = RapersB[2].GetBaseObject().GetName()
+            endif
+            if RapersB[3]
+                RapersB_3_Name = RapersB[3].GetBaseObject().GetName()
+            endif
+        endif
+        if RapersCCount > 0
+            if RapersC[0]
+                RapersC_0_Name = RapersC[0].GetBaseObject().GetName()
+            endif
+            if RapersC[1]
+                RapersC_1_Name = RapersC[1].GetBaseObject().GetName()
+            endif
+            if RapersC[2]
+                RapersC_2_Name = RapersC[2].GetBaseObject().GetName()
+            endif
+            if RapersC[3]
+                RapersC_3_Name = RapersC[3].GetBaseObject().GetName()
+            endif
+        endif
+    endif
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: :::::::::::::::::::::: ##RAPERS ::::::::::::::::::::::", 0)
+    if Nym()
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: RapersACount:" + RapersACount + " [0]:" + RapersA_0_Name + " [1]:" + RapersA_1_Name + " [2]:" + RapersA_2_Name + " [3]:" + RapersA_3_Name, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: RapersBCount:" + RapersBCount + " [0]:" + RapersB_0_Name + " [1]:" + RapersB_1_Name + " [2]:" + RapersB_2_Name + " [3]:" + RapersB_3_Name, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: RapersCCount:" + RapersCCount + " [0]:" + RapersC_0_Name + " [1]:" + RapersC_1_Name + " [2]:" + RapersC_2_Name + " [3]:" + RapersC_3_Name, 0)
+    else
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: RapersACount:" + RapersACount, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: RapersBCount:" + RapersBCount, 0)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: RapersCCount:" + RapersCCount, 0)
+    endif
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesACount:" + CreaturesACount + " CreaturesARace: " + CreaturesARace, 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesBCount:" + CreaturesBCount + " CreaturesBRace: " + CreaturesBRace, 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesCCount:" + CreaturesCCount + " CreaturesCRace: " + CreaturesCRace, 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesDCount:" + CreaturesDCount + " CreaturesDRace: " + CreaturesDRace, 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesECount:" + CreaturesECount + " CreaturesERace: " + CreaturesERace, 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreaturesFCount:" + CreaturesFCount + " CreaturesFRace: " + CreaturesFRace, 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: VictimCount:" + VictimCount, 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: HumanGroupsAvailable:" + HumanGroupsAvailable, 0)
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: CreatureGroupsAvailable:" + CreatureGroupsAvailable, 0)
+    note = false
 EndFunction
 
 
@@ -9726,804 +8537,559 @@ int [] GroupArray
 	String LastGroupPlayer = "Empty"
 	
 	String GroupTypePlayer = "none"
-	
 	Bool PlayerHadCreatures = false
 		
-Function SelectAggressor(Int iFuckingRound = 0, Int VictimNumber = 0)			;does this mean the numbers from the "call" are reverted to 0?)			##select## #SelectAggressor
-Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SelectAggressor START Round: "+iFuckingRound)
-
-		;1. Selects a random RapersX/CreaturesX Group that is available
-		;2. Fills the RapersX/CreaturesX actos into AggressorsGroup
-		;3. Blocks the Selected Group
-		;4. Selects the Sex Tags
-			
-	SelectedGroup = "none"	
-	String ActorName 
-	int y = 0
-;if we only have ONE group and then Start ForePlay the Group is still Blocked!!!; VictimNumber 0 = Player
-; VictimNumber 1 = Victims[0]
-; VictimNumber 2 = Victims[1]
-
-	if Nym() && (iFuckingRound > 1) && (ForePlayGroup != "none")
-	NymMessage("#ERROR- Foreplaygroup should be none")
-	endif
-
-	if VictimNumber == 0
-	ActorName = "Player"
-	
-	elseif VictimNumber == 1
-	ActorName = folqst.Name_Follower01
-	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SelectAggressor START Victims[0]: "+Victims[0].GetBaseObject().GetName())
-	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SelectAggressor START Victims[0]")
-	elseif VictimNumber == 2
-	ActorName = folqst.Name_Follower02
-	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SelectAggressor START Victim[1]: "+Victims[2].GetBaseObject().GetName())
-	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SelectAggressor START Victims[1]")
-	endif 
-
-	; ------------------- SELECT GROUP -----------------------------: 
-	
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SelectAggressor["+ActorName+"][Round "+iFuckingRound+"]") 
-	
-	creaturegroup = false
-	humangroup = false
-	group = false	
-	
-	
-	;we select NO new group when we had ForePlay. We use the last Group instead.
-	if WasForeplay 	
-	SelectedGroup = LastGroupPlayer
-	
-	;we also want to vary groups more, so LastGroupPlayer will be used more anyway
-	else 
-
-		NymraCountsFunctions +=1
-		String [] RandomGroupArray		
-		RandomGroupArray = new String [9]
-		RandomGroupArray[0] = "none"
-		RandomGroupArray[1]	= "none"	
-		RandomGroupArray[2]	= "none"
-		RandomGroupArray[3]	= "none"
-		RandomGroupArray[4]	= "none"
-		RandomGroupArray[5]	= "none"
-		RandomGroupArray[6]	= "none"
-		RandomGroupArray[7]	= "none"
-		RandomGroupArray[8]	= "none"
-
-		int x = 0
-		int w = 0
-		bool GroupFound = false
-		Bool UsePreselectedGroups = false
-		Bool AllowHumanGroups = false
-		Bool AllowCreatureGroups = false
-		;int HumansChance = 100 ;= 25
-			
-		if VictimNumber == 0 && HasForeplay
-		NymTrace("SelectAggressor() #ForePlayGroup - Pick ForePlayGroup")
-		w = 3 ;only search humangroups for foreplay (at the moment....) 
-		elseif (VictimNumber == 0) && WasForeplay;&& ForePlayGroup != "none"
-		w = 3 ;only search humangroups for foreplay
-		NymTrace("SelectAggressor()  #ForePlayGroup - This is the error I think. Not needed")
-		else
-		NymTrace("SelectAggressor() #All Groups Allowed")
-		w = 9 ;search all groups << we needs to be x + 1 (or the search ends with group 2 or 5 ....) 
-		endif 
-
-		;Make Sure Round 1 fits the DefeatType (Round 0-1 always, Round 2 - 50% chance
-		if (cfgqst.DefeatTypeGeneral == "AreAnimals") || (cfgqst.DefeatTypeGeneral == "AreHumanoids")
-			if (VictimNumber == 0) && ((iFuckingRound < 2) || (iFuckingRound == 2) && D100(50))
-				if (CreaturesARace == cfgqst.DefeatType) || (CreaturesBRace == cfgqst.DefeatType) || (CreaturesCRace == cfgqst.DefeatType) || (CreaturesDRace == cfgqst.DefeatType) || (CreaturesERace == cfgqst.DefeatType) || (CreaturesFRace == cfgqst.DefeatType)
-				;check if one of the Groups matches the DefeatType 1:1 
-				;if so, we only load the groups with that CreatureRaceType (set its designation to 3)
-				;int iGroupsBlocked = 0
-					UsePreselectedGroups = true			
-					NymTrace("SelectAggressor() #Creatures Types ("+cfgqst.DefeatType+" Presorting")
-					if (CreaturesARace == cfgqst.DefeatType) && (GroupArray[3] == 1)
-					GroupArray[3] = 3 
-					endif 
-					if (CreaturesBRace == cfgqst.DefeatType) && (GroupArray[4] == 1)
-					GroupArray[4] = 3 
-					endif 
-					if (CreaturesCRace == cfgqst.DefeatType) && (GroupArray[5] == 1)
-					GroupArray[5] = 3 
-					endif 
-					if (CreaturesDRace == cfgqst.DefeatType) && (GroupArray[6] == 1)
-					GroupArray[6] = 3 
-					endif 
-					if (CreaturesERace == cfgqst.DefeatType) && (GroupArray[7] == 1)
-					GroupArray[7] = 3 
-					endif 
-					if (CreaturesFRace == cfgqst.DefeatType) && (GroupArray[8] == 1)
-					GroupArray[8] = 3 
-					endif 
-				endif 
-			endif 
-		endif 
-		
-		;HUMAN vs CREATUREGROUPS 
-		if (VictimNumber == 0) && (iFuckingRound < 3) && Allow_Creatures
-		NymTrace("SelectAggressor(A)")
-			if cfgqst.DefeatTypeGeneral == "AreHumans"	;consider rounds!
-			;	NymTrace("SelectAggressor(B)")
-				AllowHumanGroups = true
-				
-				if iFuckingRound == 1
-				AllowCreatureGroups = false
-			;	NymTrace("SelectAggressor(C)")
-				elseif (iFuckingRound == 2) && !PlayerHadCreatures
-				AllowCreatureGroups = true
-			;	NymTrace("SelectAggressor(D)")
-					;guarantee one creature group
-					if cfgqst.NYMspawning && CheckCreatureGroups() && cfgqst.AllowCreatures && !PlayerHadCreatures
-						NymTrace("SelectAggressor(E)")
-						if (Allow_SexScenes < 3) 
-					;	NymTrace("SelectAggressor() AllowHumanGroups = false (A)")
-						AllowHumanGroups = false
-						elseif D100(50)
-					;	NymTrace("SelectAggressor() AllowHumanGroups = false (B)")
-						AllowHumanGroups = false
-						endif 
-					endif 
-				
-				elseif (iFuckingRound == 3) && cfgqst.NYMspawning && CheckCreatureGroups() && cfgqst.AllowCreatures && !PlayerHadCreatures
-			;	NymTrace("SelectAggressor() AllowHumanGroups = false (C)")
-				AllowHumanGroups = false
-				AllowCreatureGroups = true	
-				endif 
-				
-			elseif cfgqst.DefeatTypeGeneral == "AreHumanoids"
-				AllowCreatureGroups = true
-			;	NymTrace("SelectAggressor(F)")
-				if iFuckingRound == 1
-			;	NymTrace("SelectAggressor(G)")
-				AllowHumanGroups = false
-				elseif (iFuckingRound == 2) && D100(25)
-			;	NymTrace("SelectAggressor(H)")
-				AllowHumanGroups = true	
-				endif 
-
-			elseif cfgqst.DefeatTypeGeneral == "AreAnimals"
-			;	NymTrace("SelectAggressor(I)")
-				AllowCreatureGroups = true	
-				if iFuckingRound == 1
-			;	NymTrace("SelectAggressor(J)")
-				AllowHumanGroups = false
-				elseif (iFuckingRound == 2) && D100(10)
-				NymTrace("SelectAggressor(K)")
-			;	AllowHumanGroups = true	
-				endif 
-			else 
-				NymTrace("SelectAggressor(L)")
-			AllowCreatureGroups = true
-			AllowHumanGroups = true
-			endif 
-		else
-				NymTrace("SelectAggressor(M)")
-			AllowCreatureGroups = true
-			AllowHumanGroups = true
-		endif			
-
-		NymTrace("SelectAggressor() AllowHumanGroups: "+AllowHumanGroups+" // AllowCreatureGroups: "+AllowCreatureGroups)
-	
-		if UsePreselectedGroups
-			;we search from 0 -> 5
-			while (x < w) 	;search all 9 groups
-				
-				;--- PreSelected ---;
-				if GroupArray[x] == 3
-			;	NymTrace("SelectAggressor() GroupArray[x] == 3")
-
-				GroupArray[x] = 1 ;set back to normal (available) 
-					if x == 0 && AllowHumanGroups					
-					RandomGroupArray[y] = "RapersA"		
-					y += 1 					
-					elseif x == 1 && AllowHumanGroups		
-					RandomGroupArray[y] = "RapersB"
-					y += 1					
-					elseif x == 2 && AllowHumanGroups			
-					RandomGroupArray[y] = "RapersC" 	
-					y += 1
-					elseif (x == 3) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesA" 	
-					y += 1
-					elseif (x == 4) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesB" 
-					y += 1
-					elseif (x == 5) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesC" 
-					y += 1					
-					elseif (x == 6) && AllowCreatureGroups&& Allow_Creatures  
-					RandomGroupArray[y] = "CreaturesD" 	
-					y += 1
-					elseif (x == 7) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesE" 
-					y += 1
-					elseif (x == 8) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesF" 
-					y += 1
-					endif
-				endif 
-				x += 1 				;continue search up to 5
-			endwhile 
-		else  
-
-		;we search from 0 -> 5
-			while (x < w) 	;search all 9 groups
-				
-				;--- Normal Selection ---;				
-				if GroupArray[x] == 1	;if group is full and not blocked, select it
-				;GroupArray[x] = 2		;selected group blocked <---- no, we block only groups that we use!
-				;NymTrace("SelectAggressor() GroupArray[x] == 1")
-
-					if x == 0 && AllowHumanGroups					
-					RandomGroupArray[y] = "RapersA"		
-					y += 1 					
-					elseif x == 1 && AllowHumanGroups		
-					RandomGroupArray[y] = "RapersB"
-					y += 1					
-					elseif x == 2 && AllowHumanGroups			
-					RandomGroupArray[y] = "RapersC" 	
-					y += 1
-					elseif (x == 3) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesA" 	
-					y += 1
-					elseif (x == 4) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesB" 
-					y += 1
-					elseif (x == 5) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesC" 
-					y += 1					
-					elseif (x == 6) && AllowCreatureGroups&& Allow_Creatures  
-					RandomGroupArray[y] = "CreaturesD" 	
-					y += 1
-					elseif (x == 7) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesE" 
-					y += 1
-					elseif (x == 8) && AllowCreatureGroups&& Allow_Creatures 
-					RandomGroupArray[y] = "CreaturesF" 
-					y += 1
-					endif	 	
-							;we found a group and filled the array, so go up a slot
-				endif 	
-				x += 1 				;continue search up to 5
-			endwhile 
-		endif 
-		;endif 
-		y -= 1 ;dont ask... just stupid. 
-		
-		;Randomly Select on of the Groups from The Array 
-								
-		if Nym()							
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[0]: "+RandomGroupArray[0])		
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[1]: "+RandomGroupArray[1])		
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[2]: "+RandomGroupArray[2])
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[3]: "+RandomGroupArray[3])	
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[4]: "+RandomGroupArray[4])
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[5]: "+RandomGroupArray[5])
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[6]: "+RandomGroupArray[6])	
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[7]: "+RandomGroupArray[7])
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - RandomGroupArray[8]: "+RandomGroupArray[8])
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - y =: "+y)
-		endif 
-		
-		int z 	
-		if y == 0	
-		z = 0
-		else
-		z = Utility.RandomInt(0, y)	;we randomly select a available and valid group that we selected earlier
-		endif 
-		
-		;Selected Group is Filled  
-		SelectedGroup = RandomGroupArray[z] 
-			
-		if VictimNumber == 0
-		ActiveGroup_Player = RandomGroupArray[z] 
-		LastGroupPlayer = RandomGroupArray[z] 
-		endif 
-	endif	
-		;-------------------------------------------------------------------------------------------------------------------------
-
-		;if HasForeplay
-		;ForePlayGroup = z
-		;endif 	
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] - Selected Group: "+SelectedGroup)
-		;Debug.MessageBox("Selected Group: "+SelectedGroup)
-		
-		;WHAT FOR??? ---> For secondary Sorting / Group Size correction etc. 
-		;/
-		Aggressors02 = new Actor[4]	
-		Aggressors02[0] = none				
-		Aggressors02[1] = none				
-		Aggressors02[2] = none					
-		Aggressors02[3] = none
-		Aggressor02Count = 0
-
-		Aggressors = new Actor[4]	
-		Aggressors[0] = none				
-		Aggressors[1] = none				
-		Aggressors[2] = none					
-		Aggressors[3] = none
-		AggressorCount = 0
-		/;
-			
-		;WE ONLY NEED A STRING with Group Name here. So we can add a String Function above. 
-		;we add a string Function that sets BLOCKED groups to "GroupArray = 2" 
-		
-		NymTrace("DEBUG SelectedGroup: "+SelectedGroup)
-		NymTrace("DEBUG RapersACount: "+RapersACount)
-		
-		;Fill Rapers in and Block selected Group
-		if (y == -1) || (SelectedGroup == "none")
-		DebugTrace("#ERROR - no Group available")
-		Aggressor02Count = 0
-	
-		elseif SelectedGroup == "RapersA"
-		GroupArray[0] = 2
-		FillAggressorGroup(SelectedGroup, RapersACount)	;#PRIO: FillAggressorGroup fills the Aggressors in AN checks the actors AND updates the OriginalGroup if required
-		humangroup = true
-		
-		elseif SelectedGroup == "RapersB"
-		GroupArray[1] = 2	
-		FillAggressorGroup(SelectedGroup, RapersBCount)
-		humangroup = true
-		
-		elseif SelectedGroup == "RapersC"
-		GroupArray[2] = 2
-		FillAggressorGroup(SelectedGroup, RapersCCount)
-		humangroup = true
-		
-		elseif SelectedGroup == "CreaturesA"
-		GroupArray[3] =	2
-		FillAggressorGroup(SelectedGroup, CreaturesACount)
-		creaturegroup = true
-		
-		elseif SelectedGroup == "CreaturesB"
-		GroupArray[4] =	2
-		FillAggressorGroup(SelectedGroup, CreaturesBCount)
-		creaturegroup = true
-		
-		elseif SelectedGroup == "CreaturesC"
-		GroupArray[5] =	2
-		FillAggressorGroup(SelectedGroup, CreaturesCCount)
-		creaturegroup = true
-	
-		elseif SelectedGroup == "CreaturesD"
-		GroupArray[6] =	2
-		FillAggressorGroup(SelectedGroup, CreaturesDCount)
-		creaturegroup = true
-
-		elseif SelectedGroup == "CreaturesE"
-		GroupArray[7] =	2
-		FillAggressorGroup(SelectedGroup, CreaturesECount)
-		creaturegroup = true
-
-		elseif SelectedGroup == "CreaturesF"
-		GroupArray[8] =	2
-		FillAggressorGroup(SelectedGroup, CreaturesFCount)
-		creaturegroup = true
-		endif 
-
-		if creaturegroup
-		PlayerHadCreatures = TRUE
-		endif 
-		
-		if AggressorCount == 0 
-			DebugTrace("SelectAggressor - AggressorCount == 0 --> Restart")
-			NymBox("SelectAggressor - AggressorCount == 0 --> Restart")
-		endif 
-	
-	;output is i which declares our group to use 
-		
-	;STAGE 0: Group assignment per Round
-	;STAGE 1: Check dead/3D Loaded and transfer to aggressors group for scene start
-	;STAGE 2: not exist atm :D
-	;STAGE 3: Reduce Animations by chance and MCM settings
-	;STAGE 4: Reduce Animations based on available Animations
-	;switch 3 and 4?
-
-	;-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-	;------- STAGE 0 ---- Manage which groups are used on which actor depending on the sex round (1, 2 or 3)
-
-	;-------------------------------------------------------------------------------------
-	;STAGE 1 - transfer actors to new group and check if dead or 3D loaded			#DEAD
-	
-	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #CHECK START")	
-	;>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 
-
-	;PROBLEM: we did not delete the sorted out actors....
-		
-	;check order:
-	;Aggressors02[3] checked first -- transfered as Aggressors[0]
-	;Aggressors[2] 
-	;Aggressors[1] 
-	;Aggressors[0] checked last
-	;NOTE Sorting is automatically done. We get the group sized down correctly if needed
-	
-		  
-
-	;-----------SCENARIO PREPARATION-----------------------------------------------------------------------------------------------------------------------------------
-	;yoke and rodeo reduce group to 1 for 2P scenes 
-	;reduce aggressorcount to 1 because we only have 2P yoke animations and want only 2P cowgirl etc. anims for rodeo
-	;PILLORY has 5P Anims from FunnyBiz but we might need to make special scenario for those.
-	;TEST PILLORY again
-
-	; THIS IS NO LONGER REQUIRED (AND NEVER WAS)
-	;if ((cfgqst.DefeatTypeScenario == "Yoke") && humangroup) || ((cfgqst.DefeatTypeScenario == "Stockade") && humangroup) || ((cfgqst.DefeatTypeScenario == "Wheel") && humangroup) || ((cfgqst.DefeatTypeScenario == "Rodeo") && humangroup) || ((cfgqst.DefeatTypeScenario == "Armbinder") && humangroup) || ((cfgqst.DefeatTypeScenario == "XCross") && humangroup) ;|| (cfgqst.DefeatTypeScenario == "Execution"); || ((cfgqst.DefeatTypeScenario == "Pillory") && humangroup)	;only if human group because we dont have creatureyoke (yet)				
-	;Aggressors[3] = None	
-	;Aggressors[2] = None					
-	;Aggressors[1] = None
-	;AggressorCount = 1						
-	;humangroup = false
-	;group = false
-	;endif
-	
-;-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-;------- STAGE 3 ---- Reduce RAPER GROUP SIZE based on MCM
-;-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-	
-	;if !HasForeplay ;foreplay is sorted later
-	
-		if AggressorCount == 4 
-			if D100(cfgqst.Group5Pchance)								;we have 5P
-			NymTrace("5P by chance")															;we remain with 5P
-			elseif D100(cfgqst.Group4Pchance)							;we have 4P
-			NymTrace("4P by chance")
-			Aggressors[3] = None	
-			AggressorCount = 3											;reduce group size to 3 for 4P
-			elseif D100(cfgqst.Group3Pchance)							;we have 3P
-			NymTrace("3P by chance")
-			Aggressors[3] = None	
-			Aggressors[2] = None
-			AggressorCount = 2											;reduce group size to 2 for 3P				
-			else 			;2P
-			NymTrace("2P by chance")
-			Aggressors[3] = None	
-			Aggressors[2] = None
-			Aggressors[1] = None
-			AggressorCount = 1											;reduce group size to 1 for 2P						
-			endIf						
-		elseif AggressorCount == 3	
-			if D100(cfgqst.Group4Pchance)						;4P
-			NymTrace("4P by chance")				;we remain with 4P
-			elseif D100(cfgqst.Group3Pchance)										;3P
-			NymTrace("3P by chance")
-			Aggressors[2] = None	
-			AggressorCount = 2		;reduce group size to 2 for 3P			
-			else 																;2P	
-			NymTrace("2P by chance")
-			Aggressors[2] = None
-			Aggressors[1] = None
-			AggressorCount = 1		;reduce group size to 1 for 2P						
-			endIf	
-		elseif AggressorCount == 2	
-			if D100(cfgqst.Group3Pchance)										;3P
-			NymTrace("3P by chance")										;we remain with 3P		
-			else 															;2P
-			NymTrace("2P by chance")
-			Aggressors[1] = None
-			AggressorCount = 1		;reduce group size to 1 for 2P						
-			endIf
-		endif	
-	
-	;-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-	;------- STAGE 4 ---- Reduce Animations based on available Animations
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	; ------ PLAYER	-----------------------------------------------------------------------------------------------------------------------------------
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	
-	if (VictimNumber == 0)
-
-			if HasForeplay
-			DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] PLAYER Group with Foreplay")
-			else 
-			DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] PLAYER Group")	
-			endif 
-
-	;bool NewSystem = true
-	
-	;sslBaseAnimation[] function GetCreatureAnimationsByRaceKeyTags(int ActorCount, string RaceKey, string Tags, string TagSuppress = "", bool RequireAll = true)
-	;return CreatureSlots.GetByRaceKeyTags(ActorCount, RaceKey, Tags, TagSuppress, RequireAll)
-	;endFunction
-
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	; ------ PLAYER	CREATURES-----------------------------------------------------------------------------------------------------------------------------------
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	
-		if creaturegroup
-		DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] creaturegroup ")
-		String raceID = MiscUtil.GetActorRaceEditorID(Aggressors[0]) 
-		String raceKey = sslCreatureAnimationSlots.GetRaceKeyByID(raceID) 
-		String CreatureTags = "Creature" 			
-		String CreatureTagsSuppress = "InvisFurn, Femdom, Loving, CreatureSub, CFF, FCC, FFCC, CCFF, CFFF, FFFC, "		
-		
-		GroupTypePlayer = raceKey
-		
-			;--- PLAYER - CREATURES - 5P ---;
-			if AggressorCount == 4           
-			
-				Animations4_IDs = cfgqst.SLPP_GetCreatureSceneIDs(5, RaceKey, CreatureTags, CreatureTagsSuppress, false)
-		
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] 5P creature animations found ("+ActorName+"): "+Animations4_IDs.Length)
-				if Animations4_IDs.Length < 1			
-				AggressorCount = 3
-				Aggressors[3] = None
-				endif
-			endif
-			
-			;--- PLAYER - CREATURES - 4P ---;
-			if AggressorCount == 3            
-			
-				Animations3_IDs = cfgqst.SLPP_GetCreatureSceneIDs(4, RaceKey, CreatureTags, CreatureTagsSuppress, false)
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] 4P creature animations found ("+ActorName+"): "+Animations3_IDs.Length)
-
-				if Animations3_IDs.Length < 1			
-				AggressorCount = 2
-				Aggressors[2] = None
-				endif
-			endif
-			
-			;--- PLAYER - CREATURES - 3P ---;
-			if AggressorCount == 2            
-
-				Animations2_IDs = cfgqst.SLPP_GetCreatureSceneIDs(3, RaceKey, CreatureTags, CreatureTagsSuppress, false)
-
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] 3P creature animations found ("+ActorName+"): "+Animations2_IDs.Length)
-				if Animations2_IDs.Length < 1			
-				AggressorCount = 1
-				Aggressors[1] = None
-				endif
-			endif
-			
-			;--- PLAYER - CREATURES - 2P ---;
-			if AggressorCount == 1            
-			
-				Animations1_IDs = cfgqst.SLPP_GetCreatureSceneIDs(2, RaceKey, CreatureTags, CreatureTagsSuppress, false)
-			
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] 2P creature animations found ("+ActorName+"): "+Animations1_IDs.Length)
-	
-				if Animations1_IDs.Length < 1			
-				AggressorCount = 0
-				Aggressors[0] = None
-					
-				 Debug.MessageBox("Naked Defeat #ERROR no suitable Creature Sex Animations Found for "+RaceKey+" Check your SLAL packs and SexLab Registration.")
-				 DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] #ERROR no suitable Creature Animations Found for "+RaceKey)
-				endif
-			endif
-		endif	
-			
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	; ------ PLAYER HUMANS ----------------------------------------------------------------------------------------------------------------------------------
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	
-		if humangroup	
-		 DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] humangroup")
-
-			;GetScenarioModifications(VictimNumber)		 ---> group size reduction is done in the Tag and Random System already, period	
-
-			;--- PLAYER - HUMANS - 5P ---;
-
-			GetSexTags(VictimNumber)	
-			if cfgqst.DefeatStateChapter == "Foreplay Scene"
-			DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] Group Tags FINAL FOREPLAY (Player): "+TagsWanted)
-			DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] Supressed Tags FINAL FOREPLAY (Player): "+TagsSuppressed)
-			else 
-			DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] Group Tags FINAL (Player): "+TagsWanted)
-			DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] Supressed Tags FINAL (Player): "+TagsSuppressed)
-			endif 
-			
-			if AggressorCount == 4   
-				Animations4_IDs = cfgqst.SLPP_GetSceneIDs(5, TagsWanted, TagsSuppressed, True)
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] 5P Animations Found: "+Animations4_IDs.Length)
-				if Animations4_IDs.Length < 1			;5P if 4 Aggressors and no 5P anims -> reduce Aggressors to 3
-				AggressorCount = 3
-				Aggressors[3] = None
-				endif 
-			endif
-			
-			;--- PLAYER - HUMANS - 4P ---;
-	
-			if AggressorCount == 3       
-				Animations3_IDs = cfgqst.SLPP_GetSceneIDs(4, TagsWanted, TagsSuppressed, True)
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] 4P Animations Found: "+Animations3_IDs.Length)
-				if Animations3_IDs.Length < 1				
-				AggressorCount = 2
-				Aggressors[2] = None
-				endif 
-			endif
-			;--- PLAYER - HUMANS - 3P ---;
-
-			if AggressorCount == 2      
-				Animations2_IDs = cfgqst.SLPP_GetSceneIDs(3, TagsWanted, TagsSuppressed, True)
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] 3P Animations Found: "+Animations2_IDs.Length)
-				if Animations2_IDs.Length  < 1			;3P if 2 Aggressors and no 3P anims -> reduce Aggressors to 1
-				AggressorCount = 1
-				Aggressors[1] = None
-				endif 
-			endif
-			
-			;--- PLAYER - HUMANS - 2P ---;
-
-			if AggressorCount == 1     
-				Animations1_IDs = cfgqst.SLPP_GetSceneIDs(2, TagsWanted, TagsSuppressed, True)
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] 2P Animations Found: "+Animations1_IDs.Length)
-				
-				if Animations1_IDs.Length < 1			;2P if 1 Aggressors and no 2P anims -> reduce Aggressors to 0
-				AggressorCount = 0
-				Aggressors[0] = None
-				DebugTrace("SelectAggressor["+ActorName+"][Round "+iFuckingRound+"] #ERROR - no suitable Animations found")
-				Debug.MessageBox("Naked Defeat #ERROR no suitable Sex Animations Found with the required Tags: "+TagsWanted+". Check your SLAL packs and SexLab Registration.")
-				endif
-			endif	
-		endif	
-		
-		if AggressorCount == 0 && cfgqst.DefeatStateChapter == "Foreplay Scene"
-		NymTrace("Naked Defeat #ERROR - no Foreplay Animations found. Import SLATE Nymra Action pack and run it in SLATE.")
-		Debug.Messagebox("Naked Defeat #ERROR - no Foreplay Animations found. Import SLATE Nymra Action pack and run it in SLATE.") 
-		elseif AggressorCount > 1 
-		PlayerHadGroup = true		;no further group size reduction after this?
-		endif 
-		
-		;PLAYER
-		;this removes the Raper[0] from the whipping Faction to make sure WhipQuest does catch a valid whipper
-		;this also adds to busy Faction to make sure other mods do not use the actor (SpecatorCrowdsCompatibility)
-	;	if (cfgqst.DefeatTypeScenario == "Rodeo") && Aggressors[0].IsInFaction(WhippingFaction)
-	;		Aggressors[0].RemoveFromFaction(WhippingFaction)
-	;		Aggressors[0].AddToFaction(BusyFaction)	
-	;	endif
-		
-		;	if cfgqst.ShowDebugMessages
-		;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: - Anim available for: "+AggressorCount)
-		;	Debug.Notification("NAKED DEFEAT -  Anim available for: "+AggressorCount)
-		;	i = AggressorCount
-		;	while i
-		;		i -= 1
-		;		Debug.Trace("NAKED DEFEAT - Select Aggressor Stage 4: Aggressor #"+i+": "+cfgqst.GetActorInfo(Aggressors[i])) ;traces the aggressors that were found
-		;		Debug.Notification("NAKED DEFEAT - Select Aggressor Stage 4: Aggressor #"+i+": "+cfgqst.GetActorInfo(Aggressors[i])) ;traces the aggressors that were found
-		;	endwhile
-		;endif
-
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	; ------ FOLLOWERS	-----------------------------------------------------------------------------------------------------------------------------------
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-		
-	elseif VictimNumber > 0  
-		
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	; ------ FOLLOWERS CREATURES	-----------------------------------------------------------------------------------------------------------------------------------
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-		if creaturegroup
-		String raceID = MiscUtil.GetActorRaceEditorID(Aggressors[0]) 
-		String raceKey = sslCreatureAnimationSlots.GetRaceKeyByID(raceID) 	
-		String CreatureTags = "Creature" 						
-		String CreatureTagsSuppress = "InvisFurn, Femdom, Loving, CreatureSub, CFF, FCC, FFCC, CCFF, CFFF, FFFC, "	
-		
-			;--- FOLLOWERS - CREATURES - 5P ---;	
-			if AggressorCount == 4           	 			
-				Animations4_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(5, RaceKey, CreatureTags, CreatureTagsSuppress, false)
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: 5P creature animations found ("+ActorName+"): "+Animations4_Follower01_IDs.Length)
-				if Animations4_Follower01_IDs.Length < 1			
-				AggressorCount = 3
-				Aggressors[3] = None
-				endif
-			endif	
-			;--- FOLLOWERS - CREATURES - 4P ---;
-			if AggressorCount == 3            		
-				Animations3_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(4, RaceKey, CreatureTags, CreatureTagsSuppress, false)
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: 4P creature animations found ("+ActorName+"): "+Animations3_Follower01_IDs.Length)
-				if Animations3_Follower01_IDs.Length < 1			
-				AggressorCount = 2
-				Aggressors[2] = None
-				endif
-			endif
-			;--- FOLLOWERS - CREATURES - 3P ---;
-			if AggressorCount == 2              	
-				Animations2_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(3, RaceKey, CreatureTags, CreatureTagsSuppress, false)
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: 3P creature animations found ("+ActorName+"): "+Animations2_Follower01_IDs.Length)
-				if Animations2_Follower01_IDs.Length < 1			
-				AggressorCount = 1
-				Aggressors[1] = None
-				endif
-			endif
-			;--- FOLLOWERS - CREATURES - 2P ---;
-			if AggressorCount == 1             		
-				Animations1_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(2, RaceKey, CreatureTags, CreatureTagsSuppress, false)
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: 2P creature animations found ("+ActorName+"): "+Animations1_Follower01_IDs.Length)
-				if Animations1_Follower01_IDs.Length < 1			
-				AggressorCount = 0
-				Aggressors[0] = None
-				endif
-			endif
-		endif	
-
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-	; ------ FOLLOWERS HUMANS	-----------------------------------------------------------------------------------------------------------------------------------
-	; ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-		if humangroup	
-		
-			if AggressorCount == 4            ;5P  	
-			GetSexTags(VictimNumber)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GroupTags Follower ("+ActorName+"): "+TagsWanted)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Supressed Tags Follower ("+ActorName+"): "+TagsSuppressed)
-							
-				Animations4_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(5, TagsWanted, TagsSuppressed, True)
-				if cfgqst.ShowDebugMessages
-				Debug.Notification("NAKED DEFEAT: 5-person animations found ("+ActorName+"): "+Animations4_Follower01_IDs.Length)
-				endif
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: 5-person animations found ("+ActorName+"): "+Animations4_Follower01_IDs.Length)
-				if Animations4_Follower01_IDs.Length < 1			
-				AggressorCount = 3
-				Aggressors[3] = None
-				else 
-				FollowerHadGroup = true
-				endif
-			endif
-
-			if AggressorCount == 3           ;4p
-			GetSexTags(VictimNumber)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GroupTags Follower ("+ActorName+"): "+TagsWanted)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Supressed Tags Follower ("+ActorName+"): "+TagsSuppressed)
-			
-				Animations3_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(4, TagsWanted, TagsSuppressed, True)
-				if cfgqst.ShowDebugMessages
-				Debug.Notification("NAKED DEFEAT: 4-person animations found ("+ActorName+"): "+Animations3_Follower01_IDs.Length)
-				endif
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: 4-person animations found ("+ActorName+"): "+Animations3_Follower01_IDs.Length)
-				if Animations3_Follower01_IDs.Length < 1				
-				AggressorCount = 2
-				Aggressors[2] = None
-				else 
-				FollowerHadGroup = true
-				endif
-			endif
-
-			if AggressorCount == 2            ;3P		
-			GetSexTags(VictimNumber)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GroupTags Follower ("+ActorName+"): "+TagsWanted)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Supressed Tags Follower ("+ActorName+"): "+TagsSuppressed)
-			
-				Animations2_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(3, TagsWanted, TagsSuppressed, True)
-				if cfgqst.ShowDebugMessages
-				Debug.Notification("NAKED DEFEAT: 3-person animations found ("+ActorName+"): "+Animations2_Follower01_IDs.Length)
-				endif
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: 3-person animations found ("+ActorName+"): "+Animations2_Follower01_IDs.Length)
-				if Animations2_Follower01_IDs.Length  < 1			;3P if 2 Aggressors and no 3P anims -> reduce Aggressors to 1
-				AggressorCount = 1
-				Aggressors[1] = None
-				else 
-				FollowerHadGroup = true
-				endif
-			endif
-			
-			if AggressorCount == 1            ;2P
-			GetSexTags(VictimNumber)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GroupTags Follower ("+ActorName+"): "+TagsWanted)
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Supressed Tags Follower ("+ActorName+"): "+TagsSuppressed)
-			
-				Animations1_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(2, TagsWanted, TagsSuppressed, True)
-				if cfgqst.ShowDebugMessages
-				Debug.Notification("NAKED DEFEAT: 2-person animations found ("+ActorName+"): "+Animations1_Follower01_IDs.Length)
-				endif
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: 2-person animations found ("+ActorName+"): "+Animations1_Follower01_IDs.Length)
-				if Animations1_Follower01_IDs.Length  < 1			;2P if 1 Aggressors and no 2P anims -> reduce Aggressors to 0
-				AggressorCount = 0
-				Aggressors[0] = None
-				endif
-			endif	
-		endif	
-		
-		;FOLLOWER
-		;this removes the Raper[0] from the whipping Faction to make sure WhipQuest does catch a valid whipper
-		;this also adds to busy Faction to make sure other mods do not use the actor (SpecatorCrowdsCompatibility)
-	;	if (cfgqst.DefeatTypeScenario == "Rodeo") && Aggressors[0].IsInFaction(WhippingFaction)
-	;		Aggressors[0].RemoveFromFaction(WhippingFaction)
-	;		Aggressors[0].AddToFaction(BusyFaction)	
-	;	endif
-	endif
-				
+Function SelectAggressor(int iFuckingRound, int VictimNumber)
+    string ActorName
+    int z
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: SelectAggressor START [Round: " + iFuckingRound + "/" + Allow_SexScenes + "] PlayerHadCreatures:" + PlayerHadCreatures, 0)
+    SelectedGroup = "None"
+    string CreatureGroupRace = "empty"
+    int y = 0
+    if Nym() && iFuckingRound > 1 && !(ForePlayGroup == "None")
+        NymMessage("#ERROR- Foreplaygroup should be none")
+    endif
+    if VictimNumber == 0
+        ActorName = "Player"
+    elseif VictimNumber == 1
+        ActorName = folqst.Name_Follower01
+    elseif VictimNumber == 2
+        ActorName = folqst.Name_Follower02
+    endif
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: SelectAggressor[" + ActorName + "][Round: " + iFuckingRound + "/" + Allow_SexScenes + "]", 0)
+    creaturegroup = false
+    humangroup = false
+    group = false
+    if WasForeplay
+        SelectedGroup = LastGroupPlayer
+    else
+        NymraCountsFunctions = NymraCountsFunctions + 1
+        string[] RandomGroupArray = new string[9]
+        RandomGroupArray[0] = "None"
+        RandomGroupArray[1] = "None"
+        RandomGroupArray[2] = "None"
+        RandomGroupArray[3] = "None"
+        RandomGroupArray[4] = "None"
+        RandomGroupArray[5] = "None"
+        RandomGroupArray[6] = "None"
+        RandomGroupArray[7] = "None"
+        RandomGroupArray[8] = "None"
+        int x = 0
+        int w = 0
+        bool GroupFound = false
+        bool UsePreselectedGroups = false
+        bool AllowHumanGroups = false
+        bool AllowCreatureGroups = false
+        if VictimNumber == 0 && HasForeplay
+            NymTrace("SelectAggressor([Round: " + iFuckingRound + "/" + Allow_SexScenes + "]) #ForePlayGroup - Pick Group for ForePlay")
+            w = 3
+        elseif VictimNumber == 0 && WasForeplay
+            w = 3
+            NymTrace("SelectAggressor([Round: " + iFuckingRound + "/" + Allow_SexScenes + "])  #ForePlayGroup (same Group for Rape 1)")
+        else
+            NymTrace("SelectAggressor([Round: " + iFuckingRound + "/" + Allow_SexScenes + "])")
+            w = 9
+        endif
+        if cfgqst.DefeatTypeGeneral == "AreAnimals" || cfgqst.DefeatTypeGeneral == "AreHumanoids"
+            if VictimNumber == 0 && (iFuckingRound < 2 || iFuckingRound == 2 && D100(50.0))
+                if CreaturesARace == cfgqst.DefeatType || CreaturesBRace == cfgqst.DefeatType || CreaturesCRace == cfgqst.DefeatType || CreaturesDRace == cfgqst.DefeatType || CreaturesERace == cfgqst.DefeatType || CreaturesFRace == cfgqst.DefeatType
+                    UsePreselectedGroups = true
+                    NymTrace("SelectAggressor([Round: " + iFuckingRound + "/" + Allow_SexScenes + "]) #Creatures Types (" + cfgqst.DefeatType + " Presorting")
+                    if CreaturesARace == cfgqst.DefeatType && GroupArray[3] == 1
+                        GroupArray[3] = 3
+                    endif
+                    if CreaturesBRace == cfgqst.DefeatType && GroupArray[4] == 1
+                        GroupArray[4] = 3
+                    endif
+                    if CreaturesCRace == cfgqst.DefeatType && GroupArray[5] == 1
+                        GroupArray[5] = 3
+                    endif
+                    if CreaturesDRace == cfgqst.DefeatType && GroupArray[6] == 1
+                        GroupArray[6] = 3
+                    endif
+                    if CreaturesERace == cfgqst.DefeatType && GroupArray[7] == 1
+                        GroupArray[7] = 3
+                    endif
+                    if CreaturesFRace == cfgqst.DefeatType && GroupArray[8] == 1
+                        GroupArray[8] = 3
+                    endif
+                endif
+            endif
+        endif
+        if VictimNumber == 0 && Allow_Creatures
+            NymTrace("SelectAggressor(A) [Round: " + iFuckingRound + "/" + Allow_SexScenes + "]")
+            if cfgqst.DefeatTypeGeneral == "AreHumans"
+                AllowHumanGroups = true
+                if iFuckingRound == 1
+                    NymTrace("SelectAggressor(E) [Round: " + iFuckingRound + "/" + Allow_SexScenes + "]")
+                    AllowCreatureGroups = false
+                elseif iFuckingRound == 2 && !PlayerHadCreatures
+                    AllowCreatureGroups = true
+                    if cfgqst.NymSpawning && CheckCreatureGroups() && cfgqst.AllowCreatures && !PlayerHadCreatures
+                        NymTrace("SelectAggressor(EE) [Round: " + iFuckingRound + "/" + Allow_SexScenes + "]")
+                        if Allow_SexScenes < 3
+                            AllowHumanGroups = false
+                        elseif D100(50.0)
+                            AllowHumanGroups = false
+                        endif
+                    endif
+                elseif iFuckingRound > 2 && CheckCreatureGroups() && cfgqst.AllowCreatures
+                    NymTrace("SelectAggressor(EEE) [Round: " + iFuckingRound + "/" + Allow_SexScenes + "]")
+                    if PlayerHadCreatures
+                        if Allow_SexScenes < 4
+                            AllowHumanGroups = true
+                            AllowCreatureGroups = false
+                        elseif D100(25.0)
+                            AllowHumanGroups = true
+                            AllowCreatureGroups = true
+                        else
+                            AllowHumanGroups = true
+                            AllowCreatureGroups = false
+                        endif
+                    elseif cfgqst.NymSpawning
+                        AllowHumanGroups = false
+                        AllowCreatureGroups = true
+                    endif
+                endif
+            elseif cfgqst.DefeatTypeGeneral == "AreHumanoids"
+                AllowCreatureGroups = true
+                if iFuckingRound == 1
+                    AllowHumanGroups = false
+                elseif iFuckingRound == 2 && RapersACount > 0
+                    AllowHumanGroups = true
+                elseif iFuckingRound == 2 && D100(25.0)
+                    AllowHumanGroups = true
+                endif
+            elseif cfgqst.DefeatTypeGeneral == "AreAnimals"
+                AllowCreatureGroups = true
+                if iFuckingRound == 1
+                    AllowHumanGroups = false
+                elseif iFuckingRound == 2 && D100(10.0)
+                    NymTrace("SelectAggressor(K) [Round: " + iFuckingRound + "/" + Allow_SexScenes + "]")
+                endif
+            else
+                NymTrace("SelectAggressor(L) [Round: " + iFuckingRound + "/" + Allow_SexScenes + "]")
+                AllowCreatureGroups = true
+                AllowHumanGroups = true
+            endif
+        else
+            NymTrace("SelectAggressor(M) [Round: " + iFuckingRound + "/" + Allow_SexScenes + "]")
+            AllowCreatureGroups = true
+            AllowHumanGroups = true
+        endif
+        NymTrace("SelectAggressor() [Round: " + iFuckingRound + "/" + Allow_SexScenes + "] AllowHumanGroups: " + AllowHumanGroups + " // AllowCreatureGroups: " + AllowCreatureGroups)
+        if UsePreselectedGroups
+            while x < w
+                if GroupArray[x] == 3
+                    GroupArray[x] = 1
+                    if x == 0 && AllowHumanGroups && UpdateGroup("RapersA")
+                        RandomGroupArray[y] = "RapersA"
+                        y = y + 1
+                    elseif x == 1 && AllowHumanGroups && UpdateGroup("RapersB")
+                        RandomGroupArray[y] = "RapersB"
+                        y = y + 1
+                    elseif x == 2 && AllowHumanGroups && UpdateGroup("RapersC")
+                        RandomGroupArray[y] = "RapersC"
+                        y = y + 1
+                    elseif x == 3 && AllowCreatureGroups && Allow_Creatures && UpdateGroup("CreaturesA")
+                        RandomGroupArray[y] = "CreaturesA"
+                        y = y + 1
+                    elseif x == 4 && AllowCreatureGroups && Allow_Creatures && UpdateGroup("CreaturesB")
+                        RandomGroupArray[y] = "CreaturesB"
+                        y = y + 1
+                    elseif x == 5 && AllowCreatureGroups && Allow_Creatures && UpdateGroup("CreaturesC")
+                        RandomGroupArray[y] = "CreaturesC"
+                        y = y + 1
+                    elseif x == 6 && AllowCreatureGroups && Allow_Creatures && UpdateGroup("CreaturesD")
+                        RandomGroupArray[y] = "CreaturesD"
+                        y = y + 1
+                    elseif x == 7 && AllowCreatureGroups && Allow_Creatures && UpdateGroup("CreaturesE")
+                        RandomGroupArray[y] = "CreaturesE"
+                        y = y + 1
+                    elseif x == 8 && AllowCreatureGroups && Allow_Creatures && UpdateGroup("CreaturesE")
+                        RandomGroupArray[y] = "CreaturesF"
+                        y = y + 1
+                    endif
+                endif
+                x = x + 1
+            endwhile
+        else
+            while x < w
+                if GroupArray[x] == 1
+                    if x == 0 && AllowHumanGroups
+                        RandomGroupArray[y] = "RapersA"
+                        y = y + 1
+                    elseif x == 1 && AllowHumanGroups
+                        RandomGroupArray[y] = "RapersB"
+                        y = y + 1
+                    elseif x == 2 && AllowHumanGroups
+                        RandomGroupArray[y] = "RapersC"
+                        y = y + 1
+                    elseif x == 3 && AllowCreatureGroups && Allow_Creatures
+                        RandomGroupArray[y] = "CreaturesA"
+                        y = y + 1
+                    elseif x == 4 && AllowCreatureGroups && Allow_Creatures
+                        RandomGroupArray[y] = "CreaturesB"
+                        y = y + 1
+                    elseif x == 5 && AllowCreatureGroups && Allow_Creatures
+                        RandomGroupArray[y] = "CreaturesC"
+                        y = y + 1
+                    elseif x == 6 && AllowCreatureGroups && Allow_Creatures
+                        RandomGroupArray[y] = "CreaturesD"
+                        y = y + 1
+                    elseif x == 7 && AllowCreatureGroups && Allow_Creatures
+                        RandomGroupArray[y] = "CreaturesE"
+                        y = y + 1
+                    elseif x == 8 && AllowCreatureGroups && Allow_Creatures
+                        RandomGroupArray[y] = "CreaturesF"
+                        y = y + 1
+                    endif
+                endif
+                x = x + 1
+            endwhile
+        endif
+        y = y - 1
+        if Nym()
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[0]: " + RandomGroupArray[0])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[1]: " + RandomGroupArray[1])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[2]: " + RandomGroupArray[2])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[3]: " + RandomGroupArray[3])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[4]: " + RandomGroupArray[4])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[5]: " + RandomGroupArray[5])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[6]: " + RandomGroupArray[6])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[7]: " + RandomGroupArray[7])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - RandomGroupArray[8]: " + RandomGroupArray[8])
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] - y =: " + y)
+        endif
+        if y == 0
+            z = 0
+        else
+            z = utility.RandomInt(0, y)
+        endif
+        SelectedGroup = RandomGroupArray[z]
+        if VictimNumber == 0
+            ActiveGroup_Player = RandomGroupArray[z]
+            LastGroupPlayer = RandomGroupArray[z]
+        endif
+    endif
+    DebugTrace("SelectAggressor[" + ActorName + "][Round: " + iFuckingRound + "/" + Allow_SexScenes + "] - Selected Group: " + SelectedGroup)
+    NymTrace("DEBUG [Round: " + iFuckingRound + "/" + Allow_SexScenes + "] SelectedGroup : " + SelectedGroup)
+    NymTrace("DEBUG [Round: " + iFuckingRound + "/" + Allow_SexScenes + "] RapersACount: " + RapersACount)
+    RaperRace = "NoRace"
+    if y == -1 || SelectedGroup == "None"
+        DebugTrace("#ERROR - no Group available")
+        Aggressor02Count = 0
+    elseif SelectedGroup == "RapersA"
+        GroupArray[0] = 2
+        FillAggressorGroup(SelectedGroup, RapersACount)
+        humangroup = true
+    elseif SelectedGroup == "RapersB"
+        GroupArray[1] = 2
+        FillAggressorGroup(SelectedGroup, RapersBCount)
+        humangroup = true
+    elseif SelectedGroup == "RapersC"
+        GroupArray[2] = 2
+        FillAggressorGroup(SelectedGroup, RapersCCount)
+        humangroup = true
+    elseif SelectedGroup == "CreaturesA"
+        GroupArray[3] = 2
+        FillAggressorGroup(SelectedGroup, CreaturesACount)
+        creaturegroup = true
+        CreatureGroupRace = CreaturesARace
+        RaperRace = CreatureGroupRace
+    elseif SelectedGroup == "CreaturesB"
+        GroupArray[4] = 2
+        FillAggressorGroup(SelectedGroup, CreaturesBCount)
+        creaturegroup = true
+        CreatureGroupRace = CreaturesBRace
+        RaperRace = CreatureGroupRace
+    elseif SelectedGroup == "CreaturesC"
+        GroupArray[5] = 2
+        FillAggressorGroup(SelectedGroup, CreaturesCCount)
+        creaturegroup = true
+        CreatureGroupRace = CreaturesCRace
+        RaperRace = CreatureGroupRace
+    elseif SelectedGroup == "CreaturesD"
+        GroupArray[6] = 2
+        FillAggressorGroup(SelectedGroup, CreaturesDCount)
+        creaturegroup = true
+        CreatureGroupRace = CreaturesDRace
+        RaperRace = CreatureGroupRace
+    elseif SelectedGroup == "CreaturesE"
+        GroupArray[7] = 2
+        FillAggressorGroup(SelectedGroup, CreaturesECount)
+        creaturegroup = true
+        CreatureGroupRace = CreaturesERace
+        RaperRace = CreatureGroupRace
+    elseif SelectedGroup == "CreaturesF"
+        GroupArray[8] = 2
+        FillAggressorGroup(SelectedGroup, CreaturesFCount)
+        creaturegroup = true
+        CreatureGroupRace = CreaturesFRace
+        RaperRace = CreatureGroupRace
+    endif
+    if creaturegroup
+        PlayerHadCreatures = true
+        NymTrace("PlayerHadCreatures [Round: " + iFuckingRound + "/" + Allow_SexScenes + "] -> is now gettig Fucked by [" + CreatureGroupRace + "] Creatures")
+    endif
+    if AggressorCount == 0
+        DebugTrace("SelectAggressor - AggressorCount == 0 --> Restart")
+        NymBox("SelectAggressor - AggressorCount == 0 --> Restart")
+    endif
+    if AggressorCount == 4
+        if D100(cfgqst.Group5Pchance)
+            NymTrace("5P by chance")
+        elseif D100(cfgqst.Group4Pchance)
+            NymTrace("4P by chance")
+            Aggressors[3] = None
+            AggressorCount = 3
+        elseif D100(cfgqst.Group3Pchance)
+            NymTrace("3P by chance")
+            Aggressors[3] = None
+            Aggressors[2] = None
+            AggressorCount = 2
+        else
+            NymTrace("2P by chance")
+            Aggressors[3] = None
+            Aggressors[2] = None
+            Aggressors[1] = None
+            AggressorCount = 1
+        endif
+    elseif AggressorCount == 3
+        if D100(cfgqst.Group4Pchance)
+            NymTrace("4P by chance")
+        elseif D100(cfgqst.Group3Pchance)
+            NymTrace("3P by chance")
+            Aggressors[2] = None
+            AggressorCount = 2
+        else
+            NymTrace("2P by chance")
+            Aggressors[2] = None
+            Aggressors[1] = None
+            AggressorCount = 1
+        endif
+    elseif AggressorCount == 2
+        if D100(cfgqst.Group3Pchance)
+            NymTrace("3P by chance")
+        else
+            NymTrace("2P by chance")
+            Aggressors[1] = None
+            AggressorCount = 1
+        endif
+    endif
+    if VictimNumber == 0
+        if HasForeplay
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] PLAYER Group with Foreplay")
+        else
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] PLAYER Group")
+        endif
+        if creaturegroup
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] creaturegroup [Race " + CreatureGroupRace + "] ")
+            string raceKey = CreatureGroupRace
+            if CreatureGroupRace == "Wolves" || CreatureGroupRace == "Dogs"
+                NymMessage("CreatureGroupRace was Wolves/Dogs - raceKey changed to Canines")
+                raceKey = "Canines"
+            endif
+            GetCreatureTags(raceKey)
+            GroupTypePlayer = raceKey
+            if AggressorCount == 4
+                Animations4_IDs = cfgqst.SLPP_GetCreatureSceneIDs(5, raceKey, CreatureTagsWanted, CreatureTagsSuppressed, false)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] 5P creature animations found (" + ActorName + "): " + Animations4_IDs.Length)
+                if Animations4_IDs.Length < 1
+                    AggressorCount = 3
+                    Aggressors[3] = None
+                endif
+            endif
+            if AggressorCount == 3
+                Animations3_IDs = cfgqst.SLPP_GetCreatureSceneIDs(4, raceKey, CreatureTagsWanted, CreatureTagsSuppressed, false)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] 4P creature animations found (" + ActorName + "): " + Animations3_IDs.Length)
+                if Animations3_IDs.Length < 1
+                    AggressorCount = 2
+                    Aggressors[2] = None
+                endif
+            endif
+            if AggressorCount == 2
+                Animations2_IDs = cfgqst.SLPP_GetCreatureSceneIDs(3, raceKey, CreatureTagsWanted, CreatureTagsSuppressed, false)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] 3P creature animations found (" + ActorName + "): " + Animations2_IDs.Length)
+                if Animations2_IDs.Length < 1
+                    AggressorCount = 1
+                    Aggressors[1] = None
+                endif
+            endif
+            if AggressorCount == 1
+                Animations1_IDs = cfgqst.SLPP_GetCreatureSceneIDs(2, raceKey, CreatureTagsWanted, CreatureTagsSuppressed, false)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] 2P creature animations found (" + ActorName + "): " + Animations1_IDs.Length)
+                if Animations1_IDs.Length < 1
+                    AggressorCount = 0
+                    Aggressors[0] = None
+                    debug.Messagebox("Naked Defeat #ERROR no suitable Creature Sex Animations Found for " + raceKey + " Check your SLAL packs and SexLab Registration.")
+                    DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] #ERROR no suitable Creature Animations Found for " + raceKey)
+                endif
+            endif
+        endif
+        if humangroup
+            if AggressorCount == 0 && cfgqst.DefeatStateChapter == "Foreplay Scene"
+                NymBox("Naked Defeat #ERROR 313 - no Rapers in Group - Skipping Scene.")
+            elseif AggressorCount > 1
+                PlayerHadGroup = true
+            endif
+            DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] humangroup")
+            GetSexTags(VictimNumber)
+            if cfgqst.DefeatStateChapter == "Foreplay Scene"
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] Group Tags FINAL FOREPLAY (Player): " + TagsWanted)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] Supressed Tags FINAL FOREPLAY (Player): " + TagsSuppressed)
+            else
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] Group Tags FINAL (Player): " + TagsWanted)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] Supressed Tags FINAL (Player): " + TagsSuppressed)
+            endif
+            if AggressorCount == 4
+                Animations4_IDs = cfgqst.SLPP_GetSceneIDs(5, TagsWanted, TagsSuppressed, true)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] 5P Animations Found: " + Animations4_IDs.Length)
+                if Animations4_IDs.Length < 1
+                    AggressorCount = 3
+                    Aggressors[3] = None
+                    GetSexTags(VictimNumber)
+                endif
+            endif
+            if AggressorCount == 3
+                Animations3_IDs = cfgqst.SLPP_GetSceneIDs(4, TagsWanted, TagsSuppressed, true)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] 4P Animations Found: " + Animations3_IDs.Length)
+                if Animations3_IDs.Length < 1
+                    AggressorCount = 2
+                    Aggressors[2] = None
+                    GetSexTags(VictimNumber)
+                endif
+            endif
+            if AggressorCount == 2
+                Animations2_IDs = cfgqst.SLPP_GetSceneIDs(3, TagsWanted, TagsSuppressed, true)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] 3P Animations Found: " + Animations2_IDs.Length)
+                if Animations2_IDs.Length < 1
+                    AggressorCount = 1
+                    Aggressors[1] = None
+                    GetSexTags(VictimNumber)
+                endif
+            endif
+            if AggressorCount == 1
+                Animations1_IDs = cfgqst.SLPP_GetSceneIDs(2, TagsWanted, TagsSuppressed, true)
+                DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] 2P Animations Found: " + Animations1_IDs.Length)
+                if Animations1_IDs.Length < 1
+                    AggressorCount = 0
+                    Aggressors[0] = None
+                    DebugTrace("SelectAggressor[" + ActorName + "][Round " + iFuckingRound + "] #ERROR - no suitable Animations found")
+                    debug.Messagebox("Naked Defeat #ERROR 103 no suitable Human Sex Animations Found with the required Tags: " + TagsWanted + ". Check your SLAL packs and SexLab Registration.")
+                endif
+            endif
+        endif
+        if AggressorCount == 0 && cfgqst.DefeatStateChapter == "Foreplay Scene"
+            NymTrace("Naked Defeat #ERROR - no Foreplay Animations found. Import SLATE Nymra Action pack and run it in SLATE.")
+            debug.Messagebox("Naked Defeat #ERROR - no Foreplay Animations found. Import SLATE Nymra Action pack and run it in SLATE.")
+        elseif AggressorCount > 1
+            PlayerHadGroup = true
+        endif
+    elseif VictimNumber > 0
+        if creaturegroup
+            string raceID = miscutil.GetActorRaceEditorID(Aggressors[0])
+            string mangled_racekey_2 = sslcreatureanimationslots.GetRaceKeyByID(raceID)
+            string CreatureTags = "Creature"
+            string CreatureTagsSuppress = "InvisFurn, InvFurn, Femdom, Loving, CreatureSub, CFF, FCC, FFCC, CCFF, CFFF, FFFC, "
+            if AggressorCount == 4
+                Animations4_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(5, mangled_racekey_2, CreatureTags, CreatureTagsSuppress, false)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: 5P creature animations found (" + ActorName + "): " + Animations4_Follower01_IDs.Length, 0)
+                if Animations4_Follower01_IDs.Length < 1
+                    AggressorCount = 3
+                    Aggressors[3] = None
+                endif
+            endif
+            if AggressorCount == 3
+                Animations3_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(4, mangled_racekey_2, CreatureTags, CreatureTagsSuppress, false)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: 4P creature animations found (" + ActorName + "): " + Animations3_Follower01_IDs.Length, 0)
+                if Animations3_Follower01_IDs.Length < 1
+                    AggressorCount = 2
+                    Aggressors[2] = None
+                endif
+            endif
+            if AggressorCount == 2
+                Animations2_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(3, mangled_racekey_2, CreatureTags, CreatureTagsSuppress, false)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: 3P creature animations found (" + ActorName + "): " + Animations2_Follower01_IDs.Length, 0)
+                if Animations2_Follower01_IDs.Length < 1
+                    AggressorCount = 1
+                    Aggressors[1] = None
+                endif
+            endif
+            if AggressorCount == 1
+                Animations1_Follower01_IDs = cfgqst.SLPP_GetCreatureSceneIDs(2, mangled_racekey_2, CreatureTags, CreatureTagsSuppress, false)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: 2P creature animations found (" + ActorName + "): " + Animations1_Follower01_IDs.Length, 0)
+                if Animations1_Follower01_IDs.Length < 1
+                    AggressorCount = 0
+                    Aggressors[0] = None
+                endif
+            endif
+        endif
+        if humangroup
+            if AggressorCount == 4
+                GetSexTags(VictimNumber)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GroupTags Follower (" + ActorName + "): " + TagsWanted, 0)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Supressed Tags Follower (" + ActorName + "): " + TagsSuppressed, 0)
+                Animations4_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(5, TagsWanted, TagsSuppressed, true)
+                if cfgqst.ShowDebugMessages
+                    debug.Notification("NAKED DEFEAT: 5-person animations found (" + ActorName + "): " + Animations4_Follower01_IDs.Length)
+                endif
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: 5-person animations found (" + ActorName + "): " + Animations4_Follower01_IDs.Length, 0)
+                if Animations4_Follower01_IDs.Length < 1
+                    AggressorCount = 3
+                    Aggressors[3] = None
+                else
+                    FollowerHadGroup = true
+                endif
+            endif
+            if AggressorCount == 3
+                GetSexTags(VictimNumber)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GroupTags Follower (" + ActorName + "): " + TagsWanted, 0)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Supressed Tags Follower (" + ActorName + "): " + TagsSuppressed, 0)
+                Animations3_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(4, TagsWanted, TagsSuppressed, true)
+                if cfgqst.ShowDebugMessages
+                    debug.Notification("NAKED DEFEAT: 4-person animations found (" + ActorName + "): " + Animations3_Follower01_IDs.Length)
+                endif
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: 4-person animations found (" + ActorName + "): " + Animations3_Follower01_IDs.Length, 0)
+                if Animations3_Follower01_IDs.Length < 1
+                    AggressorCount = 2
+                    Aggressors[2] = None
+                else
+                    FollowerHadGroup = true
+                endif
+            endif
+            if AggressorCount == 2
+                GetSexTags(VictimNumber)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GroupTags Follower (" + ActorName + "): " + TagsWanted, 0)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Supressed Tags Follower (" + ActorName + "): " + TagsSuppressed, 0)
+                Animations2_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(3, TagsWanted, TagsSuppressed, true)
+                if cfgqst.ShowDebugMessages
+                    debug.Notification("NAKED DEFEAT: 3-person animations found (" + ActorName + "): " + Animations2_Follower01_IDs.Length)
+                endif
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: 3-person animations found (" + ActorName + "): " + Animations2_Follower01_IDs.Length, 0)
+                if Animations2_Follower01_IDs.Length < 1
+                    AggressorCount = 1
+                    Aggressors[1] = None
+                else
+                    FollowerHadGroup = true
+                endif
+            endif
+            if AggressorCount == 1
+                GetSexTags(VictimNumber)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: GroupTags Follower (" + ActorName + "): " + TagsWanted, 0)
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Supressed Tags Follower (" + ActorName + "): " + TagsSuppressed, 0)
+                Animations1_Follower01_IDs = cfgqst.SLPP_GetSceneIDs(2, TagsWanted, TagsSuppressed, true)
+                if cfgqst.ShowDebugMessages
+                    debug.Notification("NAKED DEFEAT: 2-person animations found (" + ActorName + "): " + Animations1_Follower01_IDs.Length)
+                endif
+                debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: 2-person animations found (" + ActorName + "): " + Animations1_Follower01_IDs.Length, 0)
+                if Animations1_Follower01_IDs.Length < 1
+                    AggressorCount = 0
+                    Aggressors[0] = None
+                endif
+            endif
+        endif
+    endif
 EndFunction
 
 Bool FollowerHadGroup = false 
@@ -10576,7 +9142,7 @@ String Function GetSuppressedTags()
 	String sTags_supFURN_Temp
 	String sTags_supBINDS_Temp
 	sTags_supBASE_Temp = "LeadIn, GoldenShower, Futa, Femdom, 3jiou, Necro, Guro, Loving, Molag " 		;#tags
-	sTags_supFURN_Temp = "Furniture, XCross, Wall, InvisFurn, Bed, Stockade, Wheel, Pillory, BedOnly, Bench, Throne, WallHole " 		;#tags "Table" AND "Chair" ALLOWED FOR NOW
+	sTags_supFURN_Temp = "Furniture, XCross, Wall, InvisFurn, InvFurn,  Bed, Stockade, Wheel, Pillory, BedOnly, Bench, Throne, WallHole " 		;#tags "Table" AND "Chair" ALLOWED FOR NOW
 	sTags_supBINDS_Temp = "Yoke, Armbinder " 
 		
 	sTags_supALL_Temp = sTags_supBASE_Temp + sTags_supFURN_Temp + sTags_supBINDS_Temp
@@ -10587,6 +9153,101 @@ EndFunction
 
 ;:::::::::::::::::::::: FOREPLAY FUNCTIONS START ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+
+Function SchlongifyRapers()
+
+	NymTrace("SchlongifyRapers()")
+		CreatureFramework CFqst = Quest.GetQuest("CFQuestFramework") as CreatureFramework
+         ;   MilkQUEST MilkQ = Quest.GetQuest("MME_MilkQUEST") as MilkQUEST
+         ;   MilkQ.AssignSlot(PlayerRef)
+
+		;where 'milkquest' is the script name attached to the quest 'MME_MilkQuest' and 'assignslot' the function to call from said script
+
+	if Rapers[0]
+	NymTrace("SchlongifyRapers(Rapers[0])")
+	CFqst.ActivateActorA(Rapers[0], true)
+	endif 
+	if Rapers[1]
+	NymTrace("SchlongifyRapers(Rapers[1])")
+	CFqst.ActivateActorA(Rapers[1], true)
+	endif 
+	if Rapers[2]
+	NymTrace("SchlongifyRapers(Rapers[2])")
+	CFqst.ActivateActorA(Rapers[2], true)
+	endif 
+	if Rapers[3]
+	NymTrace("SchlongifyRapers(Rapers[3])")
+	CFqst.ActivateActorA(Rapers[3], true)
+	endif 
+	
+EndFunction 
+	
+;/
+Function ForceSchlongOnCreature(actor akActor)
+	NymTrace("ForceSchlongOnCreature()")
+
+; Change the actor's arousal state, used in almost everything.
+; SexLabState: 0=not active, 1=playing animation.
+; Flags: 0=Creature not aroused, 1=Creature is aroused.
+;function ChangeArousal(Int CreatureI, Int SexLabState, Bool ForceChange)
+
+
+		string activeMod = JMap.GetStr(ACreaturesMaps[CreatureI], "activeMod")
+		if activeMod
+		NymTrace("ForceSchlongOnCreature(activeMod)")
+			int creatureModMap = JMap.GetObj(JMap.GetObj(ACreaturesMaps[CreatureI], "mods"), activeMod)
+			int creatureModType = JMap.GetInt(creatureModMap, "type")
+			int jRestrictedSlots = JMap.GetObj(creatureModMap, "restrictedSlots")
+			bool stripArmor = JMap.GetInt(creatureModMap, "stripArmor") as bool
+			bool stripWeapons = JMap.GetInt(creatureModMap, "stripWeapons") as bool
+			; Ensure the restricted slots are empty if necessary
+		;	if !(SexLabState && stripArmor) && CreatureFrameworkUtil.ActorHasAnyEquippedSlot(thisCreature, jRestrictedSlots)
+		;		AFlags[CreatureI] = NewFlag
+		;		rcGuard = false
+		;		return
+		;	endIf
+			; Strip/restore armour if we came from sex
+		;	if SexLabState
+		;		if IsCreature(thisCreature)
+		;			if SexLabState == 1 && NewFlag == 1
+		;				StripA(thisCreature, creatureModMap, stripArmor, stripWeapons)
+		;			else
+		;				EquipA(thisCreature, stripArmor, stripWeapons)
+		;			endif
+		;		else
+		;			SexLabState = 0
+		;		endif
+		;	endif
+		
+			; Handle the armour swap
+			if creatureModType == 1
+			NymTrace("ForceSchlongOnCreature(creatureModType == 1)")
+				;if true  ;MadMansGun: BadDog changed it to "true" from "ForceChange || !OldFlag || !NewFlag" but i'm unsure about this.
+					Armor normalArmor
+					Armor arousedArmor
+					
+					normalArmor = JMap.GetForm(creatureModMap, "normalArmor") as Armor
+					arousedArmor = JMap.GetForm(creatureModMap, "arousedArmor") as Armor
+		
+
+					RemoveArmors(akActor)
+					
+					Utility.Wait(0.05)
+				;	if NewFlag
+					CreatureFrameworkUtil.AddAndEquipArmor(akActor, arousedArmor)
+				;	else
+					;		if normalArmor
+					;			CreatureFrameworkUtil.AddAndEquipArmor(akActor, normalArmor)
+					;		endIf
+					;	endif
+
+				;endif
+			endif
+	endif 
+
+EndFunction 
+
+/;
 
 String ActiveGroup_Player = "empty"
 
@@ -10678,13 +9339,51 @@ Function OnForeplayEnding(String EventName, String ArgString, Float ArgNum, Form
 	UnregisterForModEvent("AnimationEnding_NadeForeplay")	
 EndFunction	
 
+
+Function FixRaperHardness()
+	
+	NymTrace("FixRaperHardness()")
+
+	if Nym()
+		if (Rapers[0])
+		storqst.FixCreatureSkin_HARD(Rapers[0])
+		endif  
+		if (Rapers[1])
+		storqst.FixCreatureSkin_HARD(Rapers[1])
+		endif 
+		if (Rapers[2])
+		storqst.FixCreatureSkin_HARD(Rapers[2])
+		endif 
+		if (Rapers[3])
+		storqst.FixCreatureSkin_HARD(Rapers[3])
+		endif 
+	endif 
+
+
+EndFunction 
+
+
+Function MoveActorsAway()
+
+	
+
+
+EndFunction 
+
 Function OnAnimationStart(String EventName, String ArgString, Float ArgNum, Form Sender)	
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnAnimationStart("+EventName+")")
 		
+	;2nd Event
 	;IMPORTANT NOTE: THIS EVENT FIRES SECOND (after AnimationStarting)
-	if EventName == "AnimationStart_NadeRape"
+		
+	if EventName == "AnimationStart_NadeRape"	;#FIXFADE
 	;Utility.Wait(8.0)
-	Utility.Wait(4.0)
+	Utility.Wait(4.0)		;6 was too short... Try 10	 ;BACK to 6 due to BUG causing this
+		if storqst.IsHeelsEffectOn(cfgqst.PlayerRef)
+		NymMessage("HEELS EFFECT ON")
+		endif 
+	Utility.Wait(1.0)	
+
 	cfgqst.FadeToBlack(false)
 	;OOOOOOOOOOOOOoooooooooooooooo............	FADE IN ...............................................................................................
 	GetIsMouthAvailable()
@@ -10692,8 +9391,11 @@ Function OnAnimationStart(String EventName, String ArgString, Float ArgNum, Form
 	UnregisterForModEvent("AnimationStart_NadeRape")
 	
 	elseif EventName == "AnimationStart_NadeForeplay"
-	Utility.Wait(5.0)
+	
+	NymTrace("FadeBlack CHECK 111 A")
+	Utility.Wait(6.0)
 	cfgqst.FadeToBlack(false)
+	NymTrace("FadeBlack CHECK 111 B")
 	;OOOOOOOOOOOOOoooooooooooooooo............	FADE IN ...............................................................................................
 	UnregisterForModEvent("AnimationStart_NadeForeplay")
 	endif
@@ -10703,11 +9405,20 @@ EndFunction
 
 Function OnAnimationStarting(String EventName, String ArgString, Float ArgNum, Form Sender)	
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnAnimationStarting("+EventName+")")
+
+	;1st Event 
+	
 	;IMPORTANT NOTE: THIS EVENT FIRES FIRST (before AnimationStart)
 	if EventName == "AnimationStarting_NadeRape"
 	
+	if Nym()	;#FIXFADE
+	;do nothing 
+	else 
+	NymTrace("FadeBlack CHECK 333 A")
 	Utility.Wait(8.0) ;make External JSON #external
 	cfgqst.FadeToBlack(false)
+	NymTrace("FadeBlack CHECK 333 B")
+	endif 
 	;OOOOOOOOOOOOOoooooooooooooooo............	FADE IN ...............................................................................................
 	
 	UnregisterForModEvent("AnimationStarting_NadeRape")
@@ -10741,23 +9452,24 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplay (Playe
 		;#GUIDE: chooses the Foreplay Animations from Nymras Forced Foreplay SLAL pack. Ignores all other foreplay scenes because there are like 2...
 		;unbound foreplay
 		
-		String[] AnimationsForeplayName_IDs = new String[1] 	;#SLPP scene ID instead of a legacy object
-
+		sslBaseAnimation[] AnimationsForeplayName = new sslBaseAnimation[1]
+		
 	;	anims[0] = SexLab.GetAnimationByName("(Dog) LeitoDogCunni")
-
-			;SIGH.....
+		
+			;SIGH..... 
 			if cfgqst.IsNymrasGame()		;ANIMATIONSbyNAME (for Foreplay and stuff)
-			AnimationsForeplayName_IDs[0] = SexlabRegistry.GetSceneByName("Billyy Sitting Fingering") 	;#SLPP GetAnimationByName does not exist in P+
+			AnimationsForeplayName[0] = SexLab.GetAnimationByName("Billyy Sitting Fingering")
+			(SexLab.GetAnimationByName("Billyy Sitting Fingering"))
 			;bound foreplay (cuffs only. might add yoke/etc. one day)
 			elseif cfgqst.DefeatStateBindings == "Cuffs"
-			AnimationsForeplay_IDs = cfgqst.SLPP_GetSceneIDs(2, "NymGroping, Cuffs", "", True)
+			AnimationsForeplay = SexLab.GetAnimationsByTags(2, "NymGroping, Cuffs", "", True)
 			else
 			cfgqst.DefeatBindsEquipped == "none"				;tags		 ;supress
-			AnimationsForeplay_IDs = cfgqst.SLPP_GetSceneIDs(2, "NymGroping", "Cuffs", True)
+			AnimationsForeplay = SexLab.GetAnimationsByTags(2, "NymGroping", "Cuffs", True)	
 			endif
 		
 		
-		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: foreplay animations found (Player): "+AnimationsForeplay_IDs.Length)
+		Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: foreplay animations found (Player): "+AnimationsForeplay.Length)
 
 		sslThreadModel Thread = SexLab.NewThread()							;THIS CREATES THE SEXLAB THREAD	
 			
@@ -10782,22 +9494,22 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplay (Playe
 			if Thread && (Thread.AddActor(cfgqst.PlayerRef, true) >= 0) && (Thread.AddActor(Rapers[0], false) >= 0)			;makes Thread with PC and Aggressor(0)
 ;
 				if cfgqst.IsNymrasGame(); ----- was needed for running anims by name. nothing worked, error was elsewehere
-
-				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsForeplayName_IDs)) 	;#SLPP
+				
+				Thread.SetForcedAnimations(AnimationsForeplayName)
 				;Thread.SetForcedAnimations(SexLab.GetByName("Billyy Sitting Fingering"))	;SLU+ this is why we need it to overwrite the COmpile Scripts
 			;	Thread.SetForcedAnimations(SexLab.GetBySlot(SexLab.GetAnimationByName("Billyy Sitting Fingering"))) ;GetBySlot not exist...
 			;	Thread.SetForcedAnimations(SexLab.GetAnimationByName("Billyy Sitting Fingering"))	;TYPE MISMATCH FUCK YOU
 			
 			
 				else
-				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsForeplay_IDs))	
+				Thread.SetForcedAnimations(AnimationsForeplay)	
 				endif				
 			
 				
 				Thread.DisableAllOrgasms(true)
 				Thread.DisableLeadIn(true)
 				if cfgqst.ModSLUplus
-				Thread.SetFurnitureStatus(0)	;#P+ SLU+ DisableFurnitureUse(true) has no P+ equivalent; furniture is controlled by SetFurnitureStatus (0 = disabled, same as P+ DisableBedUse(true))
+				Thread.DisableFurnitureUse(true)
 				endif
 				Thread.CenterOnObject(VehiclePlayer)			
 				Thread.DisableBedUse(true)
@@ -10875,10 +9587,7 @@ Bool Function IsSexAnimationAvailable(String sAnimName)
 
 	int iAnimFound = 0
 
-	iAnimFound = 0 	;#SLPP FindAnimationByName does not exist in P+ - resolve via the registry
-	if SexlabRegistry.GetSceneByName(sAnimName) != ""
-	iAnimFound = 1
-	endif
+	iAnimFound = Sexlab.FindAnimationByName(sAnimName)
 	NymMessage("#NOTE: iAnimFound: "+iAnimFound)
 
 	if iAnimFound <= 0 ; || iAnimFound == 0
@@ -10941,7 +9650,7 @@ Function StartForeplayNew(Actor akAggressor)		;#foreplay	#leadin	#StartForeplayN
 Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplayNew(Player)")
 		;cfgqst.FadeToBlack(true)
 		;HasForeplay
-		String[] AnimationsForeplayName_IDs = new String[1] 	;#SLPP scene ID instead of a legacy object
+		sslBaseAnimation[] AnimationsForeplayName = new sslBaseAnimation[1]
 		
 		int ForePlayerCount = 0	;this sets the group size, nothing else
 		String ForePlaySelected
@@ -11255,10 +9964,7 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplayNew(Pla
 				
 				;NymMessage("AnimationsForeplayName: "+AnimationsForeplayName.Length)	;Lenght is 1 !!! 
 				int iAnimFound = 0
-				iAnimFound = 0 	;#SLPP FindAnimationByName does not exist in P+ - resolve via the registry
-					if SexlabRegistry.GetSceneByName(ForePlaySelected) != ""
-					iAnimFound = 1
-					endif
+				iAnimFound = Sexlab.FindAnimationByName(ForePlaySelected)
 				NymMessage("iAnimFound: "+iAnimFound)
 				
 				;if AnimationsForeplayName.Length < 1
@@ -11286,10 +9992,7 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplayNew(Pla
 					endif 
 				else 
 				
-				iAnimFound = 0 	;#SLPP FindAnimationByName does not exist in P+ - resolve via the registry
-					if SexlabRegistry.GetSceneByName(ForePlaySelected) != ""
-					iAnimFound = 1
-					endif
+				iAnimFound = Sexlab.FindAnimationByName(ForePlaySelected)
 				NymMessage("iAnimFound: "+iAnimFound)
 				
 					if iAnimFound <= 0
@@ -11304,7 +10007,7 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplayNew(Pla
 				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Foreplay Found: "+ForePlaySelected)
 				
 				
-				AnimationsForeplayName_IDs[0] = SexlabRegistry.GetSceneByName(ForePlaySelected) 	;#SLPP GetAnimationByName does not exist in P+
+				AnimationsForeplayName[0] = SexLab.GetAnimationByName(ForePlaySelected)
 				
 			;	if cfgqst.IsNymrasGame()
 			;	ScreenMessage("ForePlaySelected: "+ForePlaySelected)
@@ -11314,11 +10017,11 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplayNew(Pla
 		
 			;2P cuffs ;OLD DELETE (TAG BASED)
 			elseif cfgqst.DefeatStateBindings == "Cuffs"
-			AnimationsForeplay_IDs = cfgqst.SLPP_GetSceneIDs(2, "NymGroping, Cuffs", "", True)
+			AnimationsForeplay = SexLab.GetAnimationsByTags(2, "NymGroping, Cuffs", "", True)
 			;2P unbound ;OLD DELETE (TAG BASED)
 			else
 			cfgqst.DefeatBindsEquipped == "none"				;tags		 ;supress
-			AnimationsForeplay_IDs = cfgqst.SLPP_GetSceneIDs(2, "NymGroping", "Cuffs", True)
+			AnimationsForeplay = SexLab.GetAnimationsByTags(2, "NymGroping", "Cuffs", True)	
 			endif
 			
 	;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: foreplay(2P) animations found (Player): "+AnimationsForeplay.Length)
@@ -11373,11 +10076,11 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplayNew(Pla
 				;new Foreplay by name
 				if StartForeplayByName; ----- was needed for running anims by name. nothing worked, error was elsewehere
 				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SetForcedAnimations")
-				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsForeplayName_IDs)) 	;#SLPP
+				Thread.SetForcedAnimations(AnimationsForeplayName)
 				
 				;old Foreplay by Tag (keep?!)
 				else
-				Thread.SetForcedAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsForeplay_IDs))	
+				Thread.SetForcedAnimations(AnimationsForeplay)	
 				endif	
 				
 				;else
@@ -11418,7 +10121,7 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartForeplayNew(Pla
 				Thread.DisableAllOrgasms(true)
 				Thread.DisableLeadIn(true)
 				if cfgqst.ModSLUplus
-				Thread.SetFurnitureStatus(0)	;#P+ SLU+ DisableFurnitureUse(true) has no P+ equivalent; furniture is controlled by SetFurnitureStatus (0 = disabled, same as P+ DisableBedUse(true))
+				Thread.DisableFurnitureUse(true)
 				endif
 				Thread.CenterOnObject(VehiclePlayer)			
 				Thread.DisableBedUse(true)
@@ -11470,6 +10173,7 @@ EndFunction
 ;:::::::::::::::::::::: FOREPLAY FUNCTIONS END ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 	
 Bool WasForeplay	
+;Bool DisableHeelsForSex = false
 int SexRound = 0
 ;Bool DoubleStart = False 	
 
@@ -11483,11 +10187,38 @@ NymTrace("::::::::::: StartRape (Player, [#SexRound: "+SexRound+"] ForePlayStage
 		Bool StartSex = true
 		SexSceneStatus = 1 ;starting
 
-		if cfgqst.HeelsFix
-			cfgqst.RestoreHeelsEffectOnActor(cfgqst.PlayerRef, 11463)	;put HeelsEffect back on so Sexlab can do its thing
-			Utility.Wait(0.5)
-		endif 
+		if Nym()
 		
+			if CHECK_Aftermath_running
+			NymBox("ERROR - Start Rape but CHECK_Aftermath_running")
+			endif 
+			
+			if !CHECK_RapeSequence_running
+			NymBox("ERROR - Start Rape but CHECK_RapeSequence_running = FALSE!!!")
+			endif 
+			
+			if IsEndOfDefeat
+			NymBox("ERROR - Start Rape but IsEndOfDefeat = TRUE!!!")
+			endif 
+
+			if (cfgqst.DefeatStateChapter == "EscapeGame") || (cfgqst.DefeatStatePlayer == "Punished in Furniture")
+			NymBox("ERROR - Start Rape but Captured already "+cfgqst.DefeatStateChapter+" "+cfgqst.DefeatStatePlayer)
+			endif
+			
+		;do FUCKING nothing
+		
+		elseif cfgqst.HeelsFix 
+		
+		;	if Nym()
+			;we currently disABLED Heels Effect restoration. We do NOT allow Sexlab to handle this and instead handle it all ourselves
+			;Hence the Removed Heels effect remains removed during these Scenes (check for other scenes too)
+		;	else
+			cfgqst.RestoreHeelsEffectOnActor(cfgqst.PlayerRef, "StartRape() Restore for SexLab compatibility")	;put HeelsEffect back on so Sexlab can do its thing
+		;	Utility.Wait(1.0)
+		;	endif	
+		
+		endif 
+
 		if cfgqst.SexScene && !WasForeplay
 		ScreenMessage("#ERROR: Sex Scene Running- Double Start?")
 		NymBox("#ERROR: Sex Scene Running- Double Start?")
@@ -11601,6 +10332,7 @@ NymTrace("::::::::::: StartRape (Player, [#SexRound: "+SexRound+"] ForePlayStage
 				Thread.SetVictim(cfgqst.PlayerRef, true)
 				
 				storqst.SexStartMaintenance(2)
+				storqst.SexFuckingPartners += 1
 				;defqst.SexDuration = 0
 				;cfgqst.SexScene = true
 				;cfgqst.SexState = 2	;SEX 
@@ -11610,12 +10342,15 @@ NymTrace("::::::::::: StartRape (Player, [#SexRound: "+SexRound+"] ForePlayStage
 				int i = 1
 					if (RaperCount > 1) && Rapers[1] && (Thread.AddActor(Rapers[1], false) >= 0) ;2 or more aggressors ;if count is 2 and aggressor[1] is there and its not in the thread, count +1
 						i += 1
+						storqst.SexFuckingPartners += 1
 						;i = 2
 						if (RaperCount > 2) && Rapers[2] && (Thread.AddActor(Rapers[2], false) >= 0) ;3 or more aggressors ;if count is 3 and aggressor[2] is there and its not in the thread, count +1
 							i += 1
+							storqst.SexFuckingPartners += 1
 							;i = 3	
 							if (RaperCount > 3) && Rapers[3] && (Thread.AddActor(Rapers[3], false) >= 0) ;4 aggressors	;if count is 4 and aggressor[3] is there and its not in the thread, count +1
 								i += 1
+								storqst.SexFuckingPartners += 1
 								;i = 4
 							endif
 						endif
@@ -11643,7 +10378,17 @@ NymTrace("::::::::::: StartRape (Player, [#SexRound: "+SexRound+"] ForePlayStage
 					Thread.SetFurnitureStatus(0)	;#P+ SLU+ DisableFurnitureUse(true) has no P+ equivalent; furniture is controlled by SetFurnitureStatus (0 = disabled, same as P+ DisableBedUse(true))
 					endif
 					
-					Thread.CenterOnObject(VehiclePlayer)			
+					if !VehiclePlayer
+					NymBox("WARNING - NO VEHICLE")
+					endif 
+					
+				;	if Nym()
+					;SEXLAB UTIL BROKEN!!!!
+				;	else 
+					Nymtrace("#SEXLAB CHECKUP 11878")
+					Thread.CenterOnObject(VehiclePlayer)	
+				;	endif 
+					
 					Thread.DisableBedUse(true)
 					
 					if cfgqst.NakedCumming
@@ -11775,14 +10520,18 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartGropeStrip()")
 		endif 
 		
 		SendModEvent("StartRaperExpressions")
-
-
-			if cfgqst.HeelsFix
+			
+			
+			if Nym()
+			
+			;do NOTHING
+			
+			elseif cfgqst.HeelsFix
 			
 			;	if Nym() && !IsHumanFucker ; HeelsFix_Sexlab
 				;do nothing - we take over from Sexlab
 			;	else 
-				cfgqst.RestoreHeelsEffectOnActor(cfgqst.PlayerRef, 11761)	;put HeelsEffect back on so Sexlab can do its thing
+				cfgqst.RestoreHeelsEffectOnActor(cfgqst.PlayerRef, "StartGropeStripFast() Restore for SexLab compatibility")	;put HeelsEffect back on so Sexlab can do its thing
 				Utility.Wait(0.5)
 			;	endif 
 			endif 
@@ -11919,15 +10668,28 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartSexFast("+FastS
 
 		;String FastSexTypeTemp = "none"
 		;Actor FastSexPartnerTemp = FastSexPartner
-
-			if cfgqst.HeelsFix
 			
-				;if Nym() && !IsHumanFucker ; HeelsFix_Sexlab
+			if Nym()
+			
+				if storqst.IsHeelsEffectOn(Rapers[0])
+				cfgqst.DisableHeelsEffectOnActor(Rapers[0], "StartSexFast() Rapers[0] disable HeelsEffect")
+				endif 
+				
+			elseif cfgqst.HeelsFix
+			
+			;	if Nym()		;DISABLED 09-2026 - HeelsCheckup
+			;	
+			;	endif 
+			
+			;	if Nym() && !IsHumanFucker ; HeelsFix_Sexlab	;DISABLED 09-2026 - HeelsCheckup
 				;do nothing - we take over from Sexlab
-				;else 
-				cfgqst.RestoreHeelsEffectOnActor(cfgqst.PlayerRef, 11904)	;put HeelsEffect back on so Sexlab can do its thing
+						;put HeelsEffect back on so Sexlab can do its thing
+					;Utility.Wait(0.5)
+				
+			;	else 	;DISABLED 09-2026 - HeelsCheckup
+				cfgqst.RestoreHeelsEffectOnActor(cfgqst.PlayerRef, "StartSexFast() for Sexlab compatibility")	;put HeelsEffect back on so Sexlab can do its thing
 				Utility.Wait(0.5)
-				;endif 
+			;	endif 
 			endif 
 		
 	;	cfgqst.SexScene = true 
@@ -11979,7 +10741,6 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartSexFast("+FastS
 			endif 
 		endif 
 
-		
 		sslThreadModel Thread = SexLab.NewThread()							;THIS CREATES THE SEXLAB THREAD				
 
 		if Thread && (Thread.AddActor(cfgqst.PlayerRef, true) >= 0) && (Thread.AddActor(Rapers[0], false) >= 0)			;makes Thread with PC and Aggressor(0)
@@ -12076,7 +10837,32 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartSexFast("+FastS
 						CageTags = FastSexSubType	
 						endif 
 						
-						if FastSexSubType == "Human" 
+						if FastSexSubType == "Eat Carrot"
+						;Animations1 = SexLab.GetCreatureAnimationByName("Billyy (Horse) Doggy 2")
+						
+						;	sslBaseAnimation[] AnimationsCheck
+						;	AnimationsCheck = SexLab.GetAnimationsByTags(2, "NymCarrot, ", "", true)
+
+							
+						;	if AnimationsCheck.Length > 0
+						;	Animations1 = SexLab.GetAnimationsByTags(2, "NymCarrot", "" , True)
+							
+							;Animations1 = SexLab.GetCreatureAnimationsByRaceKeyTags(2, "NymCarrot", "Horse", "", false)
+							Animations1_IDs = cfgqst.SLPP_GetCreatureSceneIDs(2, "Horses", "NymCarrot", "", True)
+							;sslBaseAnimation[] function GetCreatureAnimationsByRaceKeyTags(int ActorCount, string RaceKey, string Tags, string TagSuppress = "", bool RequireAll = true)
+							
+							
+							NymTrace("Animations1_IDs.Length: "+Animations1_IDs.Length)
+							
+					;	if Animations1.Length == 0
+					;	Animations1 = SexLab.GetCreatureAnimationsByRaceKeyTags(2, "Horse", "Creature", CageSuppressedTags, false)
+					;	endif
+							
+						;	else
+						;	Animations1 = SexLab.GetAnimationsByTags(2, "Horse", CageSuppressedTags , True)
+						;	endif 
+							
+						elseif FastSexSubType == "Human" 
 						Animations1_IDs = cfgqst.SLPP_GetSceneIDs(2, CageTags, CageSuppressedTags , True)	;TRUE: all Tags in "CageTags" are required to match
 						else
 						Animations1_IDs = cfgqst.SLPP_GetCreatureSceneIDs(2, CageTags, "Creature", CageSuppressedTags, True)	;TRUE: all Tags in "CageTags" are required to match
@@ -12110,9 +10896,7 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartSexFast("+FastS
 					endif 
 					
 					Thread.DisableBedUse(true)
-					
-
-		
+				
 					if !AllowOrgasmsInThread || cfgqst.DefeatStateChapter == "Foreplay Scene"
 					Thread.DisableAllOrgasms(true)
 					Thread.SetHook("NadeForeplay")
@@ -12212,7 +10996,9 @@ SolosRunning -= 1
 
 /;
 	if cfgqst.DefeatStateChapter == "Golden Shower"			
-	cfgqst.Pee(Rapers[0], false)
+	;cfgqst.Pee(Rapers[0], false)
+	RemovePee(Rapers[0], 0)
+	storqst.ProtectActor(Rapers[0], false)
 	endif 
 
 
@@ -12250,7 +11036,9 @@ SolosRunning -= 1
 
 
 	if cfgqst.DefeatStateChapter == "Golden Shower"			
-	cfgqst.Pee(Rapers[1], false)
+	;cfgqst.Pee(Rapers[1], false)
+	RemovePee(Rapers[1], 1)
+	storqst.ProtectActor(Rapers[1], false)
 	endif 
 	
 	
@@ -12283,7 +11071,9 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnAnimationEndingSol
 SolosRunning -= 1
 
 	if cfgqst.DefeatStateChapter == "Golden Shower"			
-	cfgqst.Pee(Rapers[2], false)
+	;cfgqst.Pee(Rapers[2], false)
+	RemovePee(Rapers[2], 2)
+	storqst.ProtectActor(Rapers[2], false)
 	endif 
 
 
@@ -12309,32 +11099,87 @@ UnregisterForModEvent("OrgasmStart_NadeSolo3")
 
 EndFunction
 
+
+Function EquipPee(actor akactor, int Count)
+    NymTrace("EquipPee(" + Count + ")")
+    Armor PeeMale = (game.GetFormFromFile(159081, "ZazAnimationpack.esm") as Armor)
+    akactor.AddItem(PeeMale, 1, true)
+    akactor.EquipItem(PeeMale, true, true)
+    utility.Wait(0.2)
+    cfgqst.Strip(32, akactor)
+    cfgqst.Strip(33, akactor)
+    if D100(50.0)
+        cfgqst.Strip(31, akactor)
+    endif
+    if D100(25.0)
+        cfgqst.Strip(37, akactor)
+    endif
+EndFunction
+
+
+Function RemovePee(actor akActor, int Count)
+	
+	NymTrace("RemovePee("+Count+")")
+	
+	Armor PeeMale = Game.GetFormFromFile(0x00026D69 , "ZazAnimationpack.esm") as armor 	;ZaZ F2 Pee II
+	akActor.RemoveItem(PeeMale, 10, true, None)	
+
+EndFunction 
+
+Function EquipPeeToGroup()
+
+	NymTrace("EquipPeeToGroup()")
+	if FapperCount > 0
+		if Fappers[0]
+		EquipPee(Fappers[0], 404)
+		endif 
+		if Fappers[1]
+		EquipPee(Fappers[1], 414)
+		endif 
+		if Fappers[2]
+		EquipPee(Fappers[2], 424)
+		endif 
+		if Fappers[3]
+		EquipPee(Fappers[3], 434)
+		endif 	
+		
+	else
+
+	NymBox("No Fappers!")
+	
+	endif 
+
+EndFunction 
+
 Function OnAnimationEndingSolo4(String EventName, String ArgString, Float ArgNum, Form Sender)
 
-Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnAnimationEndingSolo4: SolosRunningRunning: "+SolosRunning)
+Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnAnimationEndingSolo4: [SolosRunningRunning: "+SolosRunning+"] [DefeatStateChapter: "+cfgqst.DefeatStateChapter+"]")
 ;SolosRunning -= 1
 SolosRunning -= 1
 
 
 	if cfgqst.DefeatStateChapter == "Golden Shower"			
-	cfgqst.Pee(Rapers[3], false)
+	;cfgqst.Pee(Rapers[3], false)
+	RemovePee(Rapers[3], 3)
 	endif 
 
-if cfgqst.SexSceneBukkake && (SolosRunning == 0)
-;ScreenMessage("You are soaked with warm cum")
-cfgqst.SexSceneBukkake = false
-AlreadySoaked = false
-endif
+	if cfgqst.SexSceneBukkake && (SolosRunning == 0)
+	;ScreenMessage("You are soaked with warm cum")
+	cfgqst.SexSceneBukkake = false
+	AlreadySoaked = false
+	endif
 
-if SolosRunning == 0
-	;this must not happen when we are in furniture
-	if cfgqst.DefeatTypeScenario == "Bukkake" 	
-		if !cfgqst.SexFinished && !IsBathing
-		cfgqst.SexSceneBukkake = false
-		SexFinished(12294)
+	if SolosRunning == 0
+		;this must not happen when we are in furniture
+		if cfgqst.DefeatTypeScenario == "Bukkake" 	
+			if !cfgqst.SexFinished && !IsBathing
+			cfgqst.SexSceneBukkake = false
+			SexFinished(12294)
+			endif
 		endif
 	endif
-endif
+	
+	storqst.ProtectActor(Rapers[3], false)
 
 UnregisterForModEvent("AnimationEnding_NadeSolo4") 
 ;UnregisterForModEvent("AnimationEnd_NadeSolo4") 
@@ -12347,7 +11192,7 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnOrgasmStart()")
 
 if (EventName == "OrgasmStart_NadeRape")
 defqst.MouthOpening = 100
-defqst.InstantMouthOpening()
+defqst.OpenMouthMaintenance()
 ;MfgConsoleFunc.SetPhoneme(cfgqst.PlayerRef, 1, 100)		;BIG AAAH
 cfgqst.Orgasm = true
 SendModEvent("Moan")
@@ -12399,206 +11244,104 @@ Int SolosRunning = 0
 Bool AllowOrgasms
 ;Int SolosRunning = 0
 
-Function StartSoloAggressor(actor akactor)	;#StartSoloAggressor #solo2
-
-	;GUIDE: we Start Male Masturbation Scenes (4 right now, each for the Player) on one of the 4 Markers around him. 
-	;OnAnimationEndingSoloX will reduce the count of active Solos 
-	;OnOrgasmSoloX will apply Cum Overlays to the PC 
-
-	SolosRunning += 1
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartAggressorSolo("+SolosRunning+")(DefeatStateChapter: "+cfgqst.DefeatStateChapter+")")
-			
-		if akactor	
-
-			cfgqst.SexSceneBukkake = true
-			
-			if akactor.IsOnMount()		;hmm, put elsewhere?
-			akactor.Dismount()
-			endif
-			
-			;MALE Actor (Gender 0)
-			if Sexlab.GetGender(akactor) == 0		;NO FEMALES GET HERE CURRENTLY 
-
-				if cfgqst.DefeatStateChapter == "Golden Shower"			
-				AnimationsSolo_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo, M, Standing", "F, FapAndTouch, Furniture, InvisFurn, Funnybiz", True)	;supress Fap and Touch, too far foward.
-				else 
-				AnimationsSolo_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo, M, Standing", "F, Furniture, InvisFurn, Funnybiz", True)	;supress Female (F) anims because... fuck SLAL tags.
-				endif 
-				
-			;FEMALE Actor (Gender 1)
-			else
-			AnimationsSolo_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo, F, Standing", "M, Furniture, InvisFurn, Funnybiz", True)	;supress Male (M) anims because... fuck SLAL tags.	
-			endif
-
-			sslThreadModel Thread = SexLab.NewThread()					
-					
-			if Thread && (Thread.AddActor(akactor, true) >= 0) 			
-			NymTrace("StartAggressorSolo("+SolosRunning+") A")
-			
-			Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsSolo_IDs))		
-			
-				if SolosRunning == 1
-				NymTrace("StartAggressorSolo("+SolosRunning+") B")
-				
-					if Nym()
-					Thread.CenterOnObject(storqst.WatcherXMarkers[0])
-					else 
-					Thread.CenterOnObject(xMarkerHeading_00)	
-					endif				
-				elseif SolosRunning == 2
-				NymTrace("StartAggressorSolo("+SolosRunning+") B")
-					if Nym()
-					Thread.CenterOnObject(storqst.WatcherXMarkers[1])
-					else 
-					Thread.CenterOnObject(xMarkerHeading_01)	
-					endif				
-				elseif SolosRunning == 3
-				NymTrace("StartAggressorSolo("+SolosRunning+") B")
-					if Nym()
-					Thread.CenterOnObject(storqst.WatcherXMarkers[2])
-					else 
-					Thread.CenterOnObject(xMarkerHeading_02)	
-					endif				
-				elseif SolosRunning == 4
-				NymTrace("StartAggressorSolo("+SolosRunning+") B")
-					if Nym()
-					Thread.CenterOnObject(storqst.WatcherXMarkers[3])
-					else 
-					Thread.CenterOnObject(xMarkerHeading_03)	
-					endif				
-				endif
-					
-				;	>>>>>>>>>>>> NEW NEW NEW ;>>>>>>>>>>>>;>>>>>>>>>>>>;>>>>>>>>>>>>;>>>>>>>>>>>>;>>>>>>>>>>>>;>>>>>>>>>>>>
-				;/
-				int i = 8 ;safety 
-				int j = 0 ;SceneID
-				SolosRunning = 0
-				cfgqst.SexSceneBukkake = true
-				sslThreadModel Thread
-				AnimationsSolo_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo, M, Standing", "F, Furniture, InvisFurn, Funnybiz", True)
-				
-				while i > 0 
-					i -= 1
-					if Fappers[j]	;starting with Fapppers 0
-						Thread = SexLab.NewThread()
-						if Thread && (Thread.AddActor(Fappers[j], true) >= 0) 	
-						Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsSolo_IDs))	
-						Thread.CenterOnObject(storqst.WatcherXMarkers[j])	;starting with WatchMarker 0
-						Thread.DisableAllOrgasms(false) ;Bukkake can all Orgasm
-						Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Starting SUCCESS Fappers["+j+"] Scene("+SolosRunning+")")
-						j += 1
-						SolosRunning += 1
-						else 
-						j += 1
-						Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Starting FAILED Fapper ["+j+"] Scene("+SolosRunning+")")
-						endif
-					else 
-					;Fappers is NONE > end loop
-					i = 0
-						
-					endif 
-					
-				endwhile 	
-				
-				/;
-				;	>>>>>>>>>>>> NEW NEW NEW ;>>>>>>>>>>>>;>>>>>>>>>>>>;>>>>>>>>>>>>;>>>>>>>>>>>>;>>>>>>>>>>>>;>>>>>>>>>>>>
-
-
-				Thread.DisableBedUse(true)
-				Thread.DisableLeadIn(true)
-			
-		;	if IsBathing || !AllowOrgasms
-		;	Thread.DisableAllOrgasms(true)
-		;	endif
-		
-				if cfgqst.DefeatStateChapter == "Golden Shower"			
-				NymTrace("StartAggressorSolo("+SolosRunning+") Pee Equipped")
-				cfgqst.Pee(akactor, true)
-				Thread.DisableAllOrgasms(true)
-				elseif cfgqst.DefeatStateChapter == "Bukkake"		
-				Thread.DisableAllOrgasms(false)
-				elseif (cfgqst.DefeatStateChapter == "Voyeurs") || (cfgqst.DefeatStateChapter == "Forced Bathing")
-				Thread.DisableAllOrgasms(false)
-				endif 
-			
-				if SolosRunning == 1
-				
-				RegisterForModEvent("AnimationEnding_NadeSolo1", "OnAnimationEndingSolo1")
-				;RegisterForModEvent("AnimationEnd_NadeSolo1", "OnOrgasmEndSolo") ;why leads to OnOrgasmEnd? Bug or intentional?
-				;RegisterForModEvent("OrgasmEnd_NadeSolo1", "OnOrgasmEndSolo")
-				RegisterForModEvent("OrgasmStart_NadeSolo1", "OnOrgasmStartSolo")
-
-				Thread.SetHook("NadeSolo1")
-				elseif SolosRunning == 2	
-				
-				RegisterForModEvent("AnimationEnding_NadeSolo2", "OnAnimationEndingSolo2")
-				;RegisterForModEvent("AnimationEnd_NadeSolo2", "OnOrgasmEndSolo")
-				;RegisterForModEvent("OrgasmEnd_NadeSolo2", "OnOrgasmEndSolo")
-				RegisterForModEvent("OrgasmStart_NadeSolo2", "OnOrgasmStartSolo")
-				
-				Thread.SetHook("NadeSolo2")	
-				
-				elseif SolosRunning == 3
-				
-				RegisterForModEvent("AnimationEnding_NadeSolo3", "OnAnimationEndingSolo3")
-				;RegisterForModEvent("AnimationEnd_NadeSolo3", "OnOrgasmEndSolo") why?
-				;RegisterForModEvent("OrgasmEnd_NadeSolo3", "OnOrgasmEndSolo")
-				RegisterForModEvent("OrgasmStart_NadeSolo3", "OnOrgasmStartSolo")
-		
-				Thread.SetHook("NadeSolo3")
-				
-				elseif SolosRunning == 4
-				RegisterForModEvent("AnimationEnding_NadeSolo4", "OnAnimationEndingSolo4")
-				;RegisterForModEvent("AnimationEnd_NadeSolo4", "OnOrgasmEndSolo")
-				;RegisterForModEvent("OrgasmEnd_NadeSolo4", "OnOrgasmEndSolo")
-				RegisterForModEvent("OrgasmStart_NadeSolo4", "OnOrgasmStartSolo")
-				
-				Thread.SetHook("NadeSolo4")
-				
-				endif
-				
-				
-				;thread start FAILED
-				if !Thread.StartThread()							
-					cfgqst.SexSceneBukkake = false
-					Debug.Notification("NAKED DEFEAT: #ERROR starting SOLO: "+SolosRunning)
-					SolosRunning -=1
-					
-				;thread start SUCCESSFULL
-				;do nothing currently
-				else
-					;SolosRunning += 1
-				;/	if SolosRunning == 1
-					RegisterForModEvent("AnimationEnding_NadeSolo1", "OnAnimationEndingSolo")
-					RegisterForModEvent("AnimationEnd_NadeSolo1", "OnOrgasmEndSolo")
-					RegisterForModEvent("OrgasmEnd_NadeSolo1", "OnOrgasmEndSolo")
-					RegisterForModEvent("OrgasmStart_NadeSolo1", "OnOrgasmStartSolo")
-					elseif SolosRunning == 2
-					RegisterForModEvent("AnimationEnding_NadeSolo2", "OnAnimationEndingSolo")
-					RegisterForModEvent("AnimationEnd_NadeSolo2", "OnOrgasmEndSolo")
-					RegisterForModEvent("OrgasmEnd_NadeSolo2", "OnOrgasmEndSolo")
-					RegisterForModEvent("OrgasmStart_NadeSolo2", "OnOrgasmStartSolo")
-					elseif SolosRunning == 3
-					RegisterForModEvent("AnimationEnding_NadeSolo3", "OnAnimationEndingSolo")
-					RegisterForModEvent("AnimationEnd_NadeSolo3", "OnOrgasmEndSolo")
-					RegisterForModEvent("OrgasmEnd_NadeSolo3", "OnOrgasmEndSolo")
-					RegisterForModEvent("OrgasmStart_NadeSolo3", "OnOrgasmStartSolo")
-					elseif SolosRunning == 4
-					RegisterForModEvent("AnimationEnding_NadeSolo4", "OnAnimationEndingSolo")	
-					endif
-					/;
-				endif
-			endif
-
-		else				
-			;thread start FAILED
-			cfgqst.SexSceneBukkake = false
-			Debug.Notification("NAKED DEFEAT: #ERROR starting SOLO: "+SolosRunning)
-			SolosRunning -=1
-		endif
-		
-		;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartAggressorSolo(SolosRunning): " +SolosRunning)
-		
+Function StartSoloAggressor(actor akactor)
+    SolosRunning = SolosRunning + 1
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: StartAggressorSolo(" + SolosRunning + ")(DefeatStateChapter: " + cfgqst.DefeatStateChapter + ")", 0)
+    if akactor && SexLab.GetGender(akactor) == 0
+        NymTrace("No Solo Females allowed currently")
+    elseif akactor
+        cfgqst.SexSceneBukkake = true
+        if akactor.IsOnMount()
+            akactor.Dismount()
+        endif
+        if SexLab.GetGender(akactor) == 0
+            if cfgqst.DefeatStateChapter == "Golden Shower"
+                AnimationsSolo_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo, M, Standing", "F, FapAndTouch, Furniture, InvisFurn , InvFurn, Funnybiz", true)
+            else
+                AnimationsSolo_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo, M, Standing", "F, Furniture, InvisFurn, InvFurn, Funnybiz", true)
+            endif
+        endif
+        cfgqst.Strip(32, akactor)
+        cfgqst.Strip(33, akactor)
+        if D100(50.0)
+            cfgqst.Strip(31, akactor)
+        endif
+        if D100(25.0)
+            cfgqst.Strip(37, akactor)
+        endif
+        sslthreadmodel Thread = SexLab.NewThread(30.0)
+        if Thread && Thread.AddActor(akactor, true, None, false) >= 0
+            NymTrace("StartAggressorSolo(" + SolosRunning + ") A")
+            storqst.ProtectActor(akactor, true)
+            Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsSolo_IDs))
+            if SolosRunning == 1
+                NymTrace("StartAggressorSolo(" + SolosRunning + ") B")
+                if Nym()
+                    Thread.CenterOnObject(storqst.WatcherXMarkers[0], true)
+                else
+                    Thread.CenterOnObject(xMarkerHeading_00, true)
+                endif
+            elseif SolosRunning == 2
+                NymTrace("StartAggressorSolo(" + SolosRunning + ") B")
+                if Nym()
+                    Thread.CenterOnObject(storqst.WatcherXMarkers[1], true)
+                else
+                    Thread.CenterOnObject(xMarkerHeading_01, true)
+                endif
+            elseif SolosRunning == 3
+                NymTrace("StartAggressorSolo(" + SolosRunning + ") B")
+                if Nym()
+                    Thread.CenterOnObject(storqst.WatcherXMarkers[2], true)
+                else
+                    Thread.CenterOnObject(xMarkerHeading_02, true)
+                endif
+            elseif SolosRunning == 4
+                NymTrace("StartAggressorSolo(" + SolosRunning + ") B")
+                if Nym()
+                    Thread.CenterOnObject(storqst.WatcherXMarkers[3], true)
+                else
+                    Thread.CenterOnObject(xMarkerHeading_03, true)
+                endif
+            endif
+            Thread.DisableBedUse(true)
+            Thread.DisableLeadIn(true)
+            if cfgqst.DefeatStateChapter == "Golden Shower"
+                NymTrace("StartAggressorSolo(" + SolosRunning + ") Pee Equipped")
+                EquipPee(akactor, SolosRunning)
+                Thread.DisableAllOrgasms(true)
+            elseif cfgqst.DefeatStateChapter == "Bukkake"
+                Thread.DisableAllOrgasms(false)
+            elseif cfgqst.DefeatStateChapter == "Voyeurs" || cfgqst.DefeatStateChapter == "Forced Bathing"
+                Thread.DisableAllOrgasms(false)
+            endif
+            if SolosRunning == 1
+                RegisterForModEvent("AnimationEnding_NadeSolo1", "OnAnimationEndingSolo1")
+                RegisterForModEvent("OrgasmStart_NadeSolo1", "OnOrgasmStartSolo")
+                Thread.SetHook("NadeSolo1")
+            elseif SolosRunning == 2
+                RegisterForModEvent("AnimationEnding_NadeSolo2", "OnAnimationEndingSolo2")
+                RegisterForModEvent("OrgasmStart_NadeSolo2", "OnOrgasmStartSolo")
+                Thread.SetHook("NadeSolo2")
+            elseif SolosRunning == 3
+                RegisterForModEvent("AnimationEnding_NadeSolo3", "OnAnimationEndingSolo3")
+                RegisterForModEvent("OrgasmStart_NadeSolo3", "OnOrgasmStartSolo")
+                Thread.SetHook("NadeSolo3")
+            elseif SolosRunning == 4
+                RegisterForModEvent("AnimationEnding_NadeSolo4", "OnAnimationEndingSolo4")
+                RegisterForModEvent("OrgasmStart_NadeSolo4", "OnOrgasmStartSolo")
+                Thread.SetHook("NadeSolo4")
+            endif
+            if !Thread.StartThread()
+                cfgqst.SexSceneBukkake = false
+                debug.Notification("NAKED DEFEAT: #ERROR starting SOLO: " + SolosRunning)
+                SolosRunning = SolosRunning - 1
+            endif
+        endif
+    else
+        cfgqst.SexSceneBukkake = false
+        debug.Notification("NAKED DEFEAT: #ERROR starting SOLO: " + SolosRunning)
+        SolosRunning = SolosRunning - 1
+    endif
 EndFunction
 
 Function StartMasturbation()			;#masturbation
@@ -12606,7 +11349,7 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartRape (Player) S
 		
 	;	ForcePosing_2 = false
 		
-		Animations1_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo, F", "Tentacles, M, InvisFurn, ", True)
+		Animations1_IDs = cfgqst.SLPP_GetSceneIDs(1, "Solo, F", "Tentacles, M, InvisFurn, InvFurn, ", True)
 		
 		RegisterForModEvent("AnimationEnding_NadeRape", "OnAnimationEnding")
 		RegisterForModEvent("AnimationEnd_NadeRape", "OnAnimationEnd")
@@ -12661,6 +11404,131 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartRape (Player) S
 		
 EndFunction
 
+Function StartEstrusScene(string sMode, bool bFuckFollowers, bool Standalone)
+    DebugTrace("StartEstrusScene(" + sMode + ")")
+    if Standalone
+        if !spe_actor.IsActorCalmed(cfgqst.PlayerRef)
+            spe_actor.SetActorCalmed(cfgqst.PlayerRef, true)
+            NymTrace("##CALM ON Player Estrus Trap")
+        endif
+        cfgqst.Crawl(cfgqst.PlayerRef, true)
+        cfgqst.Immobilize(true)
+    endif
+    defqst.PlaceExplosion(cfgqst.PlayerRef, "Dust Medium")
+    utility.Wait(0.5)
+    defqst.PlaceExplosion(cfgqst.PlayerRef, "Shockwave 1")
+    utility.Wait(0.5)
+    if D100(10.0)
+        StripPlayer()
+    endif
+    storqst.SexStartMaintenance(2)
+    defqst.PlaceExplosion(cfgqst.PlayerRef, "Estrus Start")
+    defqst.PlaceExplosion(cfgqst.PlayerRef, "Dust Medium")
+    int EstrusTraptype = utility.RandomInt(0, 3)
+    int ECTrap = modevent.Create("ECStartAnimation")
+    modevent.PushForm(ECTrap, cfgqst.PlayerRef)
+    modevent.PushForm(ECTrap, cfgqst.PlayerRef)
+    modevent.PushInt(ECTrap, EstrusTraptype)
+    modevent.PushBool(ECTrap, false)
+    modevent.PushInt(ECTrap, 1000)
+    modevent.PushBool(ECTrap, true)
+    modevent.Send(ECTrap)
+    if bFuckFollowers
+        if folqst.IsWithUs_Follower(0)
+            NymTrace("StartEstrusScene(MOVE FOLLOWER [0]")
+            folqst.Actor_Follower01.MoveTo(cfgqst.PlayerRef, -2000.0 * math.Sin(cfgqst.PlayerRef.GetAngleZ() + 45.0), -2000.0 * math.Cos(cfgqst.PlayerRef.GetAngleZ() + 45.0), cfgqst.PlayerRef.GetHeight() - 125.0, true)
+            utility.Wait(0.5)
+            defqst.PlaceExplosion(folqst.Actor_Follower01, "Dust Medium")
+            EstrusTraptype = utility.RandomInt(0, 3)
+            int ECFTrap1 = modevent.Create("ECStartAnimation")
+            modevent.PushForm(ECFTrap1, folqst.Actor_Follower01)
+            modevent.PushForm(ECFTrap1, folqst.Actor_Follower01)
+            modevent.PushInt(ECFTrap1, EstrusTraptype)
+            modevent.PushBool(ECFTrap1, false)
+            modevent.PushInt(ECFTrap1, 1000)
+            modevent.PushBool(ECFTrap1, true)
+            modevent.Send(ECFTrap1)
+        endif
+        if folqst.IsWithUs_Follower(1)
+            folqst.Actor_Follower01.MoveTo(cfgqst.PlayerRef, -2000.0 * math.Sin(cfgqst.PlayerRef.GetAngleZ() + 135.0), -2000.0 * math.Cos(cfgqst.PlayerRef.GetAngleZ() + 135.0), cfgqst.PlayerRef.GetHeight() - 125.0, true)
+            utility.Wait(0.5)
+            defqst.PlaceExplosion(folqst.Actor_Follower02, "Dust Medium")
+            EstrusTraptype = utility.RandomInt(0, 3)
+            int ECFTrap2 = modevent.Create("ECStartAnimation")
+            modevent.PushForm(ECFTrap2, folqst.Actor_Follower02)
+            modevent.PushForm(ECFTrap2, folqst.Actor_Follower02)
+            modevent.PushInt(ECFTrap2, EstrusTraptype)
+            modevent.PushBool(ECFTrap2, false)
+            modevent.PushInt(ECFTrap2, 1000)
+            modevent.PushBool(ECFTrap2, true)
+            modevent.Send(ECFTrap2)
+        endif
+    endif
+    int iCycle = 0
+    int iProgress = 0
+    while !cfgqst.IsFucking(cfgqst.PlayerRef)
+        NymTrace("#ESTRUS Wait for Estrus Start LOOP")
+        utility.Wait(1.0)
+    endwhile
+    while cfgqst.IsFucking(cfgqst.PlayerRef) && cfgqst.ModEnabled
+        NymTrace("#ESTRUS  PlayerStillFucked LOOP")
+        iCycle = iCycle + 1
+        utility.Wait(1.0)
+        if iCycle == 3
+            cfgqst.StartPunishmentEffect("Shock")
+        endif
+        if iCycle == 5
+            iCycle = 0
+            iProgress = iProgress + 1
+            StripDuringSex(iProgress)
+            if D100(90.0)
+                if D100(50.0)
+                    cfgqst.StartPunishmentEffect("Shock")
+                else
+                    cfgqst.StartPunishmentEffect("Pain")
+                endif
+            endif
+        endif
+    endwhile
+    storqst.SexEndMaintenance()
+    if bFuckFollowers
+        bool FollowersStillFucked = true
+        while FollowersStillFucked && cfgqst.ModEnabled
+            NymTrace("#ESTRUS  FollowersStillFucked LOOP")
+            if folqst.IsWithUs_Follower(0) && cfgqst.IsFucking(folqst.NakedFollower[0])
+                FollowersStillFucked = true
+            else
+                FollowersStillFucked = false
+            endif
+            if !FollowersStillFucked
+                if folqst.IsWithUs_Follower(1) && cfgqst.IsFucking(folqst.NakedFollower[1])
+                    FollowersStillFucked = true
+                else
+                    FollowersStillFucked = false
+                endif
+            endif
+            utility.Wait(1.0)
+        endwhile
+    endif
+    if Standalone
+        if cfgqst.RapersNearby()
+            cfgqst.Immobilize(true)
+            utility.Wait(2.0)
+            cfgqst.ProximityQuestStart("DefeatScenarioScan")
+            cfgqst.DefeatQuestRunning = true
+            cfgqst.DefeatEntranceVia = "Trap Trigger"
+            cfgqst.StartDefeat()
+        else
+            if spe_actor.IsActorCalmed(cfgqst.PlayerRef)
+                spe_actor.SetActorCalmed(cfgqst.PlayerRef, false)
+                NymTrace("##CALM OFF Player Estrus Trap")
+            endif
+            cfgqst.Crawl(cfgqst.PlayerRef, false)
+            cfgqst.Immobilize(false)
+        endif
+    endif
+EndFunction
+
 ;----------------------------------------------------------------------------------------------------------------------
 
 ;/
@@ -12671,11 +11539,11 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartIdleScene_01 ST
 			
 		sslThreadModel Thread = SexLab.NewThread()										
 	;	Debug.Notification("<font color='#ff0000'>They fuck your follower, too!</font>")	;MESSAGE
-		AnimationsIdle01_IDs = cfgqst.SLPP_GetSceneIDs(1, "tentacle", none, True)
+		AnimationsIdle01 = SexLab.GetAnimationsByTags(1, "tentacle", none, True)
 			
 			if Thread && (Thread.AddActor(Victims[0], true) >= 0) 
 				
-				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(Animations1_IDs))
+				Thread.SetAnimations(Animations1)
 				;Thread.SetForcedAnimations(Animations1)										
 				Thread.CenterOnObject(Vehicle_Victims0)	
 				Thread.DisableBedUse(true)
@@ -12695,13 +11563,29 @@ bool SexFollower01Running = false ;internal, short time bool
 
 Function StartRapeFollower01(Actor akAggressor)					;#StartRapeFollower01		
 Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartRape (Follower01) START")
-				
-		if cfgqst.HeelsFix
+		
+		if Nym()
+		
+		;do NOTHING
+			if storqst.IsHeelsEffectOn(Aggressors[0])
+			cfgqst.DisableHeelsEffectOnActor(Aggressors[0], "StartRapeFollower01() Aggressors[0] disable HeelsEffect")
+			endif 
+			if storqst.IsHeelsEffectOn(Aggressors[1])
+			cfgqst.DisableHeelsEffectOnActor(Aggressors[1], "StartRapeFollower01() Aggressors[1] disable HeelsEffect")
+			endif 
+			if storqst.IsHeelsEffectOn(Aggressors[2])
+			cfgqst.DisableHeelsEffectOnActor(Aggressors[2], "StartRapeFollower01() Aggressors[2] disable HeelsEffect")
+			endif 
+			if storqst.IsHeelsEffectOn(Aggressors[3])
+			cfgqst.DisableHeelsEffectOnActor(Aggressors[3], "StartRapeFollower01() Aggressors[3] disable HeelsEffect")
+			endif 
+		
+		elseif cfgqst.HeelsFix
 		
 		;	if Nym() && !IsHumanFucker ; HeelsFix_Sexlab
 			;do nothing - we take over from Sexlab
 		;	else 
-			cfgqst.RestoreHeelsEffectOnActor(Victims[0], 12675)	;put HeelsEffect back on so Sexlab can do its thing
+			cfgqst.RestoreHeelsEffectOnActor(Victims[0], "StartRapeFollower01() Victims[0] RESTORE HeelsEffect")	;put HeelsEffect back on so Sexlab can do its thing
 			Utility.Wait(1.0)
 		;	endif 
 		endif 
@@ -12811,13 +11695,27 @@ bool SexFollower02Running = false	;internal, short time bool
 
 Function StartRapeFollower02(Actor akAggressor)		;#StartRapeFollower02	
 Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartRape (Follower02) START")
-			
-		if cfgqst.HeelsFix
+		
+		if Nym()
+			if storqst.IsHeelsEffectOn(Aggressors[0])
+			cfgqst.DisableHeelsEffectOnActor(Aggressors[0], "StartRapeFollower01() Aggressors[0] disable HeelsEffect")
+			endif 
+			if storqst.IsHeelsEffectOn(Aggressors[1])
+			cfgqst.DisableHeelsEffectOnActor(Aggressors[1], "StartRapeFollower01() Aggressors[1] disable HeelsEffect")
+			endif 
+			if storqst.IsHeelsEffectOn(Aggressors[2])
+			cfgqst.DisableHeelsEffectOnActor(Aggressors[2], "StartRapeFollower01() Aggressors[2] disable HeelsEffect")
+			endif 
+			if storqst.IsHeelsEffectOn(Aggressors[3])
+			cfgqst.DisableHeelsEffectOnActor(Aggressors[3], "StartRapeFollower01() Aggressors[3] disable HeelsEffect")
+			endif 
+		
+		elseif cfgqst.HeelsFix
 		
 		;	if Nym()&& !IsHumanFucker ; HeelsFix_Sexlab
 			;do nothing - we take over from Sexlab
 		;	else 
-			cfgqst.RestoreHeelsEffectOnActor(Victims[1], 12791)	;put HeelsEffect back on so Sexlab can do its thing
+			cfgqst.RestoreHeelsEffectOnActor(Victims[1], "StartRapeFollower01() Victims[1] disable HeelsEffect for Sexlab")	;put HeelsEffect back on so Sexlab can do its thing
 			Utility.Wait(1.0)
 		;	endif 
 		endif 
@@ -12915,86 +11813,6 @@ EndFunction
 
 ;----------------------------------------------------------------------------------------------------------------------
 
-Function StartPee(Actor akAggressor)						;#pee
-
-Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: StartPee START")
-		if akAggressor && !akAggressor.IsDead()							;checks if dead? or more?	; CHECK if Aggressor(0) is dead
-		
-
-		RegisterForModEvent("AnimationEnding_NadePee", "OnPeeFinished")
-		RegisterForModEvent("StageStart_NadePee", "OnStageStart")
-		
-	;	defqst.SexDuration = 0
-	;	cfgqst.SexScene = true
-	;	storqst.HideHUD()
-	;	cfgqst.SexState = 3 ;GoldenShower
-		
-		storqst.SexStartMaintenance(3)
-		
-	;	SendModEvent("StartNakedSexExpressions")
-		
-		sslThreadModel Thread = SexLab.NewThread()							;THIS CREATES THE SEXLAB THREAD						
-		ScreenMessage("Here is your golden shower!")	
-
-			if Thread && (Thread.AddActor(cfgqst.PlayerRef, false) >= 0) && (Thread.AddActor(Aggressors[0], false) >= 0)			;makes Thread with PC and Aggressor(0)
-			int i = 1
-				if (AggressorCount > 1) && Aggressors[1] && (Thread.AddActor(Aggressors[1], false) >= 0) ;2 or more aggressors ;if count is 2 and aggressor[1] is there and its not in the thread, count +1
-					i += 1
-					;i = 2
-					if (AggressorCount > 2) && Aggressors[2] && (Thread.AddActor(Aggressors[2], false) >= 0) ;3 or more aggressors ;if count is 3 and aggressor[2] is there and its not in the thread, count +1
-						i += 1
-						;i = 3	
-						if (AggressorCount > 3) && Aggressors[3] && (Thread.AddActor(Aggressors[3], false) >= 0) ;4 aggressors	;if count is 4 and aggressor[3] is there and its not in the thread, count +1
-							i += 1
-							;i = 4
-						endif
-					endif
-				endif	
-				
-				if cfgqst.ShowDebugMessages
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Aggressors added to the thread: "+i)
-				endif
-								
-				if i == 4
-				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsPee4_IDs))
-				elseif i == 3
-				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsPee3_IDs))
-				elseif i == 2
-				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsPee2_IDs))
-				elseif i == 1
-				Thread.SetAnimations(cfgqst.SLPP_AnimsFromIDs(AnimationsPee1_IDs))	
-				endif	
-				
-				if cfgqst.ModSLUplus
-;				(Game.GetModByName("SexLab UtilityPlus.esp") != 255)
-				Thread.DisableAllOrgasms(true)
-				Thread.SetFurnitureStatus(0)	;#P+ SLU+ DisableFurnitureUse(true) has no P+ equivalent; furniture is controlled by SetFurnitureStatus (0 = disabled, same as P+ DisableBedUse(true))
-				endif
-				
-				Thread.CenterOnObject(cfgqst.PlayerRef)			
-				Thread.DisableBedUse(true)
-				Thread.DisableLeadIn(true)
-				Thread.SetHook("NadePee")		
-			
-			
-				if !Thread.StartThread()
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: (#ERROR) Failed to Start A (StartPee)")		
-					Debug.Notification("Nobody wants to piss on you.")
-					OnPeeFinished("", "", 0, None)
-				endif
-
-			else	
-				Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: (#ERROR) Failed to Start B (StartPee)")		
-				Debug.Notification("Nobody wants to piss on you.")
-				OnPeeFinished("", "", 0, None)
-			endif
-
-		else
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: (#ERROR) Failed to Start C (StartPee)")		
-			Debug.Notification("Nobody wants to piss on you.")
-			OnPeeFinished("", "", 0, None)
-		endif	
-EndFunction
 
 ;----------------------------------------------------------------------------------------------------------------------
 
@@ -13031,6 +11849,38 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnPeeFinished()")
 	if cfgqst.FollowerCount == 0
 	Sexlab.ThreadSlots.StopAll()
 	endif
+	
+	if Rapers[0]		;NOTE, later we want to have 8 Pee guys... 
+	RemovePee(Rapers[0], 10)
+	endif 
+	
+	if Rapers[1]
+	RemovePee(Rapers[1], 11)
+	endif 	
+
+	if Rapers[2]
+	RemovePee(Rapers[2], 12)
+	endif 
+	
+	if Rapers[3]
+	RemovePee(Rapers[3], 13)
+	endif 
+	
+	if Fappers[0]		;NOTE, later we want to have 8 Pee guys... 
+	RemovePee(Fappers[0], 100)
+	endif 
+	
+	if Fappers[1]
+	RemovePee(Fappers[1], 110)
+	endif 	
+
+	if Fappers[2]
+	RemovePee(Fappers[2], 120)
+	endif 
+	
+	if Fappers[3]
+	RemovePee(Fappers[3], 130)
+	endif 
 
 	; xxxxxxxxxxxxxxxxxxxxXXXX --- #POSE --- XXXXxxxxxxxxxxxxxxxxxxxx 	
 	; Repair Posing 	
@@ -13063,10 +11913,9 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnPeeFinished()")
 
 EndFunction
 
-
 ;----------------------------------------------------------------------------------------------------------------------
 
-Event OnStartSolo(String EventName, String ArgString, Float ArgNum, Form Sender)	;	;#solo		#events #bukkake
+Event OnStartSolo(String EventName, String ArgString, Float ArgNum, Form Sender)	;	;#OnStartSolo		#events #bukkake
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStartSolo()")
 	
 	;IMPROVE THIS!!!
@@ -13182,6 +12031,9 @@ Event OnStartVoyeurs(String EventName, String ArgString, Float ArgNum, Form Send
 				
 EndEvent
 
+
+
+
 ;----------------------------------------------------------------------------------------------------------------------
 
 bool MolestersCalled = false
@@ -13266,11 +12118,12 @@ Event OnStartForceExpression(String EventName, String ArgString, Float ArgNum, F
 EndEvent
 
 ;----------------------------------------------------------------------------------------------------------------------
-
+;/
 Event OnStartAddRapeHands(String EventName, String ArgString, Float ArgNum, Form Sender)	;				
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStartAddRapeHands()")
 	cfgqst.AddRapeHands()
 EndEvent
+/;
 
 ;----------------------------------------------------------------------------------------------------------------------
 
@@ -13289,12 +12142,12 @@ EndEvent
 
 
 ;----------------------------------------------------------------------------------------------------------------------
-
+;/
 Event OnStartAddRapeTears(String EventName, String ArgString, Float ArgNum, Form Sender)	;				
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStartAddRapeTears()")	
 	cfgqst.AddRapeTears()
 EndEvent
-
+/;
 ;----------------------------------------------------------------------------------------------------------------------
 
 Event OnStartAddRapeCount(String EventName, String ArgString, Float ArgNum, Form Sender)	;				
@@ -13443,15 +12296,17 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStartEscape()")
 					Utility.Wait(1.0)
 					
 					if Nym()
+					
+						if folqst.IsWithUs_Follower(0) && !folqst.NakedFollower[0].IsInFaction(cfgqst.CrawlFaction)
 						
-						if !folqst.Actor_Follower01.IsInFaction(cfgqst.CrawlFaction)
-						NymTrace("#ERROR - Follower01 not in CrawlFaction -> FIX")
-						folqst.Actor_Follower01.Addtofaction(cfgqst.CrawlFaction)
+						NymTrace("#ERROR - Follower[0] not in CrawlFaction -> FIX")
+						folqst.NakedFollower[0].Addtofaction(cfgqst.CrawlFaction)
 						endif 
 						
-						if !folqst.Actor_Follower02.IsInFaction(cfgqst.CrawlFaction)
-						NymTrace("#ERROR - Follower02 not in CrawlFaction -> FIX")
-						folqst.Actor_Follower02.Addtofaction(cfgqst.CrawlFaction)
+						if folqst.IsWithUs_Follower(1) && !folqst.NakedFollower[1].IsInFaction(cfgqst.CrawlFaction)
+					
+						NymTrace("#ERROR - Follower[0] not in CrawlFaction -> FIX")
+						folqst.NakedFollower[1].Addtofaction(cfgqst.CrawlFaction)
 						endif 
 					
 					endif 
@@ -13510,7 +12365,9 @@ Int DefeatStageProb
 
 
 
-Function GetIsMouthAvailable()
+Function GetIsMouthAvailable()				;#GetIsMouthAvailable()
+	
+	NymTrace("GetIsMouthAvailable(START)")
 	
 	cfgqst.IsMouthAvailable = 1 ;neutral 
 	
@@ -13526,6 +12383,8 @@ Function GetIsMouthAvailable()
 	Int i = 0
 	Int PlayerPos
 	Actor NextActor
+	
+	
 	While i < actorList.Length
 		NextActor = actorList[i]
 		If NextActor == cfgqst.PlayerRef
@@ -13625,7 +12484,7 @@ Int Function OrgasmChanceMale(int SceneStage, int Orgasms)
 EndFunction 
 
 Function OnStartForceStageProgression(String EventName, String ArgString, Float ArgNum, Form Sender)	;#OnStartForceStageProgression
-
+NymTrace("OnStartForceStageProgression()")
 Bool Enable = true
 int MonitoredStage = 0
 
@@ -13648,6 +12507,7 @@ if Nym() && Enable
 	endwhile
 	
 	if (MonitoredStage == CurrentStage) && cfgqst.SexScene
+	NymTrace("OnStartForceStageProgression(Stage: "+CurrentStage+") FuckingRound:"+FuckingRound)
 	NymMessage("!!! FORCED Stage Progression:" +MonitoredStage)
 	thread.AdvanceStage(false)
 	else 
@@ -13657,6 +12517,11 @@ if Nym() && Enable
 endif 
 
 EndFunction 
+
+Event OnStartSpawnRapers(string EventName, string ArgString, float ArgNum, form Sender)
+    NymTrace("OnStartSpawnRapers (for Afterlife) START")
+    SpawnActorGroups("Afterlife")
+EndEvent
 
 Bool ForceOpenMouthRunning = false
 
@@ -13682,9 +12547,62 @@ EndFunction
 
 
 
+Bool Function IsFuckedByMonsters()
+	
+	if (RaperRace == "NoRace")
+	return false
+	elseif (RaperRace == "Trolls") || (RaperRace == "Giants") || (RaperRace == "Werewolves") || (RaperRace == "Gargoyles") || (RaperRace == "Horses") || (RaperRace == "Bears") || (RaperRace == "Trolls")
+	return true 
+	else 
+	return false
+	endif 
 
+EndFunction 
 
+;/
+	
+Quest Property SexlabQuest Auto  
 
+Function ToggleHeelEffect(bool bDisable)
+
+	SexLabFramework.RemoveHeelEffect = false
+
+    ; Cast the quest to the SexLab script type
+   ; sslSystemConfig config = SexLabQuestInstance as sslSystemConfig
+   ; sslSystemLibrary config = SexLabQuestInstance as sslSystemLibrary
+   sslSystemLibrary config = SexLabFramework as sslSystemLibrary
+
+    ;if config
+    ;    config.RemoveHeelEffect = bDisable
+       NymBox("Heel effect setting changed successfully to: "+bDisable+"!")
+  ;  else
+        NymBox("ERROR: Could not cast to sslSystemConfig.")
+  ;  endif
+EndFunction
+
+/;
+
+;/
+
+Function SexlabToggle_MCM(string sToggle)
+
+	NymTrace("SexlabToggle_MCM TestBool A: RemoveHeelEffect "+RemoveHeelEffect)
+	
+	sslSystemConfig RemoveHeelEffect = false
+	
+	
+	if RemoveHeelEffect == 1 
+	RemoveHeelEffect = 0
+	else 
+	RemoveHeelEffect = 1 
+	endif 
+	;RemoveHeelEffect = FalseBool
+	;TestBool = RemoveHeelEffect
+	NymTrace("SexlabToggle_MCM TestBool B: RemoveHeelEffect "+RemoveHeelEffect)
+	
+EndFunction 
+
+/;
 
 
 
@@ -13692,126 +12610,240 @@ Int CurrentStage
 Bool DroolApplied = false
 
 Function OnStageStart(String EventName, String ArgString, Float ArgNum, Form Sender)		;#stagegoback ;#OnStageStart ;#StageStart
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStageStart() cfgqst.DefeatStateChapter:"+cfgqst.DefeatStateChapter)
+	
+
+	;NOTE: it seems "OnStageStart does not play on every Sex Scene (or not reliably).
 
 	GetIsMouthAvailable()
 
 	int threadID = SexLab.FindActorController(cfgqst.PlayerRef)
 	SslThreadController thread = SexLab.GetController(threadID)
 	Int SceneStage = thread.Stage
-	CurrentStage = SceneStage
+	storqst.SexSceneStage = SceneStage
 	
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Stage "+SceneStage+" Started: Mouth: "+cfgqst.IsMouthAvailable)
+	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStageStart(Stage "+SceneStage+") FuckingRound: "+FuckingRound+" DefeatStateChapter:"+cfgqst.DefeatStateChapter)
+	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStageStart(Stage "+SceneStage+") Mouth: "+cfgqst.IsMouthAvailable)
 
 	sslThreadController Controller = Sexlab.ThreadSlots.GetController(threadID)
 	sslBaseAnimation previousAnim = Controller.Animation	
 	
 	SendModEvent("ForceStageProgression")
 
-	NymMessage("Current SexStage: "+CurrentStage)
+	NymMessage("Current SexStage: "+storqst.SexSceneStage)
 	
+	if (storqst.SexSceneStage > 1) && (ForeplayStages == 1)
 
-	if Nym() && SceneStage == 1
-	cfgqst.FixExpressions()	
-	endif 
-
-	if cfgqst.DefeatStateChapter == "Foreplay Scene"
-		if previousAnim.HasTag("NymForeplay1")
-		ForePlayStages = 1
-		elseif previousAnim.HasTag("NymForeplay2")
-		ForePlayStages = 2
-		elseif previousAnim.HasTag("NymForeplay3")
-		ForePlayStages = 3
-		elseif previousAnim.HasTag("NymForeplayAll")
+		UnRegisterForModEvent("StageEnd_NadeForeplay")
 		ForePlayStages = 0
-		endif 
-		NymTrace("#NOTE ForeplayStages: "+ForePlayStages)
-	endif 
-	
-	if cfgqst.DefeatStateChapter == "Foreplay Scene" || cfgqst.DefeatStateChapter == "Golden Shower"
-	;do nothing! 
-	elseif cfgqst.NakedCumming 
+		NymTrace("OnStageStart- DEBUG Foreplay, Force End After 1 Stage")
+		thread.EndAnimation(true)
 		
-		if SceneStage == 1
-		
-		Raper0_Orgasms = 0
-		Raper1_Orgasms = 0
-		Raper2_Orgasms = 0 
-		Raper3_Orgasms = 0
-		Player_Orgasms = 0
-				
-		elseif SceneStage > 1
-						
-			if Rapers[0] && Rapers[0].IsInFaction(SexLabAnimatingFaction)
-			Utility.Wait(Utility.RandomInt(1, 5))
-				if D100(OrgasmChanceMale(SceneStage, Raper0_Orgasms))
-				Thread.ForceOrgasm(Rapers[0])
-				
-					if SceneStage == 5 && cfgqst.Gagged && !DroolApplied
-					DroolApplied = true 
-					defqst.ToggleDroolPlayer(true)
-					endif 			
-				
-		;		NymMessage("Stage: "+SceneStage+" Rapers[0] is cumming! threadID: "+threadID)
-				EndIf
-			endif 
-			if Rapers[1] && Rapers[1].IsInFaction(SexLabAnimatingFaction)
-			Utility.Wait(Utility.RandomInt(1, 5))
-				if D100(OrgasmChanceMale(SceneStage, Raper1_Orgasms))
-				Thread.ForceOrgasm(Rapers[1])
-					if SceneStage == 5 && cfgqst.Gagged && !DroolApplied
-					DroolApplied = true 
-					defqst.ToggleDroolPlayer(true)
-					endif 
-			;	NymMessage("Stage: "+SceneStage+" Rapers[1] is cumming! threadID: "+threadID)
-				EndIf
-			endif 
+	else 	
 
-			;PLAYER 
-			if D100(15*SceneStage) && !previousAnim.HasTag("Blowjob")
-			Utility.Wait(Utility.RandomInt(1, 5))
-			Thread.ForceOrgasm(cfgqst.PlayerRef)
-		;	NymMessage("Stage: "+SceneStage+" Player is cumming !threadID: "+threadID)	
-			;MfgConsoleFunc.SetPhoneme(cfgqst.PlayerRef, 1, 100)		;BIG AAAH
-			cfgqst.Orgasm = true
-			SendModEvent("Moan")
-			cfgqst.Orgasm = false
-			EndIf
+		; >>> GetSexStageSound() ---------------
+		if Nym()
+		
+			Sound CurrentlyPlayingSound = thread.SoundFX
+			Sound CurrentlyPlayingSoundTEST = Controller.Animation.GetSoundFX(SceneStage)
 			
-			if Rapers[2] && Rapers[2].IsInFaction(SexLabAnimatingFaction)
-			Utility.Wait(Utility.RandomInt(1, 3))
-				if D100(OrgasmChanceMale(SceneStage, Raper2_Orgasms))
-				Thread.ForceOrgasm(Rapers[2])
+			Sound SLFX_Squishing
+			Sound SLFX_Sucking
+			Sound SLFX_MixedFX 
+			
+			SLFX_Squishing = (Game.GetFormFromFile(0x01065A31, "SexLab.esm") as Sound)
+			SLFX_Sucking = (Game.GetFormFromFile(0x01065A32, "SexLab.esm") as Sound)
+			SLFX_MixedFX = (Game.GetFormFromFile(0x01065A33, "SexLab.esm") as Sound)
+			
+			if CurrentlyPlayingSound
 				
-									if SceneStage == 5 && cfgqst.Gagged && !DroolApplied
-					DroolApplied = true 
-					defqst.ToggleDroolPlayer(true)
+				if (CurrentlyPlayingSound == SLFX_Squishing)
+					if IsFuckedByMonsters()
+					storqst.SexFuckingSound = 20	
+					else 
+					storqst.SexFuckingSound = 10
 					endif 
-				
-			;	NymMessage("Stage: "+SceneStage+" Rapers[2] is cumming!threadID: "+threadID)
-				EndIf
+				NymTrace("OnStageStart() -  Sound Playing: SQUISHING") 
+				elseif CurrentlyPlayingSound == SLFX_Sucking
+				NymTrace("OnStageStart() -  Sound Playing: SUCKING") 
+				elseif CurrentlyPlayingSound == SLFX_MixedFX
+					if IsFuckedByMonsters()
+					storqst.SexFuckingSound = 20	
+					else 
+					storqst.SexFuckingSound = 10
+					endif 
+				NymTrace("OnStageStart() -  Sound Playing: MIXED") 
+				else 
+				NymTrace("OnStageStart() -  Sound Playing: playing but not found") 
+				endif 
+			else 
+			NymTrace("OnStageStart() -  Sound Playing: NO SOUND")
 			endif 
-			Utility.Wait(Utility.RandomInt(1, 3))
-			if Rapers[3] && Rapers[3].IsInFaction(SexLabAnimatingFaction)
-				if D100(OrgasmChanceMale(SceneStage, Raper3_Orgasms))
-				Thread.ForceOrgasm(Rapers[3])
+		endif 
+		
+		
+		if storqst.SummonedHorses 
+		
+			if SceneStage == 2	
+			;Horse eats the carrot
+			previousAnim.HasTag("NymCarrot")
+			Utility.Wait(3.0)
 				
-					if SceneStage == 5 && cfgqst.Gagged && !DroolApplied
-					DroolApplied = true 
-					defqst.ToggleDroolPlayer(true)
-					endif 
-			;	NymMessage("Stage: "+SceneStage+" Rapers[3] is cumming! threadID: "+threadID)
-				EndIf
+		;--------------------------------
+			
+				if cfgqst.ModPLUGS
+				Armor CarrotPlug = (Game.GetFormFromFile(0x00000D63, "pchsImmersivePlugs.esp") As Armor)
+				cfgqst.PlayerRef.RemoveItem(CarrotPlug, 1, true, None)
+				storqst.DeleteCarrot()
+				endif 
+			ForePlayStages = 2
+			endif 
+		endif 
+		
+
+		if Nym() 		
+			if SceneStage == 1
+			cfgqst.FixExpressions()	
 			endif 
 			
+			bool StartKissing = false
+			
+			if SceneStage == 1 
+				if previousAnim.HasTag("NymKissing2")
+				StartKissing = true
+				endif 
+			elseif SceneStage == 2 
+				if previousAnim.HasTag("NymKissing2")
+				StartKissing = true
+				endif 
+			elseif SceneStage == 3
+				if previousAnim.HasTag("NymKissing3")
+				StartKissing = true
+				endif 
+			elseif SceneStage == 4
+				if previousAnim.HasTag("NymKissing4")
+				StartKissing = true
+				endif 
+			elseif SceneStage == 5
+				if previousAnim.HasTag("NymKissing5")
+				StartKissing = true
+				endif 
+			elseif SceneStage == 6
+				if previousAnim.HasTag("NymKissing6")
+				StartKissing = true
+				endif 
+			endif 
+			
+			if StartKissing
+			defqst.EquipTonguesPlayer()
+			storqst.ForceOpen = 22 ;Kissing
+			elseif storqst.ForceOpen == 22 
+			storqst.ForceOpen = 0 ;reset, we no longer kiss
+			defqst.UnequipTonguesPlayer("forced")
+			endif 
+			
+			if previousAnim.HasTag("Cowgirl")
+			storqst.Riding = true
+			NymTrace("OnStageStart(Stage "+SceneStage+") FuckingRound: "+FuckingRound+" storqst.Riding = true")
+			endif 		
+		endif 
+
+		if cfgqst.DefeatStateChapter == "Foreplay Scene"
+			if previousAnim.HasTag("NymForeplay1")
+			ForePlayStages = 1
+			elseif previousAnim.HasTag("NymForeplay2")
+			ForePlayStages = 2
+			elseif previousAnim.HasTag("NymForeplay3")
+			ForePlayStages = 3
+			elseif previousAnim.HasTag("NymForeplayAll")
+			ForePlayStages = 0
+			endif 
+			NymTrace("OnStageStart(Stage "+SceneStage+") FuckingRound: "+FuckingRound+" ForeplayStages: "+ForePlayStages)
+		endif 
+		
+		if cfgqst.DefeatStateChapter == "Foreplay Scene" || cfgqst.DefeatStateChapter == "Golden Shower"
+		;do nothing! 
+		elseif cfgqst.NakedCumming 
+			
+			if SceneStage == 1
+			
+			Raper0_Orgasms = 0
+			Raper1_Orgasms = 0
+			Raper2_Orgasms = 0 
+			Raper3_Orgasms = 0
+			Player_Orgasms = 0
+					
+			elseif SceneStage > 1
+							
+				if Rapers[0] && Rapers[0].IsInFaction(SexLabAnimatingFaction)
+				Utility.Wait(Utility.RandomInt(1, 5))
+					if D100(OrgasmChanceMale(SceneStage, Raper0_Orgasms))
+					Thread.ForceOrgasm(Rapers[0])
+					
+						if SceneStage == 5 && cfgqst.Gagged && !DroolApplied
+						DroolApplied = true 
+						defqst.ToggleDroolPlayer(true)
+						endif 			
+					
+			;		NymMessage("Stage: "+SceneStage+" Rapers[0] is cumming! threadID: "+threadID)
+					EndIf
+				endif 
+				if Rapers[1] && Rapers[1].IsInFaction(SexLabAnimatingFaction)
+				Utility.Wait(Utility.RandomInt(1, 5))
+					if D100(OrgasmChanceMale(SceneStage, Raper1_Orgasms))
+					Thread.ForceOrgasm(Rapers[1])
+						if SceneStage == 5 && cfgqst.Gagged && !DroolApplied
+						DroolApplied = true 
+						defqst.ToggleDroolPlayer(true)
+						endif 
+				;	NymMessage("Stage: "+SceneStage+" Rapers[1] is cumming! threadID: "+threadID)
+					EndIf
+				endif 
+
+				;PLAYER 
+				if D100(15*SceneStage) && !previousAnim.HasTag("Blowjob")
+				Utility.Wait(Utility.RandomInt(1, 5))
+				Thread.ForceOrgasm(cfgqst.PlayerRef)
+			;	NymMessage("Stage: "+SceneStage+" Player is cumming !threadID: "+threadID)	
+				;MfgConsoleFunc.SetPhoneme(cfgqst.PlayerRef, 1, 100)		;BIG AAAH
+				cfgqst.Orgasm = true
+				SendModEvent("Moan")
+				cfgqst.Orgasm = false
+				EndIf
+				
+				if Rapers[2] && Rapers[2].IsInFaction(SexLabAnimatingFaction)
+				Utility.Wait(Utility.RandomInt(1, 3))
+					if D100(OrgasmChanceMale(SceneStage, Raper2_Orgasms))
+					Thread.ForceOrgasm(Rapers[2])
+					
+						if SceneStage == 5 && cfgqst.Gagged && !DroolApplied
+						DroolApplied = true 
+						defqst.ToggleDroolPlayer(true)
+						endif 
+					
+				;	NymMessage("Stage: "+SceneStage+" Rapers[2] is cumming!threadID: "+threadID)
+					EndIf
+				endif 
+				Utility.Wait(Utility.RandomInt(1, 3))
+				if Rapers[3] && Rapers[3].IsInFaction(SexLabAnimatingFaction)
+					if D100(OrgasmChanceMale(SceneStage, Raper3_Orgasms))
+					Thread.ForceOrgasm(Rapers[3])
+					
+						if SceneStage == 5 && cfgqst.Gagged && !DroolApplied
+						DroolApplied = true 
+						defqst.ToggleDroolPlayer(true)
+						endif 
+				;	NymMessage("Stage: "+SceneStage+" Rapers[3] is cumming! threadID: "+threadID)
+					EndIf
+				endif 
+				
+			endif 
 		endif 
 	endif 
-	
 EndFunction
 
 ; THIS FUNCTION IS CALLED ON registered EVENT from SEXLAB 
-Function OnStageEnd(String EventName, String ArgString, Float ArgNum, Form Sender)		;#stagegoback ;#OnStageEnd
-Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStageEnd()")
+Function OnStageEnd(String EventName, String ArgString, Float ArgNum, Form Sender)		;#stagegoback ;#OnStageEnd	#StageEnd
+Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"][Round: "+FuckingRound+"/"+Allow_SexScenes+"]: OnStageEnd(Stage: "+CurrentStage+")")
 
 	int threadID = SexLab.FindActorController(cfgqst.PlayerRef)
 	SslThreadController thread = SexLab.GetController(threadID)
@@ -13821,14 +12853,45 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStageEnd()")
 	
 	CurrentStage = SceneStage
 	
-	
-	Sound CurrentlyPlayingSound = thread.SoundFX
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SoundPlayed(): "+CurrentlyPlayingSound.GetName())
-	
-		
 	sslThreadController Controller = Sexlab.ThreadSlots.GetController(threadID)
 	sslBaseAnimation previousAnim = Controller.Animation
-
+	
+	;MOVED TO STAGE START obviously
+	;/
+	; >>> GetSexStageSound() ---------------
+	if Nym()
+	
+		Sound CurrentlyPlayingSound = thread.SoundFX
+		Sound CurrentlyPlayingSoundTEST = Controller.Animation.GetSoundFX(SceneStage)
+		
+		Sound SLFX_Squishing
+		Sound SLFX_Sucking
+		Sound SLFX_MixedFX 
+		
+		SLFX_Squishing = (Game.GetFormFromFile(0x01065A31, "SexLab.esm") as Sound)
+		SLFX_Sucking = (Game.GetFormFromFile(0x01065A32, "SexLab.esm") as Sound)
+		SLFX_MixedFX = (Game.GetFormFromFile(0x01065A33, "SexLab.esm") as Sound)
+		
+		if CurrentlyPlayingSound
+			
+			if CurrentlyPlayingSound == SLFX_Squishing
+			storqst.SexFuckingSound = 1
+			NymTrace("OnStageEnd() -  Sound Playing: SQUISHING") 
+			elseif CurrentlyPlayingSound == SLFX_Sucking
+			NymTrace("OnStageEnd() -  Sound Playing: SUCKING") 
+			elseif CurrentlyPlayingSound == SLFX_MixedFX
+			storqst.SexFuckingSound = 2
+			NymTrace("OnStageEnd() -  Sound Playing: MIXED") 
+			else 
+			NymTrace("OnStageEnd() -  Sound Playing: playing but not found") 
+			endif 
+		else 
+		NymTrace("OnStageEnd() -  Sound Playing: NO SOUND")
+		endif 
+	endif 
+	
+	/; 
+	
 
 ; ------------------------------------------------------- ;
 ; --- Tagging System                                  --- ;
@@ -13839,7 +12902,7 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStageEnd()")
 ;endFunction
 
 	
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetDescriptor(): "+CurrentlyPlayingSound.GetDescriptor()) ;<<<<---- THIS WORKS 
+	
 
 	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: GetDescriptor(): "+CurrentlyPlayingSound.GetDescriptor().GetName())
 	;sslThreadController tc = SexLab.GetController(tid)
@@ -13888,35 +12951,47 @@ Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStageEnd()")
 	
 	SceneStage -= 1
 	
-	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnStageEnd() #Stage: "+SceneStage)
+	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"][Round: "+FuckingRound+"/"+Allow_SexScenes+"]: OnStageEnd() #Stage: "+SceneStage)
 
 	;DebugNotification("NAKED DEFEAT: End of Stage: "+SceneStage)
 	
 	If Nym()
-	InfoMessage("End of Stage: "+SceneStage)
+	InfoMessage("End of Stage: "+SceneStage+" of Round: "+FuckingRound+"/"+Allow_SexScenes)
 	endif
 	
 	
 	;--- FOREPLAY HANDLING -----------------------------------------------------------------------------------------
 	
-	if cfgqst.DefeatStateChapter == "Foreplay Scene"
+	if storqst.SummonedHorses && ForePlayStages == 2 && SceneStage == 2 && D100(80)
+	 ;this is part of the "foreplay" scene of the horse summoning ritual, eating the carrot out of the player ass
+	 ;the scene has a 20% chance to play in full. regardless of that, there can be a second scene afterwards.
+		UnRegisterForModEvent("StageEnd_NadeRape")
+		ForePlayStages = 0
+		NymTrace("["+storqst.Defeat_ID+"][Round: "+FuckingRound+"/"+Allow_SexScenes+"]: OnStageEnd(Stage: "+CurrentStage+") - Carrot Eating End After 2 Stage")
+		thread.EndAnimation(true)	
+	
+	elseif cfgqst.DefeatStateChapter == "Foreplay Scene"
+	
 		if ForePlayStages == 1 
 			if SceneStage == 1
 			UnRegisterForModEvent("StageEnd_NadeForeplay")
 			
 			ForePlayStages = 0
+			NymTrace("["+storqst.Defeat_ID+"][Round: "+FuckingRound+"/"+Allow_SexScenes+"]: OnStageEnd(Stage: "+CurrentStage+") - Foreplay End After 1 Stage")
 			thread.EndAnimation(true)
 			endIf
 		elseif ForePlayStages == 2
 			if SceneStage == 2
 			UnRegisterForModEvent("StageEnd_NadeForeplay")
 			ForePlayStages = 0
+			NymTrace("["+storqst.Defeat_ID+"][Round: "+FuckingRound+"/"+Allow_SexScenes+"]: OnStageEnd(Stage: "+CurrentStage+") - Foreplay End After 2 Stages")
 			thread.EndAnimation(true)
 			endIf
 		elseif ForePlayStages == 3
 			if SceneStage == 3
 			UnRegisterForModEvent("StageEnd_NadeForeplay")
 			ForePlayStages = 0
+			NymTrace("["+storqst.Defeat_ID+"][Round: "+FuckingRound+"/"+Allow_SexScenes+"]: OnStageEnd(Stage: "+CurrentStage+") - Foreplay End After 3 Stages")
 			thread.EndAnimation(true)
 			endIf
 		endif 
@@ -13974,18 +13049,18 @@ Function ToggleRaperFaceLight(Bool Enable)
 		if Enable && FaceLightSpell && Rapers[0] && !Rapers[0].HasSpell(FaceLightSpell)
 					
 			;2 - Enable Facelight Spell 
-			Rapers[0].AddSpell(FaceLightSpell)
+			Rapers[0].AddSpell(FaceLightSpell, false)
 			
 			if Rapers[1] && !Rapers[1].HasSpell(FaceLightSpell)
-			Rapers[1].AddSpell(FaceLightSpell)
+			Rapers[1].AddSpell(FaceLightSpell, false)
 			endif 
 			
 			if Rapers[2] && !Rapers[2].HasSpell(FaceLightSpell)
-			Rapers[2].AddSpell(FaceLightSpell)
+			Rapers[2].AddSpell(FaceLightSpell, false)
 			endif 
 			
 			if Rapers[3] && !Rapers[3].HasSpell(FaceLightSpell)
-			Rapers[3].AddSpell(FaceLightSpell)
+			Rapers[3].AddSpell(FaceLightSpell, false)
 			endif 
 		;--- EQUIP TORCH ---; 
 		else
@@ -14013,22 +13088,29 @@ EndFunction
 
 ;----------------------------------------------------------------------------------------------------------------------
 
-;early event 	PLAYER MAIN  
-Function OnAnimationEnding(String EventName, String ArgString, Float ArgNum, Form Sender)	;SEXFINISHSCENE				
-
+;EARLY event 	PLAYER MAIN  
+Function OnAnimationEnding(String EventName, String ArgString, Float ArgNum, Form Sender)	;SEXFINISHSCENE					;#OnAnimationEnding()	
+	
+	;1st Event
+	;EARLY EVENT: This fires FIRST
+	
 	if storqst.FastSex > 0 ;cfgqst.DefeatStateChapter == "Cage Escape" || cfgqst.DefeatStateChapter == "Escaping the Cage" || cfgqst.DefeatStateChapter == "Fast Slave Sex"
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnAnimationEnding(FastSex)")
 	; do nothng 
+	;if !Nym()	;#FIXFADE
 	cfgqst.FadeToBlack(true)
-	
+	;endif 
 	elseif cfgqst.DefeatStateChapter == "Free"
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnAnimationEnding(Free)")
+		;if !Nym()	;#FIXFADE
 	cfgqst.FadeToBlack(false)
-	
+		;endif
 	else
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: OnAnimationEnding()")
-	cfgqst.FadeToBlack(true)
 	
+	;	if !Nym()	;#FIXFADE
+	cfgqst.FadeToBlack(true)
+	;	endif 
 	cfgqst.Immobilize(true)
 	Vehicle("restore") 	;double check
 	
@@ -14043,9 +13125,15 @@ EndFunction
 ;----------------------------------------------------------------------------------------------------------------------	
 	
 ;late Event	
-Function OnAnimationEnd(String EventName, String ArgString, Float ArgNum, Form Sender)	;SEXFINISHSCENE					
-
-NymTrace("SexDuration: "+defqst.SexDuration)	;#fast2
+Function OnAnimationEnd(String EventName, String ArgString, Float ArgNum, Form Sender)	;SEXFINISHSCENE						;#OnAnimationEnd
+	
+	;LATE EVENT, this firest second/later. 
+	
+	NymTrace("SexDuration: "+defqst.SexDuration)	;#fast2
+	
+	int SexTimerTEMP = storqst.SexTimerSlave as int
+	
+	;["+defqst.SexDuration+"/"+SexTimerTEMP+"]
 	
 	;move to SexFinished
 	;/
@@ -14072,7 +13160,9 @@ NymTrace("SexDuration: "+defqst.SexDuration)	;#fast2
 	
 	if cfgqst.DefeatStateChapter == "Free"
 
-	cfgqst.FadeToBlack(false)
+
+	;#FIXFADE do we have a fade out here at all?
+	cfgqst.FadeToBlack(false)		
 	
 	elseif cfgqst.DefeatStateChapter == "Fast Slave Sex"
 	
@@ -14102,10 +13192,15 @@ NymTrace("SexDuration: "+defqst.SexDuration)	;#fast2
 	;MiscObject LockPick = (Game.GetFormFromFile(0x0000000A, "Naked Defeat.esp") As MiscObject)	
 	Form lockpick = Game.GetFormFromFile(0x0000000A, "Skyrim.esm")
 	NymMessage("defqst.SexDuration: "+defqst.SexDuration)
-		if defqst.SexDuration < 90 
-		ScreenMessage("You did not fuck long enough for a reward")
+	
+		if (defqst.SexDuration) == 0
+		NymBox("Sex Duration = 0 #ERROR")
+		endif 
+	
+		if (defqst.SexDuration) > 0 && ((defqst.SexDuration) < SexTimerTEMP)
+		ScreenMessage("You did not fuck long enough for a reward ["+defqst.SexDuration+"/"+SexTimerTEMP+"]")
 		defqst.SexDuration = 0
-		elseif defqst.SexDuration > 90 
+		elseif defqst.SexDuration > SexTimerTEMP 
 		defqst.SexDuration = 0
 			if D100(5)
 			ScreenMessage("No reward for you, just out of spite!")
@@ -14339,303 +13434,218 @@ EndFunction
 	Bool SexFailed 
 	
 	
-Function SexFinished(int iSender)				;##finished #SexFinished()
-
-		if cfgqst.SexFinished
-		NymBox("#ERROR SexFinished DoubleStart")
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SexFinished(#DOUBLESTART Sender: "+iSender+") :::::::::::::::::::::: #Rape Round "+FuckingRound+" (Player) END ::::::::::::::::::::::")
-		else 
-	
-			; --- After Sex Maintenance ---;  
-			cfgqst.SexFinished = true
-			Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SexFinished(Sender: "+iSender+") :::::::::::::::::::::: #Rape Round "+FuckingRound+" (Player) END ::::::::::::::::::::::")
-			
-			Vehicle("restore")
-			storqst.ForceOpen = 0
-			cfgqst.FixExpressions() ; ---> Nym()
-			
-			storqst.WhippingDuration = 0 ;ends whipping
-			
-			if Nym()
-			defqst.ToggleDroolPlayer(false) ;--->  Nym() 
-			endif 
-
-			cfgqst.DefeatStateChapter = "Waiting"
-			
-			ToggleRaperFaceLight(false) ;--->  Nym() 
-			
-			StopSexEffects()
-		;	if cfgqst.IsNymrasGame()
-		;	cfgqst.PlayCombatBlockingSound()
-		;	Utility.Wait(1.0)
-		;	cfgqst.PlayCombatBlockingSound()
-		;	endif 
-			
-			
-			
-			;Debug.Messagebox
-		
-			;if Nym() && cfgqst.SexFinished
-			;
-			;endif 
-			
-			if (VictimCount > 0) && SexFailed
-			SexFailed = false 
-			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SexFinished() SexFailed, now we wait")	
-			Utility.Wait(15.0)
-
-			endif 
-
-			;cfgqst.SexScene = false	
-			
-			storqst.SexEndMaintenance()	
-			
-			Utility.Wait(1.0)
-			
-			if storqst.IsLocalSlave()
-		
-				if cfgqst.DefeatEntranceVia == "Orgy" 
-				
-					if defqst.SexDuration < 90 
-					defqst.SexDuration = 0
-					ScreenMessage("You did not fuck long enough, lazy Cunt!")
-					NymTrace("ServicesCompleted: "+slaveqst.ServicesCompleted)
-					else 
-					defqst.SexDuration = 0
-					GoodMessage("Good work, slave")
-					slaveqst.SexTaskDuration += 1
-					slaveqst.ServicesCompleted+=1
-					NymTrace("ServicesCompleted: "+slaveqst.ServicesCompleted)
-					endif 
-				elseif cfgqst.DefeatEntranceVia == "Service"	
-					;all is done externailly
-				endif 
-			endif 
-		;	if cfgqst.SexScene
-		;	cfgqst.SexScene = false
-		;	cfgqst.SexState = 0
-		;	endif 
-			
-			NymTrace("cfgqst.IsMouthAvailable - calm 14681 :"+cfgqst.IsMouthAvailable)
-			cfgqst.IsMouthAvailable = 1
-			NymTrace("cfgqst.IsMouthAvailable - calm 14683 :"+cfgqst.IsMouthAvailable)
-			cfgqst.Immobilize(true)	;double check
-			ResetGroupsForNextRound() 
-			; -----------------------------; 
-				
-		;	StripRapers()	
-			PushRapersAway()	;--->  Nym() 
-			MoveRapersAway() ;only for Afterlife/FastTravel at the moment SKIP for the rest not good yet 
-
-
-			SendModEvent("StartAddRapeCount")	;---> cfgqst.NymBeta 
-
-
-			;Vehicle("restore") 	;double check
-			SendModEvent("Moan")
-
-			;Still needed? 
-			If Nym() && cfgqst.PlayerRef.IsAIEnabled() && (!cfgqst.AbortAll) ;Is  AI enabled?
-			;NymBox("#ERROR AI is DISABLED")
-			cfgqst.PlayerRef.EnableAI(true) ; If so enable his AI.
-			EndIf
-						
-			; xxxxxxxxxxxxxxxxxxxxXXXX --- #POSE --- XXXXxxxxxxxxxxxxxxxxxxxx 	
-			if cfgqst.DefeatTypeScenario == "FastTravel"	
-			; we patiently wait for the ritual to end 	
-			PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)		
-			PlayPoseOnActor(Victims[0], "Offering", false)
-			PlayPoseOnActor(Victims[1], "Offering", false)
-			else
-			; we await our fait, calm or angry (struggling or waiting) 
-			PlayPoseOnActor(cfgqst.PlayerRef, "Random", false)		
-			PlayPoseOnActor(Victims[0], "Random", false)
-			PlayPoseOnActor(Victims[1], "Random", false)
-			endif
-			
-			if (!cfgqst.AbortAll) && (cfgqst.Dead == 0)
-			Utility.Wait(5.0)
-			endif 
-				
-			; xxxxxxxxxxxxxxxxxxxxXXXX --- #POSE RESTORE --- XXXXxxxxxxxxxxxxxxxxxxxx 
-			if cfgqst.DefeatTypeScenario == "FastTravel"
-			PlayPoseOnActor(cfgqst.PlayerRef, "Offering", true)		
-			PlayPoseOnActor(Victims[0], "Offering", true)
-			PlayPoseOnActor(Victims[1], "Offering", true)
-			else
-			PlayPoseOnActor(cfgqst.PlayerRef, "Random", true)		
-			PlayPoseOnActor(Victims[0], "Random", true)
-			PlayPoseOnActor(Victims[1], "Random", true)
-			endif
-				
-			if (!cfgqst.AbortAll) && (cfgqst.Dead == 0)
-			Utility.Wait(1.0)
-			endif
-			
-			if cfgqst.HeelsFix
-			
-				if Nym() && !IsHumanFucker ; HeelsFix_Sexlab
-				;do nothing - we take over from Sexlab
-				
-				cfgqst.DisableHeelsEffectOnActor(cfgqst.PlayerRef,14450)
-
-				else 
-				cfgqst.DisableHeelsEffectOnActor(cfgqst.PlayerRef,14450)
-				endif 
-			endif 
-			
-			;OOOOOOOOOOOOOoooooooooooooooo............	FADE BLACK OUT 
-							
-			if cfgqst.BlackFadeStatus == 1
-			cfgqst.FadeToBlack(false)	
-			endif
-						
-			if cfgqst.FollowerCount == 0 || (!cfgqst.AbortAll)
-			;Not so Nice... replace should not happen that much anyway 
-			;Sexlab.ThreadSlots.StopAll()
-			endif
-
-			;Wait for FollowerScenes to finish
-			while (SexFollower01Running || SexFollower02Running || (SolosRunning > 0)) && cfgqst.ModEnabled && (!cfgqst.AbortAll)
-			Utility.Wait (1.0)
-			endwhile
-		
-			PushFollowerRapersAway()
-
-			SendModEvent("Moan")
-			
-			; xxxxxxxxxxxxxxxxxxxxXXXX --- #POSE RESTORE --- XXXXxxxxxxxxxxxxxxxxxxxx 
-			if (!cfgqst.AbortAll)
-				if cfgqst.DefeatTypeScenario == "FastTravel"
-				PlayPoseOnActor(cfgqst.PlayerRef, "Offering", true)		
-				PlayPoseOnActor(Victims[0], "Offering", true)
-				PlayPoseOnActor(Victims[1], "Offering", true)
-				else
-				PlayPoseOnActor(cfgqst.PlayerRef, "Random", true)		
-				PlayPoseOnActor(Victims[0], "Random", true)
-				PlayPoseOnActor(Victims[1], "Random", true)
-				endif
-			endif 
-
-			;additional waiting time:		
-			float IdleWaitTime = 0
-			IdleWaitTime = cfgqst.DefeatIdleTime
-			while (IdleWaitTime > 0) && cfgqst.ModEnabled && (!cfgqst.AbortAll) && (cfgqst.Dead == 0)
-			IdleWaitTime =- 4.0
-			SendModEvent("Moan")
-			Utility.Wait(4.0)
-			endwhile
-					
-			Vehicle("restore") 	
-			SendModEvent("Moan")		 
-			UnRegisterForModEvent("AnimationEnd_NadeRape") 
-			UnRegisterForModEvent("AnimationEnding_NadeRape") 
-			UnRegisterForModEvent("StageEnd_NadeRape")
-			UnRegisterForModEvent("StageStart_NadeRape")
-			UnRegisterForModEvent("OrgasmStart_NadeRape")
-			UnRegisterForModEvent("OrgasmEnd_NadeRape")
-			UnRegisterForModEvent("StageEnd_NadeForeplay")
-			UnRegisterForModEvent("StageStart_NadeForeplay")
-				
-			;SceneStage = 0
-			GoBack = false
-		
-			SexScenesDone +=1	
-
-			;RAPE TEARS
-			if (!cfgqst.AbortAll)
-				if SexScenesDone == 0
-					if D100(30)
-					SendModEvent("StartAddRapeTears")
-					endIf
-				elseif SexScenesDone == 1
-					if D100(60)
-					SendModEvent("StartAddRapeTears")
-					endIf
-				elseif SexScenesDone > 1
-					SendModEvent("StartAddRapeTears")
-				endif
-			endif
-			
-			if (!cfgqst.AbortAll)
-			Allow_SexScenes == 0
-			endif 
-			
-		;	if cfgqst.IsNymrasGame()
-		;	cfgqst.PlayCombatBlockingSound()
-		;	endif
-			
-			NymTrace("cfgqst.IsMouthAvailable - calm 14827 :"+cfgqst.IsMouthAvailable)
-			
-			cfgqst.SexFinished = false	
-						
-			;0 SCENES
-			if cfgqst.IsDefeatRunning() && (Allow_SexScenes == 0)			;WHY DOES THIS EXIST?
-			SetStage(14) ;end of rape
-			SexScenesDone = 0 ;reset counter
-			elseif cfgqst.IsDefeatRunning()
-			
-				;SEX SCENES HANDLING for CHAIN RAPE 		#scenes #chain
-				if SexScenesDone == 1  	
-					if Allow_SexScenes == 1
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: round 1/"+Allow_SexScenes+" done, send to end of rape") 
-					SetStage(14) ;round 1/1 done >>> sent of end of rape
-					elseif Allow_SexScenes > 1
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: chainrape round 1/"+Allow_SexScenes+" done: send to round 2")
-					LastSceneOrdered = 2
-					Setstage(11)	;round 1 completed >>> send to round 2
-					endif
-				elseif SexScenesDone == 2	
-					if Allow_SexScenes == 2
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: round 2/"+Allow_SexScenes+" done, send to end of rape") 
-					SetStage(14) ;round 2/2 done >>> sent of end of rape
-					elseif Allow_SexScenes > 2
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: chainrape round 2/"+Allow_SexScenes+" done: send to round 3")
-					LastSceneOrdered = 3
-					Setstage(12)	;round 2 completed >>> send to round 3
-					endif
-				elseif SexScenesDone == 3	
-					if Allow_SexScenes == 3
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: round 3/"+Allow_SexScenes+" done, send to end of rape") 
-					SetStage(14) ;round 3/3 done >>> sent of end of rape
-					elseif Allow_SexScenes > 3
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: chainrape round 3/"+Allow_SexScenes+" done: send to round 4")
-					LastSceneOrdered = 4
-					Setstage(11)	;round 3 completed >>> send to round 4
-					endif
-				elseif SexScenesDone == 4	
-					if Allow_SexScenes == 4
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: round 4/"+Allow_SexScenes+" done, send to end of rape") 
-					
-					SetStage(14) ;round 4/4 done >>> sent of end of rape
-					elseif Allow_SexScenes > 4
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: chainrape round 4/"+Allow_SexScenes+" done: send to round 5")
-					LastSceneOrdered = 5
-					Setstage(12)	;round 4 completed >>> send to round 5
-					endif
-				elseif SexScenesDone == 5	
-					if Allow_SexScenes == 5
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: round 5/"+Allow_SexScenes+" done, send to end of rape") 
-					SetStage(14) ;round 5/5 done >>> sent of end of rape
-					elseif Allow_SexScenes > 5
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: chainrape round 5/"+Allow_SexScenes+" done: send to round 6")
-					LastSceneOrdered = 6
-					Setstage(11)	;round 5 completed >>> send to round 6
-					endif
-				elseif SexScenesDone == 6	
-					if Allow_SexScenes == 6
-					Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: round 6/"+Allow_SexScenes+" done, send to end of rape") 
-					SetStage(14) ;round 6/6 done >>> sent of end of rape
-					endif
-				elseif cfgqst.IsDefeatRunning()
-				ScreenMessage("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR - why are we here?")
-				else
-				ScreenMessage("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #ERROR - ABORT END OF DEFEAT")
-				SetStage(1000)
-				endif
-			endif
-		endif 
-	
+Function SexFinished(int iSender)
+    if cfgqst.SexFinished
+        NymBox("#ERROR SexFinished DoubleStart")
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: SexFinished(#DOUBLESTART Sender: " + iSender + ") :::::::::::::::::::::: #Rape Round " + FuckingRound + " (Player) END ::::::::::::::::::::::", 0)
+    else
+        cfgqst.SexFinished = true
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: SexFinished(Sender: " + iSender + ") :::::::::::::::::::::: #Rape Round " + FuckingRound + " (Player) END ::::::::::::::::::::::", 0)
+        Vehicle("restore")
+        storqst.ForceOpen = 0
+        cfgqst.FixExpressions()
+        storqst.WhippingDuration = 0
+        if Nym()
+            defqst.ToggleDroolPlayer(false)
+        endif
+        cfgqst.DefeatStateChapter = "Waiting"
+        ToggleRaperFaceLight(false)
+        StopSexEffects()
+        if VictimCount > 0 && SexFailed
+            SexFailed = false
+            debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: SexFinished() SexFailed, now we wait", 0)
+        endif
+        storqst.SexEndMaintenance()
+        utility.Wait(1.0)
+        if storqst.IsLocalSlave()
+            int SexTimerTEMP = (storqst.SexTimerSlave as int)
+            if cfgqst.DefeatEntranceVia == "Orgy"
+                if defqst.SexDuration == 0
+                    NymBox("Sex Duration = 0 #ERROR 14863")
+                endif
+                if defqst.SexDuration > 0 && defqst.SexDuration < SexTimerTEMP
+                    ScreenMessage("You did not fuck long enough, lazy Cunt! [" + defqst.SexDuration + "/" + SexTimerTEMP + "]")
+                    defqst.SexDuration = 0
+                    NymTrace("ServicesCompleted: " + slaveqst.ServicesCompleted)
+                else
+                    GoodMessage("Good work, slave [" + defqst.SexDuration + "/" + SexTimerTEMP + "]")
+                    defqst.SexDuration = 0
+                    slaveqst.SexTaskDuration = slaveqst.SexTaskDuration + 1
+                    slaveqst.ServicesCompleted = slaveqst.ServicesCompleted + 1
+                    NymTrace("ServicesCompleted: " + slaveqst.ServicesCompleted)
+                endif
+            elseif cfgqst.DefeatEntranceVia == "Service"
+            endif
+        endif
+        NymTrace("cfgqst.IsMouthAvailable - calm 14681 :" + cfgqst.IsMouthAvailable)
+        cfgqst.IsMouthAvailable = 1
+        NymTrace("cfgqst.IsMouthAvailable - calm 14683 :" + cfgqst.IsMouthAvailable)
+        cfgqst.Immobilize(true)
+        ResetGroupsForNextRound()
+        PushRapersAway()
+        MoveRapersAway()
+        SendModEvent("StartAddRapeCount", "", 0.0)
+        SendModEvent("Moan", "", 0.0)
+        if Nym() && cfgqst.PlayerRef.IsAIEnabled() && !cfgqst.AbortAll
+            cfgqst.PlayerRef.EnableAI(true)
+        endif
+        if cfgqst.DefeatTypeScenario == "FastTravel"
+            PlayPoseOnActor(cfgqst.PlayerRef, "Offering", false)
+            if !SexFollower01Running && !SexFollower02Running
+                PlayPoseOnActor(Victims[0], "Offering", false)
+                PlayPoseOnActor(Victims[1], "Offering", false)
+            endif
+        else
+            PlayPoseOnActor(cfgqst.PlayerRef, "Random", false)
+            if !SexFollower01Running && !SexFollower02Running
+                PlayPoseOnActor(Victims[0], "Random", false)
+                PlayPoseOnActor(Victims[1], "Random", false)
+            endif
+        endif
+        if !cfgqst.AbortAll && cfgqst.Dead == 0
+            utility.Wait(1.0)
+        endif
+        if cfgqst.DefeatTypeScenario == "FastTravel"
+            PlayPoseOnActor(cfgqst.PlayerRef, "Offering", true)
+            if !SexFollower01Running && !SexFollower02Running
+                PlayPoseOnActor(Victims[0], "Offering", true)
+                PlayPoseOnActor(Victims[1], "Offering", true)
+            endif
+        else
+            PlayPoseOnActor(cfgqst.PlayerRef, "Random", true)
+            if !SexFollower01Running && !SexFollower02Running
+                PlayPoseOnActor(Victims[0], "Random", true)
+                PlayPoseOnActor(Victims[1], "Random", true)
+            endif
+        endif
+        if !cfgqst.AbortAll && cfgqst.Dead == 0
+        endif
+        if Nym()
+        elseif cfgqst.HeelsFix
+            cfgqst.DisableHeelsEffectOnActor(cfgqst.PlayerRef, "14450")
+        endif
+        if cfgqst.BlackFadeStatus == 1
+            cfgqst.FadeToBlack(false)
+        endif
+        if cfgqst.FollowerCount == 0 || !cfgqst.AbortAll
+        endif
+        while (SexFollower01Running || SexFollower02Running || SolosRunning > 0) && cfgqst.ModEnabled && !cfgqst.AbortAll
+            utility.Wait(1.0)
+        endwhile
+        PushFollowerRapersAway()
+        SendModEvent("Moan", "", 0.0)
+        if !cfgqst.AbortAll
+            if cfgqst.DefeatTypeScenario == "FastTravel"
+                PlayPoseOnActor(cfgqst.PlayerRef, "Offering", true)
+                PlayPoseOnActor(Victims[0], "Offering", true)
+                PlayPoseOnActor(Victims[1], "Offering", true)
+            else
+                PlayPoseOnActor(cfgqst.PlayerRef, "Random", true)
+                PlayPoseOnActor(Victims[0], "Random", true)
+                PlayPoseOnActor(Victims[1], "Random", true)
+            endif
+        endif
+        float IdleWaitTime = 0.0
+        IdleWaitTime = cfgqst.DefeatIdleTime
+        NymTrace("#SEXFINSIHED cfgqst.DefeatIdleTime: " + cfgqst.DefeatIdleTime)
+        while IdleWaitTime > 0.0 && cfgqst.ModEnabled && !cfgqst.AbortAll
+            NymTrace("#SEXFINSIHED IdleWaitTime: " + IdleWaitTime)
+            IdleWaitTime = IdleWaitTime - 4.0
+            SendModEvent("Moan", "", 0.0)
+            utility.Wait(4.0)
+        endwhile
+        Vehicle("restore")
+        SendModEvent("Moan", "", 0.0)
+        UnregisterForModEvent("AnimationEnd_NadeRape")
+        UnregisterForModEvent("AnimationEnding_NadeRape")
+        UnregisterForModEvent("StageEnd_NadeRape")
+        UnregisterForModEvent("StageStart_NadeRape")
+        UnregisterForModEvent("OrgasmStart_NadeRape")
+        UnregisterForModEvent("OrgasmEnd_NadeRape")
+        UnregisterForModEvent("StageEnd_NadeForeplay")
+        UnregisterForModEvent("StageStart_NadeForeplay")
+        GoBack = false
+        SexScenesDone = SexScenesDone + 1
+        if !cfgqst.AbortAll
+            if SexScenesDone == 0
+                if D100(30.0)
+                    SendModEvent("StartAddRapeTears", "", 0.0)
+                endif
+            elseif SexScenesDone == 1
+                if D100(60.0)
+                    SendModEvent("StartAddRapeTears", "", 0.0)
+                endif
+            elseif SexScenesDone > 1
+                SendModEvent("StartAddRapeTears", "", 0.0)
+            endif
+        endif
+        if !cfgqst.AbortAll
+            Allow_SexScenes == 0
+        endif
+        NymTrace("cfgqst.IsMouthAvailable - calm 14827 :" + cfgqst.IsMouthAvailable)
+        cfgqst.SexFinished = false
+        if cfgqst.IsDefeatRunning() && Allow_SexScenes == 0
+            SetStage(14)
+            SexScenesDone = 0
+        elseif cfgqst.IsDefeatRunning()
+            if SexScenesDone == 1
+                if Allow_SexScenes == 1
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: round 1/" + Allow_SexScenes + " done, send to end of rape", 0)
+                    SetStage(14)
+                elseif Allow_SexScenes > 1
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: chainrape round 1/" + Allow_SexScenes + " done: send to round 2", 0)
+                    LastSceneOrdered = 2
+                    SetStage(11)
+                endif
+            elseif SexScenesDone == 2
+                if Allow_SexScenes == 2
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: round 2/" + Allow_SexScenes + " done, send to end of rape", 0)
+                    SetStage(14)
+                elseif Allow_SexScenes > 2
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: chainrape round 2/" + Allow_SexScenes + " done: send to round 3", 0)
+                    LastSceneOrdered = 3
+                    SetStage(12)
+                endif
+            elseif SexScenesDone == 3
+                if Allow_SexScenes == 3
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: round 3/" + Allow_SexScenes + " done, send to end of rape", 0)
+                    SetStage(14)
+                elseif Allow_SexScenes > 3
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: chainrape round 3/" + Allow_SexScenes + " done: send to round 4", 0)
+                    LastSceneOrdered = 4
+                    SetStage(11)
+                endif
+            elseif SexScenesDone == 4
+                if Allow_SexScenes == 4
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: round 4/" + Allow_SexScenes + " done, send to end of rape", 0)
+                    SetStage(14)
+                elseif Allow_SexScenes > 4
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: chainrape round 4/" + Allow_SexScenes + " done: send to round 5", 0)
+                    LastSceneOrdered = 5
+                    SetStage(12)
+                endif
+            elseif SexScenesDone == 5
+                if Allow_SexScenes == 5
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: round 5/" + Allow_SexScenes + " done, send to end of rape", 0)
+                    SetStage(14)
+                elseif Allow_SexScenes > 5
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: chainrape round 5/" + Allow_SexScenes + " done: send to round 6", 0)
+                    LastSceneOrdered = 6
+                    SetStage(11)
+                endif
+            elseif SexScenesDone == 6
+                if Allow_SexScenes == 6
+                    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: round 6/" + Allow_SexScenes + " done, send to end of rape", 0)
+                    SetStage(14)
+                endif
+            elseif cfgqst.IsDefeatRunning()
+                ScreenMessage("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR - why are we here?")
+            else
+                ScreenMessage("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: #ERROR - ABORT END OF DEFEAT")
+                SetStage(1000)
+            endif
+        endif
+    endif
 EndFunction
 ;----------------------------------------------------------------------------------------------------------------------
 
@@ -14736,61 +13746,16 @@ EndFunction
 
 ;----------------------------------------------------------------------------------------------------------------------
 
-Event OnUpdate()			; #update
-
-Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: onupdate()")
-		
-	;/
-	if (cfgqst.DefeatTypeGeneral == "AreHumans") ;(cfgqst.DefeatTypeScenario != "AfterLife") && (cfgqst.DefeatTypeScenario != "FastTravel")
-	cfgqst.TempIntBridge = 1
-	cfgqst.WhipAgain = true
-	whipq00.StartShortWhipping()
-	endif 
-	/;
-		
-	;	cfgqst.TempIntBridge = 1
-	;	whipq00.StartWhipQuest_00()
-		 ;no scene protectors
-	;	Utility.Wait(8.0)
-	;	whipq00.SetStage(25)
-		;EscapeDifficulty += 1
-	;	cfgqst.WhipAgain = false
-	;	cfgqst.TempIntBridge = 0
-
-	
-	
-	
-						;	if EndOfRape && !cfgqst.RapeAgain
-						;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: onupdate (EndOfRape)")
-						;	EndOfRape = false
-						;	SetStage(500)	;send to defeat outcomes
-	
-						;	elseif EndOfQuest && !cfgqst.RapeAgain
-						;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: onupdate (EndOfQuest)")
-						;	EndOfQuest = false
-						;	Debug.Notification("<font color='#ff0000'>It seems like they are done with you.</font>")	;MESSAGE
-						;	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: (#msg) It seems like they are done with you.")				
-						;	SetStage(1000)	;end of defeat
-	
-;	if ForcePosing_1				
-;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: onupdate (ForcePosing_1)")
-	;ForcePose("surrender")
-;	elseif ForcePosing_2
-;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: onupdate (ForcePosing_2)")
-	;ForcePose("wiggle")
-						;elseif cfgqst.RapeAgain && EndOfRape ;&& !EndOfRape && !EndOfQuest ;&& !ForcePosing_1 &&
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: onupdate (RapeAgain)")
-					
-						;EndOfRape = false
-						;EndOfQuest = false
-						;SetStage(500)
-
-;	else
-;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: onupdate (ERROR - update call)")
-;	endif
-	
-	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: onupdate (OFF)")
-
+Event OnUpdate()
+    debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: onupdate()", 0)
+    if Nym() && !cfgqst.SexScene && cfgqst.PlayerRef.GetDistance(VehiclePlayer) > 25.0
+        if cfgqst.DefeatStatePlayer == "Escaping"
+        else
+            Vehicle("restore")
+            NymMessage("!!!Calmquest OnUpdate Vehicle Restored!!!")
+            RegisterForSingleUpdate(1.0)
+        endif
+    endif
 EndEvent
 
 ;----------------------------------------------------------------------------------------------------------------------
@@ -14804,7 +13769,8 @@ EndFunction
 
 String TagsSuppressed
 String TagsWanted	
-
+String CreatureTagsSuppressed
+String CreatureTagsWanted	
 
 String Function GetCurrentBoundScenario()
 
@@ -14817,6 +13783,37 @@ String Function GetCurrentBoundScenario()
 
 EndFunction 
 
+Function GetCreatureTags(String RaceKey)	
+
+		DebugTrace("GetCreatureTags("+RaceKey+")")
+		
+		Bool AnimalGroup = storqst.CheckGroupRace(RaceKey)
+		Bool AnimalScenario = false
+		
+		if cfgqst.DefeatTypeGeneral == "AreAnimals"
+		AnimalScenario = true
+		endif 
+		
+		if AnimalGroup && AnimalScenario
+		CreatureTagsWanted = "Creature, "
+		CreatureTagsSuppressed = "InvisFurn, InvFurn, Femdom, Loving, CreatureSub, CFF, FCC, FFCC, CCFF, CFFF, FFFC, Furniture, Bound, Armbinder, Yoke, Pillory, "	
+		
+			if Nym()
+				if D100(50) ;Doggy Chance
+				CreatureTagsWanted = "Creature, Doggy, "
+					if D100(25)
+					CreatureTagsWanted = "Creature, Doggy, Aggressive, "
+					endif 
+				elseif D100(25)
+				CreatureTagsWanted = "Creature, Aggressive, "
+				endif 
+			endif
+		else 
+		CreatureTagsWanted = "Creature, "
+		CreatureTagsSuppressed = "InvisFurn, InvFurn, Femdom, Loving, CreatureSub, CFF, FCC, FFCC, CCFF, CFFF, FFFC, "
+		endif 
+
+EndFunction 
 
 
 Function GetSexTags(int VictimNumber)			;#tags   #GetSexTags(VictimNumber)
@@ -14829,18 +13826,19 @@ Function GetSexTags(int VictimNumber)			;#tags   #GetSexTags(VictimNumber)
 	
 	;String TagsSuppressedTemp_supFOREPLAY
 	
-	String TagsSuppressedTemp_supNYMRA = "Futa, Femdom,s 3jiou, Loving, "
+	String TagsSuppressedTemp_supNYMRA = "gone, Futa, Femdom, 3jiou, Loving, "
 	
-	if !cfgqst.IsPoseScenario() && D100(50)
+	if !cfgqst.IsPoseScenario() ;&& D100(50)
 	NymTrace("FunnyBiz suppressed")
-	TagsSuppressedTemp_supNYMRA = "Futa, Femdom,s 3jiou, FunnyBiz, Loving, "
+	TagsSuppressedTemp_supNYMRA = "gone, Futa, Femdom, 3jiou, FunnyBiz, Loving, "
 	endif 
 	
 	String TagsSuppressedTemp_supBASE = "LeadIn, GoldenShower, Necro, Guro, Molag, MM, Gay, Femdom, " 		;#tags
-	String TagsSuppressedTemp_supFURN = "Furniture, XCross, Wall, InvisFurn, Bed, Stockade, Wheel, Pillory, BedOnly, Bench, Throne, WallHole, " 		;#tags "Table" AND "Chair" ALLOWED FOR NOW
+	String TagsSuppressedTemp_supFURN = "Furniture, XCross, Wall, InvisFurn, InvFurn, Bed, Stockade, Wheel, Pillory, BedOnly, Bench, Throne, WallHole, " 		;#tags "Table" AND "Chair" ALLOWED FOR NOW
 	String TagsSuppressedTemp_supBINDS = "Yoke, Armbinder, Cuffs, " 		
 	String TagsSuppressedTemp_supPOSEScenarios = "GoldenShower, LeadIn, " 	
 	String TagsSuppressedTemp_supNYMForeplay = "NymForeplayPack, " 
+	String TagsSuppressedTemp_supGAG = "Blowjob, " 
 	
 	;"VictimNumber 0 = Player" , BULLSHIT - use names
 	
@@ -14873,9 +13871,12 @@ Function GetSexTags(int VictimNumber)			;#tags   #GetSexTags(VictimNumber)
 			elseif i == 10
 				TagsWantedTemp = "Billyy"
 			endif	
+		
+		TagsSuppressedTemp = TagsSuppressedTemp_supBASE + TagsSuppressedTemp_supFURN + TagsSuppressedTemp_supPOSEScenarios + TagsSuppressedTemp_supNYMRA + GroupComposition()
+		
 		endif 
 			
-	TagsSuppressedTemp = TagsSuppressedTemp_supBASE + TagsSuppressedTemp_supNYMRA + TagsSuppressedTemp_supPOSEScenarios + GroupComposition()
+		TagsSuppressedTemp = TagsSuppressedTemp_supBASE + TagsSuppressedTemp_supFURN + TagsSuppressedTemp_supPOSEScenarios + GroupComposition()
 		;/
 		if Nym()
 		TagsWantedForeplayTemp = "Anubs,FFM,NymForeplay, "
@@ -14942,7 +13943,7 @@ Function GetSexTags(int VictimNumber)			;#tags   #GetSexTags(VictimNumber)
 		int i = Utility.RandomInt(1, 5)
 		if i > 2
 		TagsWantedTemp = "Cowgirl"
-		storqst.Riding = true
+		storqst.Riding = true	;when will it get FALSE
 		elseif i == 2
 		TagsWantedTemp = "Standing"
 		elseif i == 1
@@ -14958,7 +13959,20 @@ Function GetSexTags(int VictimNumber)			;#tags   #GetSexTags(VictimNumber)
 	;	if i < 4
 	;	TagsWantedTemp = "Loving"
 	;	else
-		TagsWantedTemp = "Vanilla"
+	
+		String[] AnimationsCheck_IDs = cfgqst.SLPP_GetSceneIDs(2, "Loving, ", "", true) 	;#SLPP scene IDs instead of the legacy proxy pool
+
+	;	int AnimCountCheck		;sslAnimationSlots
+	;	AnimCountCheck = Sexlab.CountTagUsage("NymLogVersion020, ", true)
+		
+		DebugTrace("AnimCountCheck: "+AnimationsCheck_IDs.Length)
+		
+		if AnimationsCheck_IDs.Length > 3
+		TagsWantedTemp = "Loving"
+		endif
+	
+	
+		
 		;elseif i == 2
 		;return "Milky"
 		;elseif i == 1
@@ -15030,7 +14044,11 @@ Function GetSexTags(int VictimNumber)			;#tags   #GetSexTags(VictimNumber)
 				TagsWantedTemp = cfgqst.SavedTags_04
 			endif	
 		endif		
-	endif 			
+	endif 	
+
+	if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage")
+	TagsSuppressed = TagsSuppressed + "Handjob"
+	endif 
 
 	if Nym()
 	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: #BEFORE TagsWantedTemp == "+TagsWantedTemp)
@@ -15048,7 +14066,18 @@ Function GetSexTags(int VictimNumber)			;#tags   #GetSexTags(VictimNumber)
 	TagsSuppressed = TagsSuppressedTemp_supFURN
 	TagsWanted = TagsWantedForeplayTemp
 	else
-	TagsSuppressed = TagsSuppressedTemp + TagsSuppressedTemp_supNYMForeplay ;block my own SLAL...
+	
+		if cfgqst.Gagged || cfgqst.IsPlayerGagged()
+		
+			if TagsWantedTemp == "Blowjob"
+			TagsWantedTemp = "Aggressive"
+			endif 
+			
+		TagsSuppressed = TagsSuppressedTemp + TagsSuppressedTemp_supNYMForeplay + TagsSuppressedTemp_supGAG
+		else 
+		TagsSuppressed = TagsSuppressedTemp + TagsSuppressedTemp_supNYMForeplay ;block my own SLAL...
+		endif 
+	
 	TagsWanted = TagsWantedTemp
 	endif 
 	
@@ -15391,9 +14420,15 @@ Function AddDefeatBinds()		;#binds		#AddDefeatBinds
 	NymTrace("AddDefeatBinds(): DefeatTypeScenario: "+cfgqst.DefeatTypeScenario)
 
 	Bool JsonPunishOutfitsExist = false
-
+	
+	if !nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage")
+		if cfgqst.DefeatStateBindings == "DDs"
+		NymBox("calmquest #15822 - No DDs, FIXED -> Unbound!")
+		cfgqst.DefeatStateBindings == "Unbound"
+		endif 
+	endif 
 							
-	if cfgqst.ModDDframework && cfgqst.DefeatTypeScenario == "DD"		;#DDD
+	if cfgqst.ModDDframework && cfgqst.DefeatTypeScenario == "DD"		;#DD
 	NymTrace("AddDefeatBinds(): WE ARE HERE")
 		
 		;BreastYOke is 32 (Body) and 46 (Harness)
@@ -15427,6 +14462,7 @@ Function AddDefeatBinds()		;#binds		#AddDefeatBinds
 			cfgqst.Load_JSON_Outfit("Punish 05", "Forced", false)
 			endif 
 			cfgqst.IsCheat = false
+			
 		elseif !WearingDDs_HeavyBondage 
 			i = Utility.RandomInt(1,9)
 			Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: AddDefeatBinds() - Add DDevices Random: "+i)
@@ -15508,9 +14544,17 @@ Function AddDefeatBinds()		;#binds		#AddDefeatBinds
 				cfgqst.DefeatBindsEquipped = "Armbinder" 	
 				cfgqst.DefeatStateBindings = "Armbinder"
 				Utility.Wait(3.0)
+				
+				
 				;CUFFS
-				elseif (cfgqst.DefeatTypeScenario == "Cuffs") 		
+				elseif (cfgqst.DefeatTypeScenario == "Cuffs") 	
+				
 					int x = Utility.RandomInt (0, 3)
+					
+					if cfgqst.DefeatType == "Trolls"
+					x = 0 
+					endif
+					
 					if x == 0 
 					cfgqst.PlayCuffsSoundRope()
 					cfgqst.PlayerRef.AddItem(DefeatBinds[0], 1, true)			;leather
@@ -15540,6 +14584,7 @@ Function AddDefeatBinds()		;#binds		#AddDefeatBinds
 					cfgqst.DefeatBindsEquipped = "Bound_3"
 					;Utility.Wait(3.0)
 					endif
+					
 					SendModEvent("Moan")	
 					cfgqst.DefeatStateBindings = "Cuffs"
 					Utility.Wait(3.0)
@@ -15576,6 +14621,8 @@ Function AddDefeatBinds()		;#binds		#AddDefeatBinds
 						else
 						x = Utility.RandomInt (0, 3)
 						endif
+						
+						
 						
 						if x == 0 
 						cfgqst.PlayCuffsSoundRope()
@@ -15624,28 +14671,115 @@ EndFunction
 
 ;----------------------------------------------------------------------------------------------------------------------
 
-Function RemoveDefeatBinds()		;#RemoveDefeatBinds()
-	NymTrace("RemoveDefeatBinds(non DD!)") 
-	if cfgqst.DefeatBindsEquipped == "Bound_0"
-	cfgqst.PlayerRef.RemoveItem(DefeatBinds[0], 1, true, None)
-	elseif cfgqst.DefeatBindsEquipped == "Bound_1"
-	cfgqst.PlayerRef.RemoveItem(DefeatBinds[1], 1, true, None)
-	elseif cfgqst.DefeatBindsEquipped == "Bound_2"
-	cfgqst.PlayerRef.RemoveItem(DefeatBinds[2], 1, true, None)
-	elseif cfgqst.DefeatBindsEquipped == "Bound_3"
-	cfgqst.PlayerRef.RemoveItem(DefeatBinds[3], 1, true, None)	
-	elseif cfgqst.DefeatBindsEquipped == "Yoke"
-	cfgqst.PlayerRef.RemoveItem(DefeatBindsYoke[0], 1, true, None)
-	elseif cfgqst.DefeatBindsEquipped == "Armbinder"
-	cfgqst.PlayerRef.RemoveItem(DefeatBindsArmbinder[0], 1, true, None)
-	else
-	;PLAY POSE HERE to Remove Xcross etc.?
-	endif
-	
-	cfgqst.DefeatBindsEquipped = "none"
-	cfgqst.DefeatStateBindings = "Unbound"
-	
+Function RemoveDefeatBinds()
+    NymTrace("RemoveDefeatBinds(non DD!)")
+    Form[] CuffsList = new Form[4]
+    keyword[] KWDList = new keyword[4]
+    KWDList[0] = KWD_nade_Cuffs
+    KWDList[1] = KWD_nade_Armbinder
+    KWDList[2] = KWD_nade_Yoke
+    KWDList[3] = KWD_nade_AnkleCuffs
+    CuffsList = spe_objectref.GetItemsByKeyword(cfgqst.PlayerRef, KWDList, false)
+    int TTestInt = spe_objectref.RemoveItems(cfgqst.PlayerRef, CuffsList, None)
+    NymTrace("Items Removed = " + TTestInt)
+    cfgqst.DefeatBindsEquipped = "None"
+    cfgqst.DefeatStateBindings = "Unbound"
 EndFunction
+
+
+Function AddDefeatCuffs(String sMode)		;#AddDefeatCuffs()
+		
+		NymTrace("AddDefeatCuffs()")
+		
+		;TO DO: we need ANKLE Cuffs for advanced style of Heavy Bondage that only uses wrists
+		
+		String EquipMode = sMode
+
+
+		if nade_DDint.IsWearingDDs(cfgqst.PlayerRef, "Heavy Bondage") || cfgqst.PlayerRef.WornHasKeyword(KWD_nade_Armbinder) || cfgqst.PlayerRef.WornHasKeyword(KWD_nade_Yoke)
+		EquipMode = "Random Ankle"
+		endif 
+
+	;	if AllowEquip
+
+			int x
+			
+			if EquipMode == "Random"
+			x = Utility.RandomInt (0, 3)
+			elseif EquipMode == "Rope"
+			x = 3
+			elseif EquipMode == "Metal"
+			x = Utility.RandomInt (1, 2)
+			elseif EquipMode == "Random Ankle"
+			x = Utility.RandomInt (4, 7)
+			endif 
+			
+			;NEED ANKLE ONLY!!
+			
+			NymTrace("AddDefeatCuffs() [EquipMode: "+EquipMode+"]")
+		;	if cfgqst.DefeatType == "Trolls"
+		;	x = 0 
+		;	endif
+			
+			if x == 0 
+			cfgqst.PlayCuffsSoundRope()
+			cfgqst.PlayerRef.AddItem(DefeatBinds[0], 1, true)			;leather
+			cfgqst.PlayerRef.EquipItem(DefeatBinds[0], false, true)
+			;SendModEvent("Moan")	
+			cfgqst.DefeatBindsEquipped = "Bound_0"
+			Utility.Wait(3.0)
+			elseif x == 1
+			cfgqst.PlayCuffsSoundMetal()
+			cfgqst.PlayerRef.AddItem(DefeatBinds[1], 1, true)			;metal
+			cfgqst.PlayerRef.EquipItem(DefeatBinds[1], false, true)
+			;SendModEvent("Moan")	
+			cfgqst.DefeatBindsEquipped = "Bound_1"
+			;Utility.Wait(3.0)
+			elseif x == 2
+			cfgqst.PlayCuffsSoundMetal()
+			cfgqst.PlayerRef.AddItem(DefeatBinds[2], 1, true)			;metal
+			cfgqst.PlayerRef.EquipItem(DefeatBinds[2], false, true)
+			;SendModEvent("Moan")	
+			cfgqst.DefeatBindsEquipped = "Bound_2"
+			;Utility.Wait(3.0)
+			elseif x == 3
+			cfgqst.PlayCuffsSoundRope()
+			cfgqst.PlayerRef.AddItem(DefeatBinds[3], 1, true)			;rope
+			cfgqst.PlayerRef.EquipItem(DefeatBinds[3], false, true)
+			;SendModEvent("Moan")	
+			cfgqst.DefeatBindsEquipped = "Bound_3"
+			;Utility.Wait(3.0)
+			
+			
+			;ANKLE CUFFS (organize better)
+			elseif x == 4
+			cfgqst.PlayCuffsSoundRope()
+			cfgqst.PlayerRef.AddItem(DefeatBindsAnkle[0], 1, true)			;leather
+			cfgqst.PlayerRef.EquipItem(DefeatBindsAnkle[0], false, true)
+			cfgqst.DefeatBindsEquipped = "AnkleLeather"
+			
+			elseif x == 5
+			cfgqst.PlayCuffsSoundRope()
+			cfgqst.PlayerRef.AddItem(DefeatBindsAnkle[1], 1, true)			;rope 01
+			cfgqst.PlayerRef.EquipItem(DefeatBindsAnkle[1], false, true)
+			cfgqst.DefeatBindsEquipped = "AnkleRope"			
+			
+			elseif x == 6
+			cfgqst.PlayCuffsSoundMetal()
+			cfgqst.PlayerRef.AddItem(DefeatBindsAnkle[3], 1, true)			;black steel
+			cfgqst.PlayerRef.EquipItem(DefeatBindsAnkle[3], false, true)
+			cfgqst.DefeatBindsEquipped = "Leather"
+
+			elseif x == 7
+			cfgqst.PlayCuffsSoundMetal()
+			cfgqst.PlayerRef.AddItem(DefeatBindsAnkle[4], 1, true)			;black steel
+			cfgqst.PlayerRef.EquipItem(DefeatBindsAnkle[4], false, true)
+			cfgqst.DefeatBindsEquipped = "Leather"			
+			
+			endif
+	;	endif 
+
+EndFunction 
 
 ;----------------------------------------------------------------------------------------------------------------------
 
@@ -16134,6 +15268,12 @@ Function CalmFollower()	;REMOVE OLD REPLACED ALREADY
 
 EndFunction
 
+
+Function CleanUpSpawns()
+NakedGhostFaction
+
+EndFunction 
+
 Function SelectWhipper()
 	
 	;GUIDE: we select an Actor based on the Scenario and remove him from his Group so that the whipper is always available
@@ -16491,46 +15631,62 @@ Function WhipStripScene()			;#WhipStripScene()
 		int i = 0
 		int iWaitTime = 5
 		storqst.StartWhipping_00(600)
+		int j = 10
 	
 		Utility.Wait(iWaitTime)
 		
 		while !StrippedCompletely
 		
+			PlayPoseOnActor(cfgqst.PlayerRef, "Struggle", false)
+			cfgqst.WhipAgain = true
+			NymTrace("WhipStripScene -> cfgqst.WhipAgain = true")
+
 			if storqst.WhippingDuration == 0 ;restart WhipQuest if needed
 			storqst.StartWhipping_00(600)
 			endif 
-		
-			if D100(50) 
-			PlayPoseOnActor(cfgqst.PlayerRef, "Struggle", false)
-			endif 
+			
+			while storqst.WhipHitCount < 5 && cfgqst.ModEnabled && j > 0
+			NymTrace("WhipStripScene(WhipHitCount: "+storqst.WhipHitCount+")")
+			j -= 1
+			Utility.Wait(1.0)
+			endwhile 
+
 			NymTrace("WhipStripScene(Round "+i+")")
 			if i == 0 
 				i += 1
 				if storqst.GetSlotItem(33, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(33, cfgqst.PlayerRef)	;gauntlets
-				cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
+			;	cfgqst.PlayCombatStrippingSound()
 				Utility.Wait(iWaitTime)
 				endif 
 			elseif i == 1 				
 				i += 1
 				if storqst.GetSlotItem(42, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(42, cfgqst.PlayerRef)	;circlet
-				cfgqst.PlayCombatStrippingSound()
+				;cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
 				Utility.Wait(iWaitTime)
 				endif 
 			elseif i == 2 				
 				i += 1
 				if storqst.GetSlotItem(57, cfgqst.PlayerRef) ;returns a Form or NONE 
-				cfgqst.Strip(57, cfgqst.PlayerRef) 	;pauldron
-				cfgqst.PlayCombatStrippingSound()
-				Utility.Wait(iWaitTime)
+					if Nym() && D100(50)
+					;do nothing 
+					else 
+					cfgqst.Strip(57, cfgqst.PlayerRef) 	;pauldron
+					;cfgqst.PlayCombatStrippingSound()
+					defqst.PlaySoundStripWhipCloth()
+					Utility.Wait(iWaitTime)
+					endif 
 				endif 	
 
 			elseif i == 3 				
 				i += 1
 				if storqst.GetSlotItem(53, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(53, cfgqst.PlayerRef)	;steel thigh armor
-				cfgqst.PlayCombatStrippingSound()
+				;cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
 				Utility.Wait(iWaitTime)
 				endif 	
 				
@@ -16538,7 +15694,8 @@ Function WhipStripScene()			;#WhipStripScene()
 				i += 1
 				if storqst.GetSlotItem(46, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(46, cfgqst.PlayerRef)	;harness
-				cfgqst.PlayCombatStrippingSound()
+				;cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
 				Utility.Wait(iWaitTime)
 				endif 	
 				
@@ -16546,7 +15703,8 @@ Function WhipStripScene()			;#WhipStripScene()
 				i += 1
 				if storqst.GetSlotItem(32, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(32, cfgqst.PlayerRef)	;body 
-				cfgqst.PlayCombatStrippingSound()
+				;cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
 				Utility.Wait(iWaitTime)
 				endif 	
 				
@@ -16554,7 +15712,8 @@ Function WhipStripScene()			;#WhipStripScene()
 				i += 1
 				if storqst.GetSlotItem(52, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(52, cfgqst.PlayerRef)	;bikini bottom
-				cfgqst.PlayCombatStrippingSound()
+				;cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
 				Utility.Wait(iWaitTime)
 				endif 	
 				
@@ -16562,40 +15721,55 @@ Function WhipStripScene()			;#WhipStripScene()
 				i += 1
 				if storqst.GetSlotItem(49, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(49, cfgqst.PlayerRef)	;savage bikini thong
-				cfgqst.PlayCombatStrippingSound()
+				;cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
 				Utility.Wait(iWaitTime)
 				endif 	
 			elseif i == 8 				
 				i += 1
 				if storqst.GetSlotItem(35, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(35, cfgqst.PlayerRef)	;amulett
-				cfgqst.PlayCombatStrippingSound()
+				;cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
 				Utility.Wait(iWaitTime)
 				endif 	
 				
 			elseif i == 9 				
 				i += 1
 				if storqst.GetSlotItem(37, cfgqst.PlayerRef) ;returns a Form or NONE 
-				cfgqst.Strip(37, cfgqst.PlayerRef)	;boots
-				cfgqst.PlayCombatStrippingSound()
-				Utility.Wait(iWaitTime)
+				
+					if Nym() && D100(50)
+					;do nothing 
+					else 
+					cfgqst.Strip(37, cfgqst.PlayerRef)	;boots
+					;cfgqst.PlayCombatStrippingSound()
+					defqst.PlaySoundStripWhipCloth()
+					Utility.Wait(iWaitTime)
+					endif 
+					
 				endif 	
 				
 			elseif i == 10
 				i += 1
 				if storqst.GetSlotItem(48, cfgqst.PlayerRef) ;returns a Form or NONE 
 				cfgqst.Strip(48, cfgqst.PlayerRef)	;bikini top
-				cfgqst.PlayCombatStrippingSound()
+				;cfgqst.PlayCombatStrippingSound()
+				defqst.PlaySoundStripWhipCloth()
 				Utility.Wait(iWaitTime)
 				endif 	
 				
 			elseif i == 11
 				i += 1
 				if cfgqst.BondageHaircutProb > 0
+					if Nym() && D100(50)
+					;do nothing 
+					else 
 					HairChangedOnce = true
-					cfgqst.ChangeHairStyle()	;whip hair into shape!!!
+					cfgqst.ChangeHairStyle("Standard")	;whip hair into shape!!!
+					cfgqst.PlayCombatStrippingSound()
 					SendModEvent("Moan")
 					Utility.Wait(iWaitTime)
+					endif 
 				endif			
 					
 			elseif i == 12 ;always ends here 
@@ -16609,6 +15783,67 @@ Function WhipStripScene()			;#WhipStripScene()
 		
 
 EndFunction 
+
+Function StripDuringSex(int iProgress)
+    DebugTrace("StripDuringSex(START)")
+    int i = 0
+    if iProgress == 1 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 48)
+        if storqst.GetSlotItem(48, cfgqst.PlayerRef)
+            cfgqst.Strip(48, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 2 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 52)
+        if storqst.GetSlotItem(52, cfgqst.PlayerRef)
+            cfgqst.Strip(52, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 3 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 32)
+        if storqst.GetSlotItem(32, cfgqst.PlayerRef)
+            cfgqst.Strip(32, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 4 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 33)
+        if storqst.GetSlotItem(33, cfgqst.PlayerRef)
+            cfgqst.Strip(33, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 5 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 42)
+        if storqst.GetSlotItem(42, cfgqst.PlayerRef)
+            cfgqst.Strip(42, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 6 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 57) && D100(50.0)
+        if storqst.GetSlotItem(57, cfgqst.PlayerRef)
+            cfgqst.Strip(57, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 7 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 57) && D100(50.0)
+        if storqst.GetSlotItem(53, cfgqst.PlayerRef)
+            cfgqst.Strip(53, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 8 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 46)
+        if storqst.GetSlotItem(46, cfgqst.PlayerRef)
+            cfgqst.Strip(46, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 9 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 49)
+        if storqst.GetSlotItem(49, cfgqst.PlayerRef)
+            cfgqst.Strip(49, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 10 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 35)
+        if storqst.GetSlotItem(35, cfgqst.PlayerRef)
+            cfgqst.Strip(35, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    elseif iProgress == 11 && storqst.IsSlotOccupied(cfgqst.PlayerRef, 37) && D100(50.0)
+        if storqst.GetSlotItem(37, cfgqst.PlayerRef)
+            cfgqst.Strip(37, cfgqst.PlayerRef)
+            defqst.PlaySoundStripWhipCloth()
+        endif
+    endif
+EndFunction
 
 ;Function DoubleCheckCreatures(Actor akactor)
 
@@ -16869,6 +16104,20 @@ Function SetVehicleToActor(Actor ActorTemp, String sPosition, ObjectReference Ve
 	VehicleTemp.MoveTo(ActorTemp, ActorTemp.GetHeight() - 125.0, abMatchRotation = true)
 EndFunction
 
+Function PlaceSafetyPlatform(bool bPlace)
+    if cfgqst.NymBeta
+        if bPlace
+            SafetyPlatform = cfgqst.PlayerRef.PlaceAtMe(cfgqst.TestFloor, 1, false, false)
+            SafetyPlatform.MoveTo(cfgqst.PlayerRef, 0.0 * math.Sin(cfgqst.PlayerRef.GetAngleZ()), 0.0 * math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 155.0, false)
+            SafetyPlatform.SetAngle(0.0, 0.0, 0.0)
+        else
+            SafetyPlatform.DisableNoWait(false)
+            SafetyPlatform.Delete()
+            SafetyPlatform = None
+        endif
+    endif
+EndFunction
+
 	;VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
 	
 
@@ -16889,561 +16138,221 @@ ObjectReference vehicle_foll_03 = none
 Bool AfterLifeStairsLocation = false
 
 
-Function Vehicle(string Type = "none")		;#vehicle()
-;DebugTrace("Vehicle()")
-NymTrace("Vehicle: "+Type)
-
-;VehicleAlreadySetup = true 
-Bool NewVehiclePlacement = true
-		
-	storqst.PlayerPosingVehicle(false)	
-		
-	if Type == "SetupForSlavery"
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Vehicle (SetupForSlavery)")
-	;PLAYER X MARKER (FAst Setup For Slavery) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	VehiclePlayer = Alias_Vehicle.GetReference() 
-	VehiclePlayer.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)
-	if Nym()
-	;VehiclePlayer.MoveTo(VehiclePlayer, 0.0 * Math.Sin(VehiclePlayer.GetAngleZ()), 0.0 * Math.Cos(VehiclePlayer.GetAngleZ()), VehiclePlayer.GetHeight() +3.0, abMatchRotation = true)
-	endif 
-	
-	
-	;	if !cfgqst.VRfix
-	;	cfgqst.PlayerRef.SetVehicle(VehiclePlayer)					
-	;	endif
-		
-		PlayerSetVehicle(TRUE)
-		
-		if folqst.Actor_Follower01	;LEFT					
-		SetVehicleToActor(folqst.Actor_Follower01, "FRONT LEFT 45°", Vehicle_Victims0, cfgqst.PlayerRef, VehiclePlayer, 160.0, 45.0)	
-		endif 	
-		if folqst.Actor_Follower02	;RIGHT			
-		SetVehicleToActor(folqst.Actor_Follower02, "FRONT RIGHT 45°", Vehicle_Victims1, cfgqst.PlayerRef, VehiclePlayer, 160.0, 320.0)
-		endif
-	
-		; --- WATCHERS SETUP --- ;
-		
-		if Nym()
-		PlaceWatcherXMarkers() 
-		else 
-		PlaceWatchMarkers()
-		endif 
-		
-	elseif Type == "Setup Early"
-	
-		VehiclePlayer = Alias_Vehicle.GetReference() 
-		VehiclePlayer.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)
-		VehiclePlayer.SetAngle(0.0, 0.0, cfgqst.PlayerRef.GetAngleZ())
-		PlayerSetVehicle(True)
-	
-	elseif Type == "SetupForAfterlife"			;#Afterlife		
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Vehicle (SetupForAfterlife)")
-		Bool NewVehicle = true
-
-		Afterlife_Table_Center = (Game.GetFormFromFile(0x00005B13, "Naked Defeat.esp") As objectreference)
-		Afterlife_Table_Front = (Game.GetFormFromFile(0x00005B14, "Naked Defeat.esp") As objectreference)
-		Afterlife_Table_Back = (Game.GetFormFromFile(0x00005B15, "Naked Defeat.esp") As objectreference)
-		
-		Afterlife_Stairs_Center = (Game.GetFormFromFile(0x00005B17, "Naked Defeat.esp") As objectreference) 
-		Afterlife_Stairs_Right = (Game.GetFormFromFile(0x00005B18, "Naked Defeat.esp") As objectreference)
-		Afterlife_Stairs_Left = (Game.GetFormFromFile(0x00005B16, "Naked Defeat.esp") As objectreference)
-	
-		;if Nym()
-		if NewVehicle
-			if D100(33) ;Random decision which setup
-			AfterLifeStairsLocation = true
-			VehiclePlayer = Afterlife_Stairs_Center
-			Vehicle_Victims0 = Afterlife_Stairs_Right
-			Vehicle_Victims1 = Afterlife_Stairs_Left 
-			else 
-			AfterLifeStairsLocation = false
-			VehiclePlayer = Afterlife_Table_Center
-			Vehicle_Victims0 = Afterlife_Table_Front
-			Vehicle_Victims1 = Afterlife_Table_Back 		
-			endif 
-
-			cfgqst.PlayerRef.MoveTo(VehiclePlayer, abMatchRotation = true)
-			TillTouchdown(cfgqst.PlayerRef)
-		;	if !cfgqst.VRfix
-		;	cfgqst.PlayerRef.SetVehicle(VehiclePlayer)					
-		;	endif
-			PlayerSetVehicle(True)
-		
-		else 
-			;/
-			; --- PLAYER SETUP --- ; OLD
-			VehiclePlayer = Alias_Vehicle.GetReference() 
-			VehiclePlayer.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)
-			if !cfgqst.VRfix
-			cfgqst.PlayerRef.SetVehicle(VehiclePlayer)					
-			endif
-			
-			VehiclePlayer.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)	;set rotation to match the PC
-			;VehiclePlayer.SetAngle(0.0, 0.0, 0.0)
-			/;
-			; --- WATCHERS SETUP --- ;
-			
-		endif 		
-		
-		if Nym()
-		PlaceWatcherXMarkers() 
-		else 
-		PlaceWatchMarkers()
-		endif 
-		
-		
-		; --- FOLLOWER PACKAGE --- ;
-		folidle01.StartFollowerIdleQuest_01("none")	
-		if folqst.Actor_Follower01
-		
-		;Vehicle_Victims0 = Alias_Vehicle_Follower_03.GetReference()
-		folidle01.StartDoingNothing_01(true)
-		folqst.Actor_Follower01.EvaluatePackage()
-		endif
-		if folqst.Actor_Follower02
-		;Vehicle_Victims1 = Alias_Vehicle_Follower_02.GetReference()
-		folidle01.StartDoingNothing_02(true)
-		folqst.Actor_Follower02.EvaluatePackage()
-		endif 
-		cfgqst.FollowersStripCompletely()		
-
-		
-		if NewVehicle
-		
-			if NewVehicle
-			;if Nym()			
-				if folqst.IsWithUs_Follower(0)		
-				NymTrace("folqst.IsWithUs_Follower(0)for VEHICLE")
-				;Vehicle_Victims0 = Afterlife_Stairs_Right
-				folqst.Actor_Follower01.MoveTo(Vehicle_Victims0, abMatchRotation = true)
-				TillTouchdown(folqst.Actor_Follower01)
-				folqst.Actor_Follower01.SetVehicle(Vehicle_Victims0)	
-				endif 
-				
-				if folqst.IsWithUs_Follower(1)
-				NymTrace("folqst.IsWithUs_Follower(0)for VEHICLE")
-				;Vehicle_Victims1 = Afterlife_Stairs_Left
-				folqst.Actor_Follower02.MoveTo(Vehicle_Victims1, abMatchRotation = true)
-				TillTouchdown(folqst.Actor_Follower02)
-				folqst.Actor_Follower02.SetVehicle(Vehicle_Victims1)	
-				endif 
-				
-			else		
-			
-			;/
-			
-				;MOVE TO LEFT AND RIGHT OF PLAYER		;TAHLIA 				
-				if folqst.Actor_Follower01	;FRONT 			
-				;SetVehicleToActor(folqst.Actor_Follower01, "LEFT 90°", Vehicle_Victims0, cfgqst.PlayerRef, VehiclePlayer, 170.0, 0.0)	;was 180 facing LEFT	less is rotating -> LEFT
-				SetVehicleToActor(folqst.Actor_Follower01, "FRONT 90°", Vehicle_Victims0, cfgqst.PlayerRef, VehiclePlayer, 185.0, 180.0)	;was 0 facing LEFT	less is rotating -> LEFT
-				endif 	
-				if folqst.Actor_Follower02	;BACK		;LYDIA
-				;SetVehicleToActor(folqst.Actor_Follower02, "RIGHT 90°", Vehicle_Victims1, cfgqst.PlayerRef, VehiclePlayer, 170.0, 180.0)	;was 0, facing LEFT	less is rotating -> LEFT
-				SetVehicleToActor(folqst.Actor_Follower02, "BACK 90°", Vehicle_Victims1, cfgqst.PlayerRef, VehiclePlayer, 180.0, 0.0)	;was 180, facing LEFT	less is rotating -> LEFT
-				endif
-				/;
-			endif 
-		
-			
-		else ;OLD VEHICLE 
-		;/
-		;1 Follower moved to Spot (LEFT)
-		folqst.Actor_Follower02.MoveTo(cfgqst.PlayerRef, -160.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90.0), -160.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()+90.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true) ;MOVES to the LEFT 
-
-		;2 Follower TO FACE PLAYER			
-		zOffset = folqst.Actor_Follower02.GetHeadingAngle(cfgqst.PlayerRef)
-		folqst.Actor_Follower02.SetAngle(folqst.Actor_Follower02.GetAngleX(), folqst.Actor_Follower02.GetAngleY(), folqst.Actor_Follower02.GetAngleZ() + zOffset)
-		cfgqst.RotateObject(folqst.Actor_Follower02, 270)
-			
-		folqst.Actor_Follower02.MoveTo(folqst.Actor_Follower02, abMatchRotation = true)
-		TillTouchdown(folqst.Actor_Follower02)
-		;MOVE TO RIGHT
-		folqst.Actor_Follower01.MoveTo(cfgqst.PlayerRef, 160.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90.0), 160.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()+90.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true) 
-		;VEHICLE TO FACE PLAYER ----------------------------------------------------------------------------				
-		zOffset = folqst.Actor_Follower01.GetHeadingAngle(cfgqst.PlayerRef)
-		folqst.Actor_Follower01.SetAngle(folqst.Actor_Follower01.GetAngleX(), folqst.Actor_Follower01.GetAngleY(), folqst.Actor_Follower01.GetAngleZ() + zOffset)
-		cfgqst.RotateObject(folqst.Actor_Follower01, 270)
-		folqst.Actor_Follower01.MoveTo(folqst.Actor_Follower01, abMatchRotation = true)
-		TillTouchdown(folqst.Actor_Follower01)
-		/;
-		endif 
-	
-	;#SS AUCTION with FOLLOWERS 		
-	elseif Type == "SetupForAuction"			;#auction		
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Vehicle (SetupForAuction)")			
-		
-		if folqst.IsWithUs_Follower(0) || folqst.IsWithUs_Follower(1)
-		folidle01.StartFollowerIdleQuest_01("none")	
-		cfgqst.FollowersStripCompletely()
-		endif 
-		
-		if folqst.IsWithUs_Follower(0)
-		NymTrace("folqst.IsWithUs_Follower(0)")
-		folidle01.StartDoingNothing_01(true)
-		folqst.Actor_Follower01.EvaluatePackage()
-		endif
-		
-		if folqst.IsWithUs_Follower(1)
-		NymTrace("folqst.IsWithUs_Follower(1)")
-		folidle01.StartDoingNothing_02(true)
-		folqst.Actor_Follower02.EvaluatePackage()
-		endif 
-		
-					if folqst.IsWithUs_Follower(1)
-					folqst.Actor_Follower02.MoveTo(cfgqst.PlayerRef, -110.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90.0), -110.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()+90.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true) ;MOVES to the LEFT 
-		
-					zOffset = folqst.Actor_Follower02.GetHeadingAngle(cfgqst.PlayerRef)
-					folqst.Actor_Follower02.SetAngle(folqst.Actor_Follower02.GetAngleX(), folqst.Actor_Follower02.GetAngleY(), folqst.Actor_Follower02.GetAngleZ() + zOffset)
-					cfgqst.RotateObject(folqst.Actor_Follower02, 270)
-				
-					folqst.Actor_Follower02.MoveTo(folqst.Actor_Follower02, abMatchRotation = true)
-					TillTouchdown(folqst.Actor_Follower02)
-
-					PlayPoseOnActor(folqst.Actor_Follower02, "FollowerAuction", false)
-					endif
-
-					if folqst.IsWithUs_Follower(0)
-					folqst.Actor_Follower01.MoveTo(cfgqst.PlayerRef, -180.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90.0), -180.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()+90.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true) 
-								
-					zOffset = folqst.Actor_Follower01.GetHeadingAngle(cfgqst.PlayerRef)
-					folqst.Actor_Follower01.SetAngle(folqst.Actor_Follower01.GetAngleX(), folqst.Actor_Follower01.GetAngleY(), folqst.Actor_Follower01.GetAngleZ() + zOffset)
-				
-					cfgqst.RotateObject(folqst.Actor_Follower01, 270)
-					folqst.Actor_Follower01.MoveTo(folqst.Actor_Follower01, abMatchRotation = true)
-					TillTouchdown(folqst.Actor_Follower01)
-				
-					PlayPoseOnActor(folqst.Actor_Follower01, "FollowerAuction", false)
-					endif
-		
-	elseif (Type == "setup")
-	Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Vehicle (setup)")
-	;GUIDE: Places the XMarker Heading for the Player (Main Vehicle/Anchor) at the final resting position (from find spot etc.).
-	;places the secondary XMarker Heading as Vehicles for the Followers and additional XMarkers surrounded all that for Fappers/Spectators. 
-	
-		;if (Type != "Restore") && (Type != "Remove")
-		
-		if Nym()
-		VehiclePlayer = cfgqst.PlayerRef.PlaceAtMe(storqst.XMarkerHeading_Naked)
-		Vehicle_Victims0 = cfgqst.PlayerRef.PlaceAtMe(storqst.XMarkerHeading_Naked)
-		Vehicle_Victims1 = cfgqst.PlayerRef.PlaceAtMe(storqst.XMarkerHeading_Naked)
-		else 
-		Vehicle_Victims0 = Alias_Vehicle_Follower_03.GetReference()
-		Vehicle_Victims1 = Alias_Vehicle_Follower_02.GetReference()
-		VehiclePlayer = Alias_Vehicle.GetReference() 
-		endif 
-		;VehiclePlayer.SetAngle(0.0, 0.0, 0.0)
-		VehiclePlayer.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)
-		VehiclePlayer.SetAngle(0.0, 0.0, cfgqst.PlayerRef.GetAngleZ())
-		if Nym()
-		;experiment with HIGHER elevation for vehicle to prevent falling through floor... but... welll...
-		;VehiclePlayer.MoveTo(VehiclePlayer, 0.0 * Math.Sin(VehiclePlayer.GetAngleZ()), 0.0 * Math.Cos(VehiclePlayer.GetAngleZ()), VehiclePlayer.GetHeight() +3.0, abMatchRotation = true)
-		endif 
-		
-		float fFollowerDistance
-		
-		if Nym()
-		fFollowerDistance = 120.0 ;add MCM setting
-		else 
-		fFollowerDistance = 160.0
-		endif 
-		
-		PlayerSetVehicle(True)
-		
-		if folqst.Actor_Follower01	;LEFT					
-		SetVehicleToActor(folqst.Actor_Follower01, "FRONT LEFT 45°", Vehicle_Victims0, cfgqst.PlayerRef, VehiclePlayer, fFollowerDistance, 45.0)	
-		endif 	
-		if folqst.Actor_Follower02	;RIGHT			
-		SetVehicleToActor(folqst.Actor_Follower02, "FRONT RIGHT 45°", Vehicle_Victims1, cfgqst.PlayerRef, VehiclePlayer, fFollowerDistance, 320.0)
-		endif	
-		
-		; --- WATCHERS SETUP --- ;
-		if Nym()
-		PlaceWatcherXMarkers() 
-		else 
-		PlaceWatchMarkers()
-		endif 
-					
-	elseif Type == "setupOLD"
-	
-	;/
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Vehicle (setup)")
-		;PLAYER X MARKER (MAIN) >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		VehiclePlayer = Alias_Vehicle.GetReference() 
-		
-		if VehiclePlayer
-		VehiclePlayer.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)
-		;VehiclePlayer.SetAngle(0.0, 0.0, 0.0)	;reset rotation to have correct alignment of Surround Markers <<<<<<------ THIS WAS THE PROBLEM!!! 
-		else
-		NymTrace("#ERROR - Vehicle is NONE")
-		endif 
-		
-	;	if !cfgqst.VRfix
-	;	cfgqst.PlayerRef.SetVehicle(VehiclePlayer)					
-	;	endif
-		PlayerSetVehicle(True)
-		
-		VehiclePlayer.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)	;set rotation to match the PC
-
-/;
-
-	;PLAYER SURROUND X MARKER HEADING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-		if NewVehiclePlacement
-		
-		;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-		;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX    X MARKERS    XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-		;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-		
-		;XMARKER 00 
-		xMarkerHeading_00 = Alias_XMarkerHeading_00.GetReference()
-		; ---- Place Relative to Player --------------------------------
-		xMarkerHeading_00.MoveTo(VehiclePlayer, 75.0 * Math.Sin(VehiclePlayer.GetAngleZ()+45.0), 75.0 * Math.Cos(VehiclePlayer.GetAngleZ()+45.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-		; ---- Face Player --------------------------------------------
-		zOffset = xMarkerHeading_00.GetHeadingAngle(cfgqst.PlayerRef)
-		xMarkerHeading_00.SetAngle(xMarkerHeading_00.GetAngleX(), xMarkerHeading_00.GetAngleY(), xMarkerHeading_00.GetAngleZ() + zOffset)
-			
-		;XMARKER 01 
-		xMarkerHeading_01 = Alias_XMarkerHeading_01.GetReference()
-		; ---- Place Relative to Player --------------------------------
-		xMarkerHeading_01.MoveTo(VehiclePlayer, -75.0 * Math.Sin(VehiclePlayer.GetAngleZ()+45.0), -75.0 * Math.Cos(VehiclePlayer.GetAngleZ()+45.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-		; ---- Face Player --------------------------------------------
-		zOffset = xMarkerHeading_01.GetHeadingAngle(cfgqst.PlayerRef)
-		xMarkerHeading_01.SetAngle(xMarkerHeading_01.GetAngleX(), xMarkerHeading_01.GetAngleY(), xMarkerHeading_01.GetAngleZ() + zOffset)
-		
-		;XMARKER 02
-		xMarkerHeading_02 = Alias_XMarkerHeading_02.GetReference()
-		; ---- Place Relative to Player --------------------------------
-		xMarkerHeading_02.MoveTo(VehiclePlayer, 75.0 * Math.Sin(VehiclePlayer.GetAngleZ()+135.0), 75.0 * Math.Cos(VehiclePlayer.GetAngleZ()+135.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-		; ---- Face Player --------------------------------------------
-		zOffset = xMarkerHeading_02.GetHeadingAngle(cfgqst.PlayerRef)
-		xMarkerHeading_02.SetAngle(xMarkerHeading_02.GetAngleX(), xMarkerHeading_02.GetAngleY(), xMarkerHeading_02.GetAngleZ() + zOffset)
-		
-		;XMARKER 03
-		xMarkerHeading_03 = Alias_XMarkerHeading_03.GetReference()
-		; ---- Place Relative to Player --------------------------------
-		xMarkerHeading_03.MoveTo(VehiclePlayer, -75.0 * Math.Sin(VehiclePlayer.GetAngleZ()+135.0), -75.0 * Math.Cos(VehiclePlayer.GetAngleZ()+135.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-		; ---- Face Player --------------------------------------------
-		zOffset = xMarkerHeading_03.GetHeadingAngle(cfgqst.PlayerRef)
-		xMarkerHeading_03.SetAngle(xMarkerHeading_03.GetAngleX(), xMarkerHeading_03.GetAngleY(), xMarkerHeading_03.GetAngleZ() + zOffset)
-
-		else 
-	
-		xMarkerHeading_00 = Alias_XMarkerHeading_00.GetReference()
-		xMarkerHeading_00.MoveTo(VehiclePlayer, 75.0 * Math.Sin(VehiclePlayer.GetAngleZ()), 75.0 * Math.Cos(VehiclePlayer.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-		xMarkerHeading_00.SetAngle(0.0, 0.0, 180.0)
-
-		xMarkerHeading_01 = Alias_XMarkerHeading_01.GetReference()
-		xMarkerHeading_01.MoveTo(VehiclePlayer, -75.0 * Math.Sin(VehiclePlayer.GetAngleZ()), -75.0 * Math.Cos(VehiclePlayer.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-		xMarkerHeading_01.SetAngle(0.0, 0.0, 0.0)
-
-		xMarkerHeading_02 = Alias_XMarkerHeading_02.GetReference()
-		xMarkerHeading_02.MoveTo(VehiclePlayer, 75.0 * Math.Sin(VehiclePlayer.GetAngleZ()+90), 75.0 * Math.Cos(VehiclePlayer.GetAngleZ()+90), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-		xMarkerHeading_02.SetAngle(0.0, 0.0, 270.0)
-
-		xMarkerHeading_03 = Alias_XMarkerHeading_03.GetReference()
-		xMarkerHeading_03.MoveTo(VehiclePlayer, -75.0 * Math.Sin(VehiclePlayer.GetAngleZ()+90), -75.0 * Math.Cos(VehiclePlayer.GetAngleZ()+90), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-		xMarkerHeading_03.SetAngle(0.0, 0.0, 90.0)
-		
-		endif
-		
-		;VehiclePlayer.MoveTo(cfgqst.PlayerRef, abMatchRotation = true)	;set rotation to match the PC
-	
-
-	
-	;FOLLOWER MARKERS HEADING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	
-		if VictimCount > 0
-		;RIGHT SPOT 	
-		;	vehicle.SetAngle(0.0, 0.0, 90.0)
-			;FOLLOWER 01:
-			Vehicle_Victims0 = Alias_Vehicle_Follower_03.GetReference() 	;#TODO clean vehicle integration Alias
-			;!!!!!!!!!! WHYS WAS THIS VEHICLE FOLLOWER 03???? >---- bullshit... tidy this up for more follwoers... 
-			;OLD VERSION (move in Front): Vehicle_Victims0.MoveTo(vehicle, 200.0 * Math.Sin(vehicle.GetAngleZ()), 200.0 * Math.Cos(vehicle.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-
-			if NewVehiclePlacement
-			;PLACE VEHICLE relative to PC
-			Vehicle_Victims0.MoveTo(VehiclePlayer, 160.0 * Math.Sin(VehiclePlayer.GetAngleZ()+45.0), 160.0 * Math.Cos(VehiclePlayer.GetAngleZ()+45.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-			;should now have same angle as the PC, so we rotate 180°?
-			
-			;VEHICLE TO FACE PLAYER ----------------------------------------------------------------------------
-			zOffset = Vehicle_Victims0.GetHeadingAngle(cfgqst.PlayerRef)
-			Vehicle_Victims0.SetAngle(Vehicle_Victims0.GetAngleX(), Vehicle_Victims0.GetAngleY(), Vehicle_Victims0.GetAngleZ() + zOffset)
-			cfgqst.RotateObject(Vehicle_Victims0, 320)
-			;this did not work so well - but untested
-			;Vehicle_Victims0.SetAngle(0.0, 0.0, 280.0)
-			;Vehicle_Victims0.SetAngle(0.0, 0.0, 320.0)
-			;Move Victim To Vehicle 
-			Victims[0].MoveTo(Vehicle_Victims0, abMatchRotation = true)
-			TillTouchdown(Victims[0])
-			
-			;Replace Vehicle to Victim 
-			Vehicle_Victims0.MoveTo(Victims[0], Victims[0].GetHeight() - 125.0, abMatchRotation = true)
-
-			else
-			
-			
-			Vehicle_Victims0.MoveTo(VehiclePlayer, 200.0 * Math.Sin(VehiclePlayer.GetAngleZ()+45.0), 200.0 * Math.Cos(VehiclePlayer.GetAngleZ()+45.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-			;VEHICLE TO FACE PLAYER ----------------------------------------------------------------------------
-			zOffset = Vehicle_Victims0.GetHeadingAngle(cfgqst.PlayerRef)
-			Vehicle_Victims0.SetAngle(Vehicle_Victims0.GetAngleX(), Vehicle_Victims0.GetAngleY(), Vehicle_Victims0.GetAngleZ() + zOffset)
-			;VEHICLE HEIGHT TO MATCH VICTIM -------------------------------------------
-			Victims[0].MoveTo(Vehicle_Victims0, abMatchRotation = true)
-			TillTouchdown(Victims[0])
-			Vehicle_Victims0.MoveTo(Victims[0], Victims[0].GetHeight() - 125.0, abMatchRotation = true)
-			endif
-			;---------------------------------------------------------------------------------------------------
-			
-
-				if Victimcount > 1
-				;LEFT SPOT 
-				;FOLLOWER 02: 	
-				Vehicle_Victims1 = Alias_Vehicle_Follower_02.GetReference() 
-				Utility.Wait(0.5)
-				;OLD VERSION: Vehicle_Victims1.MoveTo(Vehicle_Victims0, -200.0 * Math.Sin(Vehicle_Victims0.GetAngleZ()+90), -200.0 * Math.Cos(Vehicle_Victims0.GetAngleZ())+90, cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-					if NewVehiclePlacement ;move closer....
-					Vehicle_Victims1.MoveTo(VehiclePlayer, 160.0 * Math.Sin(VehiclePlayer.GetAngleZ()+315.0), 160.0 * Math.Cos(VehiclePlayer.GetAngleZ()+315.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-					;VEHICLE TO FACE PLAYER ----------------------------------------------------------------------------				
-					zOffset = Vehicle_Victims1.GetHeadingAngle(cfgqst.PlayerRef)
-					Vehicle_Victims1.SetAngle(Vehicle_Victims1.GetAngleX(), Vehicle_Victims1.GetAngleY(), Vehicle_Victims1.GetAngleZ() + zOffset)
-					cfgqst.RotateObject(Vehicle_Victims1, 45)
-					;Vehicle_Victims0.SetAngle(0.0, 0.0, 45.0)
-					;Vehicle_Victims0.SetAngle(0.0, 0.0, 180.0) <<---- no rotation could do it (lol)
-					Victims[1].MoveTo(Vehicle_Victims1, abMatchRotation = true)
-					TillTouchdown(Victims[1])
-					Vehicle_Victims1.MoveTo(Victims[1], Victims[1].GetHeight() - 125.0, abMatchRotation = true)
-					else
-					
-					Vehicle_Victims1.MoveTo(VehiclePlayer, 200.0 * Math.Sin(VehiclePlayer.GetAngleZ()+315.0), 200.0 * Math.Cos(VehiclePlayer.GetAngleZ()+315.0), cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)			
-					;VEHICLE TO FACE PLAYER ----------------------------------------------------------------------------				
-					zOffset = Vehicle_Victims1.GetHeadingAngle(cfgqst.PlayerRef)
-					Vehicle_Victims1.SetAngle(Vehicle_Victims1.GetAngleX(), Vehicle_Victims1.GetAngleY(), Vehicle_Victims1.GetAngleZ() + zOffset)
-					;---------------------------------------------------------------------------------------------------
-
-					;Move Victim to Vehicle & adjust Vehicle Height to Victim-------------------------------------------
-					Victims[1].MoveTo(Vehicle_Victims1, abMatchRotation = true)
-					TillTouchdown(Victims[1])
-					Vehicle_Victims1.MoveTo(Victims[1], Victims[1].GetHeight() - 125.0, abMatchRotation = true)
-					;---------------------------------------------------------------------------------------------------
-				endif
-			endif
-		endif
-		
-;/
-	;OLD VEHICLE SETUP
-	;FOLLOWER 01:
-	Vehicle_Victims0 = Alias_Vehicle_Follower_01.GetReference() 
-	Vehicle_Victims0.MoveTo(cfgqst.PlayerRef, 95.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90), 95.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ())+90, cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-	Vehicle_Victims0.SetAngle(0.0, 0.0, 180.0)
-	;FOLLOWER 02:
-	Vehicle_Victims1 = Alias_Vehicle_Follower_02.GetReference() 
-	Vehicle_Victims1.MoveTo(cfgqst.PlayerRef, -95.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90), 95.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ())+90, cfgqst.PlayerRef.GetHeight() - 125.0, abMatchRotation = true)
-	Vehicle_Victims1.SetAngle(0.0, 0.0, 180.0)
-/;
-	
-
-
-	elseif Type == "restore"
-	
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Vehicle (restored)")
-		
-		if !VehiclePlayer
-		NymBox("#ERROR NO VEHICLE")
-		endif 
-		
-		float VehicleDistance
-		
-		VehicleDistance = cfgqst.PlayerRef.GetDistance(VehiclePlayer)
-	
-		NymTrace("VehicleDistance: "+VehicleDistance as int)
-		
-		cfgqst.PlayerRef.MoveTo(VehiclePlayer)								
-		
-		float cZ = 0.0
-		float second = 0.0 ;----> to prevent a delay of the pose for more than a second	
-		While(cZ != cfgqst.PlayerRef.Z) && (second < 2.0)
-		cZ = cfgqst.PlayerRef.Z
-		Utility.Wait(0.1)
-		second += 0.1
-		EndWhile
-	
-	;	if !cfgqst.VRfix
-	;	cfgqst.PlayerRef.SetVehicle(VehiclePlayer)					
-		;Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Set Vehicle AfterSexA (ON)")
-	;	endif
-		
-		PlayerSetVehicle(True)
-	
-	elseif Type == "remove"
-		
-	;	cfgqst.PlayerRef.SetVehicle(cfgqst.PlayerRef)	
-		PlayerSetVehicle(False)
-		
-		Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: Vehicle (removed)")
-		
-		if VehiclePlayer
-		VehiclePlayer.DisableNoWait()
-		VehiclePlayer.Delete()	
-		VehiclePlayer = None		
-		Alias_Vehicle.Clear() 
-		endif 
-		
-		if Vehicle_Victims0
-		Vehicle_Victims0.DisableNoWait()
-		Vehicle_Victims0.Delete()	
-		Vehicle_Victims0 = none	
-		Alias_Vehicle_Follower_03.Clear() 	;#TODO clean vehicle integration Alias
-		endif 
-		
-		if Vehicle_Victims1
-		Vehicle_Victims1.DisableNoWait()
-		Vehicle_Victims1.Delete()	
-		Vehicle_Victims1 = none			
-		Alias_Vehicle_Follower_02.Clear() 		
-		endif 
-		
-		if xMarkerHeading_00
-		xMarkerHeading_00.DisableNoWait()
-		xMarkerHeading_00.Delete()										
-		endif 
-		Alias_XMarkerHeading_00.Clear() 
-		
-		if xMarkerHeading_01
-		xMarkerHeading_01.DisableNoWait()
-		xMarkerHeading_01.Delete()										
-		endif 
-		Alias_XMarkerHeading_01.Clear() 
-		
-		if xMarkerHeading_02
-		xMarkerHeading_02.DisableNoWait()
-		xMarkerHeading_02.Delete()	
-		endif 
-		Alias_XMarkerHeading_02.Clear() 
-		
-		if xMarkerHeading_03
-		xMarkerHeading_03.DisableNoWait()
-		xMarkerHeading_03.Delete()	
-		endif		
-		Alias_XMarkerHeading_03.Clear() 
-
-		if Nym() ;#XMARKERS3
-			int iMarkers = 24
-			int iDeleted = 0
-			while iMarkers > 0
-				iMarkers -= 1
-				iDeleted += 1
-				if storqst.WatcherXMarkers[iMarkers]
-				storqst.WatcherXMarkers[iMarkers].DisableNoWait()
-				storqst.WatcherXMarkers[iMarkers].Delete()	
-				storqst.WatcherXMarkers[iMarkers] = none
-				endif 
-			endwhile 
-			
-			
-			NymTrace("Markers Deleted: "+iDeleted)
-		endif 
-	
-	endif
-
+Function Vehicle(string type)
+    float fFollowerDistance
+    NymTrace("Vehicle START: " + type + " - AlreadyPlaced?: " + VehiclePlaced)
+    bool NewVehiclePlacement = true
+    if !VehiclePlayer && VehiclePlaced
+        NymBox("NO VEHICLE - VehiclePlaced Bool was Stuck")
+    endif
+    storqst.PlayerPosingVehicle(false)
+    if type == "SetupForSlavery" && !VehiclePlaced
+        VehiclePlaced = true
+        PlaceSafetyPlatform(true)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Vehicle (" + type + ") PLACED", 0)
+        VehiclePlayer = Alias_Vehicle.GetReference()
+        VehiclePlayer.MoveTo(cfgqst.PlayerRef, 0.0, 0.0, 0.0, true)
+        PlayerSetVehicle(true)
+        if folqst.Actor_Follower01
+            SetVehicleToActor(folqst.Actor_Follower01, "FRONT LEFT 45°", Vehicle_Victims0, cfgqst.PlayerRef, VehiclePlayer, 160.0, 45.0)
+        endif
+        if folqst.Actor_Follower02
+            SetVehicleToActor(folqst.Actor_Follower02, "FRONT RIGHT 45°", Vehicle_Victims1, cfgqst.PlayerRef, VehiclePlayer, 160.0, 320.0)
+        endif
+        if Nym()
+            PlaceWatcherXMarkers()
+        else
+            PlaceWatchMarkers()
+        endif
+        RegisterForSingleUpdate(1.0)
+    elseif type == "SetupForAfterlife" && !VehiclePlaced
+        VehiclePlaced = true
+        PlaceSafetyPlatform(true)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Vehicle (" + type + ") PLACED", 0)
+        bool NewVehicle = true
+        Afterlife_Table_Center = (game.GetFormFromFile(23315, "Naked Defeat.esp") as objectreference)
+        Afterlife_Table_Front = (game.GetFormFromFile(23316, "Naked Defeat.esp") as objectreference)
+        Afterlife_Table_Back = (game.GetFormFromFile(23317, "Naked Defeat.esp") as objectreference)
+        Afterlife_Stairs_Center = (game.GetFormFromFile(23319, "Naked Defeat.esp") as objectreference)
+        Afterlife_Stairs_Right = (game.GetFormFromFile(23320, "Naked Defeat.esp") as objectreference)
+        Afterlife_Stairs_Left = (game.GetFormFromFile(23318, "Naked Defeat.esp") as objectreference)
+        if NewVehicle
+            if D100(33.0)
+                AfterLifeStairsLocation = true
+                VehiclePlayer = Afterlife_Stairs_Center
+                Vehicle_Victims0 = Afterlife_Stairs_Right
+                Vehicle_Victims1 = Afterlife_Stairs_Left
+            else
+                AfterLifeStairsLocation = false
+                VehiclePlayer = Afterlife_Table_Center
+                Vehicle_Victims0 = Afterlife_Table_Front
+                Vehicle_Victims1 = Afterlife_Table_Back
+            endif
+            cfgqst.PlayerRef.MoveTo(VehiclePlayer, 0.0, 0.0, 0.0, true)
+            TillTouchdown(cfgqst.PlayerRef)
+            PlayerSetVehicle(true)
+        endif
+        PlaceWatcherXMarkers()
+        folidle01.StartFollowerIdleQuest_01("None")
+        if folqst.Actor_Follower01
+            folidle01.StartDoingNothing_01(true)
+            folqst.Actor_Follower01.EvaluatePackage()
+        endif
+        if folqst.Actor_Follower02
+            folidle01.StartDoingNothing_02(true)
+            folqst.Actor_Follower02.EvaluatePackage()
+        endif
+        cfgqst.FollowersStripCompletely()
+        if NewVehicle
+            if NewVehicle
+                if folqst.IsWithUs_Follower(0)
+                    NymTrace("folqst.IsWithUs_Follower(0)for VEHICLE")
+                    folqst.Actor_Follower01.MoveTo(Vehicle_Victims0, 0.0, 0.0, 0.0, true)
+                    TillTouchdown(folqst.Actor_Follower01)
+                    folqst.Actor_Follower01.SetVehicle(Vehicle_Victims0)
+                endif
+                if folqst.IsWithUs_Follower(1)
+                    NymTrace("folqst.IsWithUs_Follower10)for VEHICLE")
+                    folqst.Actor_Follower02.MoveTo(Vehicle_Victims1, 0.0, 0.0, 0.0, true)
+                    TillTouchdown(folqst.Actor_Follower02)
+                    folqst.Actor_Follower02.SetVehicle(Vehicle_Victims1)
+                endif
+            endif
+        endif
+        RegisterForSingleUpdate(1.0)
+    elseif type == "SetupForAuction"
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Vehicle (" + type + ") PLACED", 0)
+        if folqst.IsWithUs_Follower(0) || folqst.IsWithUs_Follower(1)
+            folidle01.StartFollowerIdleQuest_01("None")
+            cfgqst.FollowersStripCompletely()
+        endif
+        if folqst.IsWithUs_Follower(0)
+            NymTrace("folqst.IsWithUs_Follower(0)")
+            folidle01.StartDoingNothing_01(true)
+            folqst.Actor_Follower01.EvaluatePackage()
+        endif
+        if folqst.IsWithUs_Follower(1)
+            NymTrace("folqst.IsWithUs_Follower(1)")
+            folidle01.StartDoingNothing_02(true)
+            folqst.Actor_Follower02.EvaluatePackage()
+        endif
+        if folqst.IsWithUs_Follower(1)
+            folqst.Actor_Follower02.MoveTo(cfgqst.PlayerRef, -110.0 * math.Sin(cfgqst.PlayerRef.GetAngleZ() + 90.0), -110.0 * math.Cos(cfgqst.PlayerRef.GetAngleZ() + 90.0), cfgqst.PlayerRef.GetHeight() - 125.0, true)
+            zOffset = folqst.Actor_Follower02.GetHeadingAngle(cfgqst.PlayerRef)
+            folqst.Actor_Follower02.SetAngle(folqst.Actor_Follower02.GetAngleX(), folqst.Actor_Follower02.GetAngleY(), folqst.Actor_Follower02.GetAngleZ() + zOffset)
+            cfgqst.RotateObject(folqst.Actor_Follower02, 270.0)
+            folqst.Actor_Follower02.MoveTo(folqst.Actor_Follower02, 0.0, 0.0, 0.0, true)
+            TillTouchdown(folqst.Actor_Follower02)
+            PlayPoseOnActor(folqst.Actor_Follower02, "FollowerAuction", false)
+        endif
+        if folqst.IsWithUs_Follower(0)
+            folqst.Actor_Follower01.MoveTo(cfgqst.PlayerRef, -180.0 * math.Sin(cfgqst.PlayerRef.GetAngleZ() + 90.0), -180.0 * math.Cos(cfgqst.PlayerRef.GetAngleZ() + 90.0), cfgqst.PlayerRef.GetHeight() - 125.0, true)
+            zOffset = folqst.Actor_Follower01.GetHeadingAngle(cfgqst.PlayerRef)
+            folqst.Actor_Follower01.SetAngle(folqst.Actor_Follower01.GetAngleX(), folqst.Actor_Follower01.GetAngleY(), folqst.Actor_Follower01.GetAngleZ() + zOffset)
+            cfgqst.RotateObject(folqst.Actor_Follower01, 270.0)
+            folqst.Actor_Follower01.MoveTo(folqst.Actor_Follower01, 0.0, 0.0, 0.0, true)
+            TillTouchdown(folqst.Actor_Follower01)
+            PlayPoseOnActor(folqst.Actor_Follower01, "FollowerAuction", false)
+        endif
+    elseif (type == "setup" || type == "Setup Early") && !VehiclePlaced
+        VehiclePlaced = true
+        PlaceSafetyPlatform(true)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Vehicle (" + type + ") PLACED V02", 0)
+        VehiclePlayer = cfgqst.PlayerRef.PlaceAtMe(storqst.XMarkerHeading_Naked, 1, false, false)
+        Vehicle_Victims0 = cfgqst.PlayerRef.PlaceAtMe(storqst.XMarkerHeading_Naked, 1, false, false)
+        Vehicle_Victims1 = cfgqst.PlayerRef.PlaceAtMe(storqst.XMarkerHeading_Naked, 1, false, false)
+        VehiclePlayer.MoveTo(cfgqst.PlayerRef, 0.0, 0.0, 0.0, true)
+        VehiclePlayer.SetAngle(0.0, 0.0, cfgqst.PlayerRef.GetAngleZ())
+        if Nym()
+        endif
+        if Nym()
+            fFollowerDistance = 120.0
+        else
+            fFollowerDistance = 160.0
+        endif
+        PlayerSetVehicle(true)
+        if folqst.Actor_Follower01
+            SetVehicleToActor(folqst.Actor_Follower01, "FRONT LEFT 45°", Vehicle_Victims0, cfgqst.PlayerRef, VehiclePlayer, fFollowerDistance, 45.0)
+        endif
+        if folqst.Actor_Follower02
+            SetVehicleToActor(folqst.Actor_Follower02, "FRONT RIGHT 45°", Vehicle_Victims1, cfgqst.PlayerRef, VehiclePlayer, fFollowerDistance, 320.0)
+        endif
+        PlaceWatcherXMarkers()
+        RegisterForSingleUpdate(1.0)
+    elseif type == "restore"
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Vehicle (restored)", 0)
+        if !VehiclePlayer
+            NymBox("#ERROR NO VEHICLE")
+        endif
+        float VehicleDistance = cfgqst.PlayerRef.GetDistance(VehiclePlayer)
+        NymTrace("VehicleDistance: " + (VehicleDistance as int))
+        cfgqst.PlayerRef.MoveTo(VehiclePlayer, 0.0, 0.0, 0.0, true)
+        float cZ = 0.0
+        float second = 0.0
+        while !(cZ == cfgqst.PlayerRef.z) && second < 2.0
+            cZ = cfgqst.PlayerRef.z
+            utility.Wait(0.1)
+            second = second + 0.1
+        endwhile
+        PlayerSetVehicle(true)
+    elseif type == "Remove"
+        VehiclePlaced = false
+        PlayerSetVehicle(false)
+        debug.trace("NAKED DEFEAT calmquest[" + storqst.Defeat_ID + "]: Vehicle (removed)", 0)
+        PlaceSafetyPlatform(false)
+        if VehiclePlayer
+            VehiclePlayer.DisableNoWait(false)
+            VehiclePlayer.Delete()
+            VehiclePlayer = None
+            Alias_Vehicle.Clear()
+        endif
+        if Vehicle_Victims0
+            Vehicle_Victims0.DisableNoWait(false)
+            Vehicle_Victims0.Delete()
+            Vehicle_Victims0 = None
+            Alias_Vehicle_Follower_03.Clear()
+        endif
+        if Vehicle_Victims1
+            Vehicle_Victims1.DisableNoWait(false)
+            Vehicle_Victims1.Delete()
+            Vehicle_Victims1 = None
+            Alias_Vehicle_Follower_02.Clear()
+        endif
+        if xMarkerHeading_00
+            xMarkerHeading_00.DisableNoWait(false)
+            xMarkerHeading_00.Delete()
+        endif
+        Alias_XMarkerHeading_00.Clear()
+        if xMarkerHeading_01
+            xMarkerHeading_01.DisableNoWait(false)
+            xMarkerHeading_01.Delete()
+        endif
+        Alias_XMarkerHeading_01.Clear()
+        if xMarkerHeading_02
+            xMarkerHeading_02.DisableNoWait(false)
+            xMarkerHeading_02.Delete()
+        endif
+        Alias_XMarkerHeading_02.Clear()
+        if xMarkerHeading_03
+            xMarkerHeading_03.DisableNoWait(false)
+            xMarkerHeading_03.Delete()
+        endif
+        Alias_XMarkerHeading_03.Clear()
+        if Nym()
+            int iMarkers = 24
+            int iDeleted = 0
+            while iMarkers > 0
+                iMarkers = iMarkers - 1
+                iDeleted = iDeleted + 1
+                if storqst.WatcherXMarkers[iMarkers]
+                    storqst.WatcherXMarkers[iMarkers].DisableNoWait(false)
+                    storqst.WatcherXMarkers[iMarkers].Delete()
+                    storqst.WatcherXMarkers[iMarkers] = None
+                endif
+            endwhile
+            NymTrace("Markers Deleted: " + iDeleted)
+        endif
+    endif
 EndFunction
 
 ;----------------------------------------------------------------------------------------------------------------------
@@ -18158,74 +17067,66 @@ Bool Function DoubleCheckRaceKey(string GroupKey)
 
 EndFunction 
 
+Function TestDeviceUnequipAnimObj()
 
-Function ResetValues()			;#reset
-	NymTrace("ResetValues()")
-	;::::::::::::::::::: FOLLOWERCLEANUP ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: ::::::::::::::::::: 
+	NymBox("Try DEVICE Unequip Objects")
+	
+	Debug.SendAnimationEvent(capqst.Device, "AnimObjectUnequip")
+	
+EndFunction 
 
-	OldPoseVictims0 = 404
-	OldPoseVictims1 = 404
-	OldPosePlayer = 404
-	OldTypeVictims0 = "empty"
-	OldTypeVictims1 = "empty"
-	OldTypePlayer = "empty"
 
-	cfgqst.PlayerRef.ClearExpressionOverride()	;#phonemebaustelle
-	defqst.ResetModifier_FACE(cfgqst.PlayerRef, 0.1)
-	
-;	MfgConsoleFunc.ResetPhonemeModifier(cfgqst.PlayerRef)
 
-	cfgqst.ShortPunishment = 0
-
-	cfgqst.PublicExposure = 0
-	
-	cfgqst.IsMouthAvailable = 1
-	
-	NoActorsAbort = false
-	HairChangedOnce = false
-	IsGuardEndDefeat = false
-	OnlyAnimals = false
-	
-	 noTrolls = false	
-	 noAnimals = false	
-	 noGhosts = false	
-	 noGuards = false	
-	 isSlave = false	
-	 noSlavery = false
-	; noRobbery = false	
-	 noCaptivity = false
-	 
-	 NeedRapersForSlavery = false
-	NeedCreaturesForSlavery = false
-
-	;ShortDefeat = false ;OLD
-	
-	Rescued = false	
-
-	UnRegisterForUpdate()
-	UnRegisterForModEvent("Bis_BatheEvent")						;#UnRegisterForModEvent
-	UnRegisterForModEvent("StartForceExpression")
-	UnRegisterForModEvent("StartCombatScanner")
-	UnRegisterForModEvent("StartAddRapeHands")
-	UnRegisterForModEvent("StartAddRapeTears")
-	UnRegisterForModEvent("StartAddRapeCount")
-	UnRegisterForModEvent("StartForceImmobilize")
-	UnRegisterForModEvent("EndofDefeat")
-	UnRegisterForModEvent("EndofDefeat_Slavery")
-	UnRegisterForModEvent("EndofDefeat_Afterlife")
-	UnRegisterForModEvent("HookStageStart")
-	UnRegisterForModEvent("StartEscape")	
-	UnRegisterForModEvent("StartCallMolesters")
-	UnRegisterForModEvent("StartPlayerRescued")
-	UnRegisterForModEvent("StartVoyeurs")
-	UnRegisterForModEvent("StartNakedSexExpressions")
-	;UnRegisterForModEvent("StartRaperExpressions")
-	UnRegisterForModEvent("StartForceOpenMouth")
-	
-	UnRegisterForAnimationEvent(cfgqst.PlayerRef, "tailSprint")
-	
-	cfgqst.ResetBools()
-	
+Function ResetValues()
+    NymTrace("ResetValues()")
+    OldPoseVictims0 = 404
+    OldPoseVictims1 = 404
+    OldPosePlayer = 404
+    OldTypeVictims0 = "empty"
+    OldTypeVictims1 = "empty"
+    OldTypePlayer = "empty"
+    PlayerHadCreatures = false
+    cfgqst.PlayerRef.ClearExpressionOverride()
+    defqst.ResetModifier_FACE(cfgqst.PlayerRef, 0.1)
+    cfgqst.ShortPunishment = 0
+    cfgqst.PublicExposure = 0
+    cfgqst.IsMouthAvailable = 1
+    VehiclePlaced = false
+    NoActorsAbort = false
+    HairChangedOnce = false
+    IsGuardEndDefeat = false
+    OnlyAnimals = false
+    noTrolls = false
+    noAnimals = false
+    noGhosts = false
+    noGuards = false
+    isSlave = false
+    noSlavery = false
+    noCaptivity = false
+    NeedRapersForSlavery = false
+    NeedCreaturesForSlavery = false
+    Rescued = false
+    UnRegisterForUpdate()
+    UnregisterForModEvent("Bis_BatheEvent")
+    UnregisterForModEvent("StartForceExpression")
+    UnregisterForModEvent("StartCombatScanner")
+    UnregisterForModEvent("StartAddRapeHands")
+    UnregisterForModEvent("StartAddRapeTears")
+    UnregisterForModEvent("StartAddRapeCount")
+    UnregisterForModEvent("StartForceImmobilize")
+    UnregisterForModEvent("EndofDefeat")
+    UnregisterForModEvent("EndofDefeat_Slavery")
+    UnregisterForModEvent("EndofDefeat_Afterlife")
+    UnregisterForModEvent("HookStageStart")
+    UnregisterForModEvent("StartEscape")
+    UnregisterForModEvent("StartCallMolesters")
+    UnregisterForModEvent("StartPlayerRescued")
+    UnregisterForModEvent("StartVoyeurs")
+    UnregisterForModEvent("StartNakedSexExpressions")
+    UnregisterForModEvent("StartForceOpenMouth")
+    UnregisterForModEvent("StartSpawnRapers")
+    UnRegisterForAnimationEvent(cfgqst.PlayerRef, "tailSprint")
+    cfgqst.ResetBools()
 EndFunction
 
 ;-----------------------------------------------------------------------------------------------------------------------------------------	
@@ -18256,11 +17157,15 @@ Try doing Debug.SendAnimationEvent("AnimObjectUnequip", player) and see if it wo
 
 	/;	
 	
-	
+Bool ForePlayStripping	
 	
 Function StartRapeSequence(int Stage)			;#StartRapeSequence()
 ;GUIDE: this starts all the rape scenes for player AND followers
 ;it starts for Every Round (so 3 times in total, more for chain rape?)
+
+if !CHECK_RapeSequence_running
+CHECK_RapeSequence_running = true 
+endif 
 
 DebugTrace("StartRapeSequence() [Round:"+FuckingRound+"][Sent From Stage: "+Stage+"][Last Scene Ordered: "+LastSceneOrdered+"]")
 ;FuckingRound 1 - can have foreplay etc. -- sent from Stage 10
@@ -18272,7 +17177,7 @@ DebugTrace("StartRapeSequence() [Round:"+FuckingRound+"][Sent From Stage: "+Stag
 bool StartFollowerScenes = true
 	;; PLAYER ;; ;>>>>>>>>>>>>>>>>>> Roll for Foreplay Yes/No >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>						
 						
-	if Allow_Foreplay && (cfgqst.DefeatTypeGeneral == "AreHumans") && D100(cfgqst.DefeatForeplayChance) 	
+	if Allow_Foreplay && (cfgqst.DefeatTypeGeneral == "AreHumans") && (ForePlayStripping || D100(cfgqst.DefeatForeplayChance))
 	;; PLAYER ;; ;Foreplay only on Round 1 (takes all too long if not...)
 		
 		if (FuckingRound == 1)  
@@ -18339,7 +17244,7 @@ bool StartFollowerScenes = true
 	
 		;--- Foreplay Scene Failed - Retry Once ---; 	
 
-		if SexSceneStatus == 3
+		if Nym() && SexSceneStatus == 3
 		NymBox("Foreplay Failed, try fixing now (reSelectAggressor and Restart Scene")
 		NymTrace("DefeatStateChapter () [Round:"+FuckingRound+"]("+cfgqst.DefeatStateChapter+") WasForeplay("+WasForeplay+") HasForeplay("+HasForeplay+")")
 			
@@ -18404,8 +17309,9 @@ bool StartFollowerScenes = true
 	if (!cfgqst.AbortAll)
 	StartRape(Rapers[0])
 	endif 
-				
-		;--- Sex Scene Failed - Retry Once ---; 
+					
+		;--- Sex Scene Failed - Retry Once ---; ;this not good. REWORK
+		;/
 		if SexSceneStatus == 3
 			NymBox("Sex Scene "+FuckingRound+" Failed, try fixing now (reSelectAggressor and Restart Scene")
 		
@@ -18425,6 +17331,7 @@ bool StartFollowerScenes = true
 			StartFollowerScenes = false
 			endif 
 		endif 
+		/;
 
 		if humangroup && D100(cfgqst.RapeHandsProb) && !cfgqst.AbortAll  	;#rapehands
 		SendModEvent("StartAddRapeHands")			
@@ -18594,7 +17501,9 @@ EndFunction
 ;-----------------------------------------------------------------------------------------------------------------------------------------
 
 Function StripFollower(int number = 0)				;#stripfollower	;#slots
-							
+									
+	;defqst.PlaySoundStripCloth()										
+									
 	cfgqst.Strip(30, Victims[number]) 	;head
 	cfgqst.Strip(31, Victims[number]) 	;hair 	
 	cfgqst.Strip(39, Victims[number]) 	;shield
@@ -18620,65 +17529,39 @@ EndFunction
 	
 	
 Function SelectSoloSceneActors()
-
-int i = 12
-int j = 0
-	RapersTemp  = new Actor[12]	
-	RapersTemp[0] = RapersA[0]						
-	RapersTemp[1] = RapersA[1]						
-	RapersTemp[2] = RapersA[2]						
-	RapersTemp[3] = RapersA[3]
-	RapersTemp[4] = RapersB[0]						
-	RapersTemp[5] = RapersB[1]						
-	RapersTemp[6] = RapersB[2]						
-	RapersTemp[7] = RapersB[3]
-	RapersTemp[8] = RapersC[0]						
-	RapersTemp[9] = RapersC[1]						
-	RapersTemp[10] = RapersC[2]						
-	RapersTemp[11] = RapersC[3]
-	;this is outside of SexScenes and our priority is to get the group ass FULL as possible 
-	
-	Rapers = new Actor[4]					
-	Rapers[0] = None						
-	Rapers[1] = None						
-	Rapers[2] = None						
-	Rapers[3] = None	
-	RaperCount = 0
-	
-
-	while (i > 0)
-	i -= 1
-	
-		if RapersTemp[i] && !RapersTemp[i].IsInFaction(SexLabAnimatingFaction) && !RapersTemp[i].IsInFaction(BusyFaction)
-			if RapersTemp[i] && (Sexlab.GetGender(RapersTemp[i]) == 0) && (j < 4)
-			Rapers[j] = RapersTemp[i]
-			j +=1
-			endif 
-		endif 	
-	endwhile 
-		
-	;/
-	if Nym()	
-		if Rapers[0] 
-		NymTrace("Rapers[0] found")
-		endif 
-		if Rapers[1] 
-		NymTrace("Rapers[1] found")
-		endif 
-		if Rapers[2] 
-		NymTrace("Rapers[2] found")
-		endif 
-		if Rapers[3] 
-		NymTrace("Rapers[3] found")
-		endif 
-	endif 
-	/;
-	
-	RaperCount = j
-	
-	NymTrace("RaperCount: "+j)
-	
-EndFunction 	
+    int i = 12
+    int j = 0
+    RapersTemp = new actor[12]
+    RapersTemp[0] = RapersA[0]
+    RapersTemp[1] = RapersA[1]
+    RapersTemp[2] = RapersA[2]
+    RapersTemp[3] = RapersA[3]
+    RapersTemp[4] = RapersB[0]
+    RapersTemp[5] = RapersB[1]
+    RapersTemp[6] = RapersB[2]
+    RapersTemp[7] = RapersB[3]
+    RapersTemp[8] = RapersC[0]
+    RapersTemp[9] = RapersC[1]
+    RapersTemp[10] = RapersC[2]
+    RapersTemp[11] = RapersC[3]
+    Rapers = new actor[4]
+    Rapers[0] = None
+    Rapers[1] = None
+    Rapers[2] = None
+    Rapers[3] = None
+    RaperCount = 0
+    while i > 0
+        i = i - 1
+        if RapersTemp[i] && !RapersTemp[i].IsInFaction(SexLabAnimatingFaction) && !RapersTemp[i].IsInFaction(BusyFaction) && storqst.GetGender(RapersTemp[i]) == 0
+            if RapersTemp[i] && SexLab.GetGender(RapersTemp[i]) == 0 && j < 4
+                Rapers[j] = RapersTemp[i]
+                j = j + 1
+            endif
+        endif
+    endwhile
+    RaperCount = j
+    NymTrace("RaperCount: " + j)
+EndFunction
 	
 	
 ;-----------------------------------------------------------------------------------------------------------------------------------------
@@ -18805,11 +17688,14 @@ Debug.trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: SceneForcedBathing()
 					SendModevent("Moan")
 					endif
 					
-					if i == 7 
-						if !Nym()
-						cfgqst.BathingRemoveBlood()
-						endif 
+					if Nym() && i == 6 
+					cfgqst.ChangeHairStyle("Standard")
+					endif 
+					
+					if i == 7 						
+					cfgqst.BathingRemoveBlood()					
 					Endif
+					
 					if i == 8
 					cfgqst.SendWashPlayerEvent()
 					endif 
@@ -19035,7 +17921,7 @@ Function RealWaiting(float WaitTime)	;#waiting
 ;	DebugTrace("ftimeStart = "+ftimeStart)
 
 	while cfgqst.ModEnabled && (ftimeCurrent < (ftimeStart + cfgqst.FindSpotTime))
-	Utility.Wait(0.25) 	;duration timer - no need to wake the VM 10x per second
+	Utility.Wait(0.1)
 	ftimeCurrent = Utility.GetCurrentRealTime()
 
 		if (cfgqst.FindSpotTime > 0) && showmessage && (ftimeCurrent > ((ftimeStart + cfgqst.FindSpotTime) - 5.0))
@@ -19515,872 +18401,532 @@ EndFunction<<<<<<<<<<<<<
 	;IdlesDefeatUnbound[11] - Sitting on Ass low, kneeling low, hands on ground, head hanging
 	;IdlesDefeatUnbound[16] - Sitting on Ass low, holding stomach, legs straight, breathing
 
-Function PlayPoseOnActor(actor akactor, string Type = "none", bool restore)				 ;#PlayPoseOnActor				
+		;AddTag,Anubs  MMF Rape last stage has sitting pose unbound (Nice) - stage 1 has knife groper, also nice for furnitures
+		;FUnnyBiz PornStar Dog (nice kneeling pose with struggle and exhaustion. For DD stuff?)
 
-String PosingActor = "empty"
-	if storqst.BlockPosing && (akactor == cfgqst.PlayerRef)
-	
-	NymTrace("PlayPoseOnActor BLOCKED!")
-
-	else 
-	
-		if akactor == cfgqst.PlayerRef
-		PosingActor = "Player"
-		NymTrace("PlayPoseOnActor: "+Type)
-		elseif akactor && akactor == folqst.NakedFollower[0]
-		PosingActor = folqst.Name_Follower01
-		;	if Nym()
-		;	OldTypeVictims0 = type
-		;	endif
-			
-		elseif akactor && akactor == folqst.NakedFollower[1]
-		PosingActor = folqst.Name_Follower02
-		;	if Nym()
-		;	OldTypeVictims1 = type
-		;	endif
-		else 
-		PosingActor = "NOT FOUND"
-		endif
-	
-
-	;#posa1
-	
-	NymTrace("PlayPoseOnActor START: "+PosingActor+" Type: "+Type+" Restore: "+restore)
-	
-	
-	;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor("+PosingActor+") - DefeatStateBindings: "+cfgqst.DefeatStateBindings+" Restore = "+restore)	
-	
-	;/
-	if restore
-		if OldPosePlayer == 404 || OldPoseVictims0 == 404 || OldPoseVictims1 == 404
-		;Debug.Messagebox("#ERROR no Old Pose saved") 
-		endif
-
-		if (OldTypePlayer == "empty") || (OldPoseVictims0 == "empty") || (OldPoseVictims1 == "empty")
-		;Debug.Messagebox("#ERROR no Old Type saved") 
-		endif 
-	else
-	/;
-	
-		
-;TYPE should be "wiggle, wait, surrender". ---> determines the pose dynamic
-;SCENARIO should be the DefeatTypeScenario String or a direct string ---> determines the furniture/bound options
-;cfgqst.PlayerPosing("Struggle", cfgqst.DefeatTypeScenario, false)
-		
-	int NewPose	
-	int DebugPose
-	;bool RestorePoseVictims0
-	;bool RestorePoseVictims1
-	;We need "NewPose saved as OlPoseVictims/Player 
-	;we set NewPose to old Pose at the start and add if NewPose > 0 > do not roll the dice.
-		if PosingActor == "NOT FOUND"
-		; DO NOTHING!!! 
-		NymTrace("PlayPoseOnActor("+PosingActor+") - EMPTY CALL - Abort")
-		else 			
-			if type == "reset"
-			NymTrace("PlayPoseOnActor("+PosingActor+") - Type: "+type)
-			OldPoseVictims0 = 404
-			OldPoseVictims1 = 404
-			OldPosePlayer = 404
-			OldTypeVictims0 = "empty"
-			OldTypeVictims1 = "empty"
-			OldTypePlayer = "empty"
-			else
-		
-		
-				;RANDOMIZE when (Type == "Random"), dont use when FollowerDevices wanted
-				if (Type == "Random") && !Restore;&& (cfgqst.DefeatStateBindings != "FollowerDevices")
-					if D100(50)
-					Type = "Struggle"
-					else
-					Type = "Wait"
-					endIf
-				endif	
-			
-				if Restore ;----> sets only the Type String
-					
-					if (akactor == cfgqst.PlayerRef)
-					Type = OldTypePlayer
-					NewPose = OldPosePlayer 
-					
-					elseif cfgqst.IsDefeatRunning()
-						
-						if (Victimcount > 0) && (akactor == Victims[0])
-						Type = OldTypeVictims0
-						NewPose = OldPoseVictims0
-						elseif (Victimcount > 0) && (akactor == Victims[1])
-						Type = OldTypeVictims1
-						NewPose = OldPoseVictims1 
-						endif 	
-							
-					else 
-				
-						if folqst.IsWithUs_Follower(0) && (akactor == folqst.NakedFollower[0])
-						Type = OldTypeVictims0
-						NewPose = OldPoseVictims0
-						elseif folqst.IsWithUs_Follower(1) && (akactor == folqst.NakedFollower[1])
-						Type = OldTypeVictims1
-						NewPose = OldPoseVictims1
-						endif 
-					
-					endif 
-				
-
-					
-				endif 
-	
-			;SUPERFLUOUS??? 
-			;/
-			if Restore ;----> sets only the Pose Number 
-				if (Victimcount > 0) && (akactor == Victims[0]) && (OldTypeVictims0 == Type)
-				NewPose = OldPoseVictims0
-				elseif (Victimcount > 0) && (akactor == Victims[1]) && (OldTypeVictims1 == Type)
-				NewPose = OldPoseVictims1 
-				elseif (akactor == cfgqst.PlayerRef)
-				NewPose = OldPosePlayer 
-				endif 
-			endif 
-			/;
-
-			;WIP!!! 
-			if cfgqst.DefeatTypeScenario == "FastTravel"
-			type = "Offering"
-			endif
-
-			;if we do NOT have DD NG and it is a DD Scenario we dont play poses
-			if !cfgqst.ModDDNG && cfgqst.IsDDScenario() ;no posing when DDs are worn "DD" and "DDeEvent"
-			; DDNG! 
-
-			else
-							
-				;STOP IDLING -----> 				
-				if Type == "Stop"			
-					;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayerPosing (Stop)")		
-					akactor.PlayIdle(cfgqst.IdlesFixHair[0])
-					Type = "none"
-					LastTypePlayer = "none"	;what is this for? 
-
-				;????			 	
-				elseif Type == "Player Down"
-					
-					if !Restore
-					NewPose = Utility.RandomInt(1,5)
-					endif
-
-						if NewPose == 1
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[4])	;STANDING, low, on toes, bend knees, Struggling Hard, Hands on Back
-						elseif NewPose == 2
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[9])	;STANDING, Upright, Struggling Hard, Hands on Back
-						elseif NewPose == 3
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[11])	;STANDING, Bowing Forwards, Struggling Hard, Hands on Back	
-						elseif NewPose == 4
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[12])	;Crouched Upright, Feet on Ground, slightly raised,  Wiggle Strong, Hands Bound on Back.
-						elseif NewPose == 5
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[16])	;;Crouched on Toes, Wiggle Strong, Legs Closed, Hands Bound on Back.
-						endif 
-
-				;DD Removal Wiggling 			 	
-				elseif Type == "DD Removal Wiggling"	
-					
-						if !Restore
-						NewPose = Utility.RandomInt(1,7)
-						endif
-
-						if NewPose == 1
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[0])	;STANDING, low, on toes, bend knees, Struggling Hard, Hands on Back
-						elseif NewPose == 2
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[1])	;STANDING, Upright, Struggling Hard, Hands on Back
-						elseif NewPose == 3
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])	;STANDING, Bowing Forwards, Struggling Hard, Hands on Back	
-						elseif NewPose == 4
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[4])	;Crouched Upright, Feet on Ground, slightly raised,  Wiggle Strong, Hands Bound on Back.
-						elseif NewPose == 5
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[8])	;;Crouched on Toes, Wiggle Strong, Legs Closed, Hands Bound on Back.
-						elseif NewPose == 6
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[9])	;;Crouched on Toes, Wiggle Strong, Legs Closed, Hands Bound on Back.
-						elseif NewPose == 7
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[18])	;standing upright, hands on back : STRUGGLING !!! (move to struggle)
-						endif 
-				
-				;DD Removal Resting			 	
-				elseif Type == "DD Removal Resting"	
-						
-						if !Restore
-						NewPose = Utility.RandomInt(1,3)
-						endif
-
-						if NewPose == 1
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[5])	;standing, legs closed, upright
-						elseif NewPose == 2
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[6])	;standing, legs apart, bowing forwards deep
-						elseif NewPose == 3
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[7])	;standing, legs together, bowing forwards deep	
-						elseif NewPose == 4
-						;akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[8])	;standing, thighs pressed together, bending forwards (orgasm after?)
-						elseif NewPose == 5
-						;akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[9])	;standing, thighs pressed together, bending forwards (orgasm after?)
-						endif 
-		
-		
-		
-		
-		;cfgqst.IdlesDefeatCuffs[18]) 	;standing upright, hands on back : STRUGGLING !!! (move to struggle)
-	;cfgqst.IdlesDefeatCuffs[17]) 	;kneeling, legs spread, upright, still
-	;cfgqst.IdlesDefeatCuffs[16]) 	;kneeling, legs spread, upright, still
-	;cfgqst.IdlesDefeatCuffs[15]) 	;kneeling, slightly leaning forwards, legs a bit spread, upright, still
-	;cfgqst.IdlesDefeatCuffs[14]) 	;laying, embryonal, still
-	;cfgqst.IdlesDefeatCuffs[13]) 	;laying on side, hip, upper body upright, still
-
-	;cfgqst.IdlesDefeatCuffs[12]) 	;sitting on ass, legs spread, knees retracted, body upright WRONG??? 
-	;cfgqst.IdlesDefeatCuffs[11]) 	;sitting on ass, legs spread, knees retracted, body upright <---- confirmed
-	;cfgqst.IdlesDefeatCuffs[10]) 	;sitting on ass, legs spread and straight, body upright  <---- confirmed
-	;cfgqst.IdlesDefeatCuffs[9]) 	;standing, thighs pressed together, bending forwards (orgasm after?) <---- confirmed
-	;cfgqst.IdlesDefeatCuffs[8]) 	;standing, thighs pressed together, bending forwards (orgasm after?) <---- confirmed
-	;cfgqst.IdlesDefeatCuffs[7]) 	;standing, legs together, bowing forwards deep <---- confirmed
-	;cfgqst.IdlesDefeatCuffs[6]) 	;standing, legs apart, standing upright <---- confirmed
-	;cfgqst.IdlesDefeatCuffs[5]) 	;standing, legs closed, upright<---- confirmed
-	;cfgqst.IdlesDefeatCuffs[4]) 	;laying flat on belly, legs closed, STRUGGLING!! !
-	;cfgqst.IdlesDefeatCuffs[3]) 	;laying flat on side, legs closed, STRUGGLING!! !
-	;cfgqst.IdlesDefeatCuffs[2]) 	;laying flat on side, HOGTIED, STRUGGLING!! !
-	;cfgqst.IdlesDefeatCuffs[1]) 	;laying flat on belly, knees spread HOGTIED, STRUGGLING!! !
-	;cfgqst.IdlesDefeatCuffs[0]) 	;laying flat on belly,feet upwards HOGTIED, STRUGGLING!! !
-		
-		
-		
-				;OFFERING -----> For Fast Travel and other Rituals				 	
-				elseif Type == "Offering"
-				;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (offering)")	
-					
-					if !Restore
-					NewPose = Utility.RandomInt(1,4)
-					endif
-					
-					if NewPose == 3 ;too much movement, standing arms to the sides
-					NewPose = 1
-					endif 
-					
-					if storqst.IsLocalSlave() && PosingActor == "Player"
-						if NewPose == 2 ;standing -> 
-						;do nothing 
-						
-						else ;kneeling or on all fourse, remove niinode 
-						cfgqst.DisableHeelsEffectOnActor(akactor, 19723)	
-						endif 
-					endif 
-					
-					if NewPose < 4
-					akactor.PlayIdle(cfgqst.IdlesHumanSurrender[NewPose])		;replace later, human surrender poses
-					elseif NewPose == 4
-					akactor.PlayIdle(cfgqst.IdlesAnimalDefeat[0])					;on all fours
-					endif	
-						
-							
-				;ORGASM 				 	
-				elseif Type == "Orgasm"
-				
-					
-					;ORGASM ----- ARMBINDER 
-					if 	(cfgqst.DefeatStateBindings == "Armbinder")
-						
-						if !Restore
-						NewPose = Utility.RandomInt(1,3)
-						endif 
-						
-						string [] AnimArray	
-						AnimArray = new string[4]	
-						AnimArray[0] = "RESET"
-						AnimArray[1] = "ZapArmbHorny01"		
-						AnimArray[2] = "ZapArmbHorny02"
-						AnimArray[3] = "ZapArmbHorny03"		
-
-
-						Debug.SendAnimationEvent(akactor, AnimArray[NewPose])
-					;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (Orgasm Armbinder): "+NewPose)
-					endif
-				;PEE 				 	
-				elseif Type == "Pee"
-				;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayerPosing (offering)")	
-					
-					;PEE ----- ARMBINDER 
-					if 	(cfgqst.DefeatStateBindings == "Armbinder")
-						NewPose = 1
-						if NewPose == 1 
-						Debug.SendAnimationEvent(akactor, "ZapArmbHorny03")
-						endif
-						
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (Orgasm Armbinder): "+NewPose)
-					endif			
-					
-					
-				;RECEIVING -----> For Golden Shower / Pee --> might be too specialized?			 	
-				elseif Type == "Receiving"
-				;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (receiving)")	
-				
-					if !Restore
-					NewPose = Utility.RandomInt(1,3)
-					endif 
-					
-					if NewPose == 1	;set 1 - sitting
-					;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (Set 1 - sitting)")	
-						int pose = Utility.RandomInt(1,3)
-						if pose == 1
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[10])
-						elseif pose == 2
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[11])
-						elseif pose == 3
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[12])
-						endif
-					elseif NewPose == 2  ;set 2 - kneeling		
-					;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (Set 2 - kneeling)")
-						int pose = Utility.RandomInt(1,5)
-						if pose == 1
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[4])
-						elseif pose == 2
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[5])
-						elseif pose == 3
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[6])
-						elseif pose == 4
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[16])
-						elseif pose == 5
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[18])	
-						endif
-					elseif NewPose == 3 ;set 3 - standing
-					;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (Set 3 - standing)")
-						int pose = Utility.RandomInt(1,3)
-						if pose == 1
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[0])
-						elseif pose == 2
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[1])
-						elseif pose == 3
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])
-						endif
-						
-					elseif NewPose == 4 ;set 4 - low standing
-					;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (Set 4 - low standing)")
-						int pose = Utility.RandomInt(1,5)
-						if pose == 1
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[19])
-						elseif pose == 2
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[3])
-						elseif pose == 3
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])
-						elseif pose == 4
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[7])
-						elseif pose == 5
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[8])
-						endif			
-						
-					endif
-							
-				;SURRENDER						
-				elseif Type == "surrender"																					
-				;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (surrender)")			
-					
-					;HUMAN SURRENDER
-					if !cfgqst.CivilRapeRunning && ((cfgqst.DefeatTypeGeneral == "AreHumans") || (cfgqst.DefeatTypeGeneral == "AreHumanoids"))				
-						
-						if !Restore
-						NewPose = Utility.RandomInt(1,6)
-						endif 
-
-						if NewPose == 1
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_01)
-						elseif NewPose == 2
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_02)
-						elseif NewPose == 3
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_03)	
-						elseif NewPose == 4
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_04)
-						elseif NewPose == 5
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_05)
-						elseif NewPose == 6
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_06)
-						endif
-
-					;PUBLIC  SURRENDER					
-					elseif cfgqst.CivilRapeRunning && (cfgqst.ProxGuardDetected > 0)
-						if !Restore
-						NewPose = Utility.RandomInt(1,3)
-						endif 
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (public surrender): "+NewPose)
-						if NewPose == 1
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_01)
-						elseif NewPose == 2
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_02)
-						elseif NewPose == 3
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_03)
-						endif
-							
-					;ANIMAL SURRENDER 	
-					elseif (cfgqst.DefeatTypeGeneral == "AreAnimals")				
-						if !Restore
-						NewPose = Utility.RandomInt(0,2)
-						endif 
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (animal surrender): "+NewPose)
-						akactor.PlayIdle(cfgqst.IdlesAnimalDefeat[NewPose])
-					
-					;INITIAL SURRENDER VIA HOTKEY (needs IMPROVING cause we dont have detected enemies yet... shit)	#TODO use Funciton GetClosestActor?
-					else	
-						if !Restore
-						NewPose = Utility.RandomInt(1,6)
-						endif 
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (hotkey surrender): "+NewPose)
-
-						if NewPose == 1
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_01)
-						elseif NewPose == 2
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_02)
-						elseif NewPose == 3
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_03)	
-						elseif NewPose == 4
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_04)
-						elseif NewPose == 5
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_05)
-						elseif NewPose == 6
-						akactor.PlayIdle(cfgqst.IdlesHumanSurrender_06)
-						endif
-					endif	
-				;------------------------------------------------------------------------------------------------------------		
-				;----- STRUGGLE ----------------------------------------------------------------------------------------------
-				;------------------------------------------------------------------------------------------------------------
-				elseif Type == "struggle"															
-				;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (struggle)")
-					
-					;----- STRUGGLE ----- ARMBINDER ----------------------------------------------------------------------------------------------
-					if 	(cfgqst.DefeatStateBindings == "Armbinder")
-						
-						if !Restore
-							if cfgqst.WhipAgain
-							NewPose = Utility.RandomInt(1,6)
-							else
-							NewPose = Utility.RandomInt(1,15)
-							endif 
-						endif 
-		
-						string [] AnimArray	
-						AnimArray = new string[16]	
-						AnimArray[0] = "RESET"
-						AnimArray[1] = "ZapArmbStruggle01"		;whip	;order changed to match whipping purposes
-						AnimArray[2] = "ZapArmbStruggle02"		;whip
-						AnimArray[3] = "ZapArmbStruggle03"		;whip	
-						AnimArray[4] = "ZapArmbStruggle04"		;whip
-						AnimArray[5] = "ZapArmbStruggle09"		;whip				
-						AnimArray[6] = "ZapArmbStruggle10"		;whip				
-						AnimArray[7] = "ZapArmbStruggle07"		
-						AnimArray[8] = "ZapArmbStruggle08"
-						AnimArray[9] = 	"ZapArmbStruggle05"	
-						AnimArray[10] = "ZapArmbStruggle06"
-						AnimArray[11] = "ZapArmbStruggle11"
-						AnimArray[12] = "ZapArmbStruggle12"
-						AnimArray[13] = "ZapArmbStruggle13"
-						AnimArray[14] = "ZapArmbStruggle14"
-						AnimArray[15] = "ZapArmbStruggle15"	
-
-						Debug.SendAnimationEvent(akactor, AnimArray[NewPose])
-
-					;----- STRUGGLE :: XCROSS ----------------------------------------------------------------------------------------------					
-					elseif 	(cfgqst.DefeatStateBindings == "XCross")
-					
-						NewPose = 1
-						Debug.SendAnimationEvent(akactor, "ZapXCrossStruggle01")		;only one struggle pose yet :(
-				
-					;----- STRUGGLE :: WHEEL ----------------------------------------------------------------------------------------------					
-					elseif 	(cfgqst.DefeatStateBindings == "Wheel")
-					
-						NewPose = 1
-						Debug.SendAnimationEvent(akactor, "B_B_TiltWFF_A1_S1")
-
-					;----- STRUGGLE :: STOCKADE ----------------------------------------------------------------------------------------------								
-					elseif 	(cfgqst.DefeatStateBindings == "Stockade")
-					
-						NewPose = 1
-						Debug.SendAnimationEvent(akactor, "Anubs_VS_A1_S1")			;no struggle pose :(
-
-					;----- STRUGGLE :: PILLORY ----------------------------------------------------------------------------------------------								
-					elseif (cfgqst.DefeatStateBindings == "Pillory")
-					
-						;REMOVEPOSE: 10 (not enough movement) 
-						
-						if !Restore
-						NewPose = Utility.RandomInt(0,16) ; <<----- CHECK
-						endif 				
-						akactor.PlayIdle(cfgqst.IdlesDefeatPilloryStruggle[NewPose])	;array lenght 17
-
-					;----- STRUGGLE :: YOKE ----------------------------------------------------------------------------------------------								
-					elseif (cfgqst.DefeatStateBindings == "Yoke")
-						if !Restore			
-
-							if cfgqst.WhipAgain 
-						
-								NewPose = Utility.RandomInt(1,5)
-								
-								if NewPose == 1
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[0])	;01 - for whip
-								elseif NewPose == 2
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[1])	;02 - for whip
-								elseif NewPose == 3
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])	;03 - for whip
-								elseif NewPose == 4
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[3])	;04 - for whip
-								elseif NewPose == 5
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[8])	;09 - for whip
-								endif 
-							else 
-							NewPose = Utility.RandomInt(0,16)
-							endif 
-						endif 	
-						akactor.PlayIdle(cfgqst.IdlesDefeatYokeStruggle[NewPose])	;array lenght 17 ;[0] = 01.....
-		
-						
-					;----- STRUGGLE :: CUFFS ----------------------------------------------------------------------------------------------								
-					elseif (cfgqst.DefeatStateBindings == "Cuffs") || cfgqst.DefeatStateBindings == "DDs"	
-										
-						if !Restore
-						
-							if cfgqst.WhipAgain 
-							
-								NewPose = Utility.RandomInt(1,6)
-								
-								if NewPose == 3 
-								NewPose = 4
-								endif
-								
-								if NewPose == 1
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[0])	;for whip
-								elseif NewPose == 2
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[1])	;for whip
-								elseif NewPose == 3
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])	;for whip  ;CHECK IF BROKEN -- seems realyl broken
-								elseif NewPose == 4
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[4])	;for whip
-								elseif NewPose == 5
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[8])	;for whip
-								elseif NewPose == 6
-								akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[9])	;for whip
-								endif 
-							else 	
-							NewPose = Utility.RandomInt(0,9)			;0 and 9 both work... error is elsewhere??? 	;check 3 if working
-								if NewPose == 3 
-								NewPose = 4
-								endif
-							endif 
-						endif 			
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[NewPose])	;array lenght 10
-
-					;----- STRUGGLE :: UNBOUND ----------------------------------------------------------------------------------------------								
-					elseif (cfgqst.DefeatStateBindings == "Unbound")   
-						if !Restore
-						NewPose = Utility.RandomInt(0,16)
-						endif 					
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[NewPose])		;array lenght 17 	;[0] = 01.....
-									
-					;STRUGGLE ----- UNBOUND FALLBACK				
-					else 
-						if !Restore
-						NewPose = Utility.RandomInt(0,16)		;[0] = 01.....
-						endif 
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor #ERROR, needed Fallback) Pose struggle")					
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[NewPose])		;array lenght 17
-					endif
-							
-				;----- WAIT ----------------------------------------------------------------------------------------------
-				elseif Type == "wait"																		
-			;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (wait)")	
-						
-					;WAIT ---- ARMBINDER 
-					if (cfgqst.DefeatStateBindings == "Armbinder")
-						if !Restore
-						NewPose = Utility.RandomInt(1,15)
-						endif 	
-						string [] AnimArray	
-						AnimArray = new string[16]	
-						AnimArray[0] = "RESET"
-						AnimArray[1] = "ZapArmbPose01"		
-						AnimArray[2] = "ZapArmbPose02"
-						AnimArray[3] = "ZapArmbPose03"		
-						AnimArray[4] = "ZapArmbPose04"
-						AnimArray[5] = "ZapArmbPose05"		
-						AnimArray[6] = "ZapArmbPose06"
-						AnimArray[7] = "ZapArmbPose07"		;
-						AnimArray[8] = "ZapArmbPose08"
-						AnimArray[9] = "ZapArmbPose09"
-						AnimArray[10] = "ZapArmbPose10"
-						AnimArray[11] = "ZapArmbPose11"
-						AnimArray[12] = "ZapArmbPose12"
-						AnimArray[13] = "ZapArmbPose13"
-						AnimArray[14] = "ZapArmbPose14"
-						AnimArray[15] = "ZapArmbPose15"		
-
-						Debug.SendAnimationEvent(akactor, AnimArray[NewPose])
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (wait Armbinder): "+NewPose)
-					
-					
-					
-					;WAIT ----- WHEEL 		
-					elseif 	(cfgqst.DefeatStateBindings == "Wheel")
-					
-						NewPose = 1
-						;test
-						Debug.SendAnimationEvent(akactor, "ZazAPCAO263")
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (Wait Wheel): "+NewPose)
-
-					;WAIT ----- STOCKADE 		
-					elseif 	(cfgqst.DefeatStateBindings == "Stockade")
-					
-						NewPose = 1
-						;no struggle pose :(
-						Debug.SendAnimationEvent(akactor, "B_Billyy_StockadeFuckMachine_A1_S1")
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (Wait Stockade): "+NewPose)
-						
-					;WAIT ---- XCROSS 
-					elseif (cfgqst.DefeatStateBindings == "XCross")
-						if !Restore
-						NewPose = Utility.RandomInt(1,3)
-						endif 
-						string [] AnimArray	
-						AnimArray = new string[4]	
-						AnimArray[0] = "RESET"
-						AnimArray[1] = "ZapXCrossPose01"		
-						AnimArray[2] = "ZapXCrossPose01b"
-						AnimArray[3] = "B_Billyy_XCrossFuck_A1_S1"		
-
-
-						Debug.SendAnimationEvent(akactor, AnimArray[NewPose])
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (wait XCross): "+NewPose)	
-
-					;WAIT ---- PILLORY
-					elseif (cfgqst.DefeatStateBindings == "Pillory")
-						if !Restore
-						NewPose = Utility.RandomInt(0,12)
-						endif 
-						
-						;REMOVEPOSES: 4 (wrong pillory)
-						
-						if akactor.PlayIdle(cfgqst.IdlesDefeatPillory[NewPose])		;array lenght 13
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (wait pillory): "+NewPose)
-						else
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (wait pillory) #ERROR: "+NewPose)
-						endif
-					;WAIT ---- YOKE
-					elseif (cfgqst.DefeatStateBindings == "Yoke")
-													
-						if !Restore
-						NewPose = Utility.RandomInt(0,14)
-						endif 
-						
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (wait yoke): "+NewPose)
-						akactor.PlayIdle(cfgqst.IdlesDefeatYoke[NewPose])			;array lenght 15
-					
-					;WAIT ---- CUFFS 					
-					elseif (cfgqst.DefeatStateBindings == "Cuffs")	
-						if !Restore	
-						NewPose = Utility.RandomInt(0,19)		;POSE 0 ALSO BROKEN??? 
-						endif 
-					
-						akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[NewPose])		;array lenght 20
-							
-					;WAIT ---- UNBOUND (Standardidles)	;CHECK FOR STRUGGLE AND WAIT VARIANTS					
-					elseif (cfgqst.DefeatStateBindings == "Unbound")  	
-						
-						if !Restore
-						NewPose = Utility.RandomInt(0,16)
-						endif 
-										
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[NewPose])		;array lenght 17			
-				
-					;WAIT ---- FALLBACK (Standardidles)	;CHECK FOR STRUGGLE AND WAIT VARIANTS				
-					else 
-						if !Restore
-						NewPose = Utility.RandomInt(0,16)
-						endif 	
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor #ERROR, needed Fallback) Pose Wait")					
-						akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[NewPose])		;array lenght 17			
-					endif		
-				;FOLLOWER AUCTION 					
-				elseif Type == ("FollowerAuction") 
-
-						if !Restore
-							NewPose = Utility.RandomInt(1,6)
-						endif 
-
-						string [] AnimArray	
-						AnimArray = new string[7]	
-						AnimArray[0] = "RESET"
-						AnimArray[1] = "ZazAPCAO307"	;Standing in chains 
-						AnimArray[2] = "ZazAPCAO306"	;Standing in chains X
-						AnimArray[3] = "ZazAPCAO304"	;Hanging in chains swinging	
-						AnimArray[4] = "ZazAPCAO303"	;Hanging in chains static
-						AnimArray[5] = "ZazAPCAO301"	;Standing in chains static legs closed
-						AnimArray[6] = "ZazAPCAO302"	;Standing in chains static
-				
-						
-						
-						Debug.SendAnimationEvent(akactor, AnimArray[NewPose])
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (FollowerAuction): "+NewPose)
-				
-										
-				;FOLLOWER DEVICES 				
-				elseif Type == ("FollowerDevices") 	
-								
-						if cfgqst.PlayerRef.IsInInterior() 
-							
-						;	if (OldPoseVictims0 > 0) && Restore && (akactor == Victims[0])
-						;	NewPose = OldPoseVictims0
-						;	elseif (OldPoseVictims1 > 0) && Restore && (akactor == Victims[1])
-						;	NewPose = OldPoseVictims1
-						;	else 	
-
-						;if NewPose
-							if !Restore
-							NewPose = Utility.RandomInt(1,37)
-							endif 
-						;		if (akactor == Victims[0])
-						;		OldPoseVictims0 = NewPose
-						;		elseif (akactor == Victims[1])
-						;		OldPoseVictims1 = NewPose
-						;		endif
-						;	endif 
-						
-						string [] AnimArray	
-						AnimArray = new string[37]	
-						AnimArray[0] = "RESET"
-						AnimArray[1] = "ZazAPCAO309"	;Hanging in chains "laying"
-						AnimArray[2] = "ZazAPCAO308"	;Hanging in chains "Upside down"
-						AnimArray[3] = "ZazAPCAO307"	;Standing in chains 		
-						AnimArray[4] = "ZazAPCAO306"	;Standing in chains X
-						AnimArray[5] = "ZazAPCAO305"	;Standing in chains bend over
-						AnimArray[6] = "ZazAPCAO304"	;Hanging in chains swinging
-						AnimArray[7] = "ZazAPCAO303"	;Hanging in chains static
-						AnimArray[8] = "ZazAPCAO302"	;Standing in chains static
-						AnimArray[9] = "ZazAPCAO301"	;Standing in chains static legs closed
-						AnimArray[10] = "ZazAPCAO007"	;hanging Tight Cage
-						AnimArray[11] = "ZazAPCAO006"	;hanging  Cage, laying
-						AnimArray[12] = "ZazAPCAO005"	;hanging  Cage, kneeling	
-						AnimArray[13] = "ZazAPCAO306"	;doublet - was missing ;Standing in chains X
-						AnimArray[14] = "ZazAPCAO205"	;Pole with big U shackles, sitting	
-						AnimArray[15] = "ZazAPCAO204"	;Pole with big U shackles, kneeling	
-						AnimArray[16] = "ZazAPCAO203"	;Pole with big U shackles, hanging			
-						AnimArray[17] = "ZazAPCAO202"	;Pole with big U shackles, standing	
-						AnimArray[18] = "ZazAPCAO201"	;Pole with big U shackles, standing, back exposed
-						AnimArray[19] = "ZazAPCAO011"	;Exposed in Stocks Standing (static :/) 
-						AnimArray[20] = "ZazAPCAO009"	;Big PILLORY
-						AnimArray[21] = "ZazAPCAO003"	;Tight Cage with Pole
-						AnimArray[22] = "ZazAPCAO002"	;Tight Cage with Pole, laying
-						AnimArray[23] = "ZazAPCAO001"	;Tight Cage with Pole, kneeling	
-						
-						AnimArray[24] = "ZazAPCAO304"	;Hanging in chains swinging
-						AnimArray[25] = "ZazAPCAO303"	;Hanging in chains static
-						;REPLACED BECAUSE TOO BULKY 
-						;AnimArray[24] = "ZazAPCAO211"	;Torture Rack Diagonal, Front exposed	;
-						;AnimArray[25] = "ZazAPCAO212"	;Torture Rack Diagonal, Back exposed		;
-						AnimArray[26] = "ZazAPCAO261"	;Wheel Medium High
-						AnimArray[27] = "ZazAPCAO262"	;Wheel very High
-						AnimArray[28] = "ZazAPCAO263"	;Wheel normal (for Scenario!)
-						AnimArray[29] = "ZazAPCAO025"	;XCROSS LIGHT STRUGGLE
-						AnimArray[30] = "ZazAPCAO024"	;Pony with Yoke
-						AnimArray[31] = "ZazAPCAO023"	;Stockade
-						AnimArray[32] = "ZazAPCAO016"	;Exposed in Stocks (static :/) 
-						AnimArray[33] = "ZazAPCAO015"	;Exposed in Stocks Upside down (static :/) 
-						AnimArray[34] = "ZazAPCAO014"	;Exposed in Stocks Standing (static :/) 
-						AnimArray[35] = "ZazAPCAO013"	;Exposed in Stocks Standing X (static :/) 
-						AnimArray[36] = "ZazAPCAO012"	;Exposed in Stocks Kneeling (static :/) 
-						
-						Debug.SendAnimationEvent(akactor, AnimArray[NewPose])
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (FollowerDevices Indoor): "+NewPose)
-
-						
-						else
-						
-							if !Restore	
-							NewPose = Utility.RandomInt(1,24)
-							endif
-							
-						string [] AnimArray	
-						AnimArray = new string[24]	
-						AnimArray[0] = "RESET"
-						AnimArray[1] = "ZazAPCAO205"	;Pole with big U shackles, sitting	
-						AnimArray[2] = "ZazAPCAO204"	;Pole with big U shackles, kneeling	
-						AnimArray[3] = "ZazAPCAO203"	;Pole with big U shackles, hanging			
-						AnimArray[4] = "ZazAPCAO202"	;Pole with big U shackles, standing	
-						AnimArray[5] = "ZazAPCAO201"	;Pole with big U shackles, standing, back exposed
-						AnimArray[6] = "ZazAPCAO211"	;Torture Rack Diagonal, Front exposed
-						AnimArray[7] = "ZazAPCAO212"	;Torture Rack Diagonal, Back exposed		;
-						AnimArray[8] = "ZazAPCAO261"	;Wheel Medium High
-						AnimArray[9] = "ZazAPCAO262"	;Wheel very High
-						AnimArray[10] = "ZazAPCAO263"	;Wheel normal (for Scenario!)
-						AnimArray[11] = "ZazAPCAO025"	;XCROSS LIGHT STRUGGLE
-						AnimArray[12] = "ZazAPCAO024"	;Pony with Yoke
-						AnimArray[13] = "ZazAPCAO023"	;Stockade
-						AnimArray[14] = "ZazAPCAO016"	;Exposed in Stocks (static :/) 
-						AnimArray[15] = "ZazAPCAO015"	;Exposed in Stocks Upside down (static :/) 
-						AnimArray[16] = "ZazAPCAO014"	;Exposed in Stocks Standing (static :/) 
-						AnimArray[17] = "ZazAPCAO013"	;Exposed in Stocks Standing X (static :/) 
-						AnimArray[18] = "ZazAPCAO012"	;Exposed in Stocks Kneeling (static :/) 
-						AnimArray[19] = "ZazAPCAO011"	;Exposed in Stocks Standing (static :/) 
-						AnimArray[20] = "ZazAPCAO009"	;Big PILLORY
-						AnimArray[21] = "ZazAPCAO003"	;Tight Cage with Pole
-						AnimArray[22] = "ZazAPCAO002"	;Tight Cage with Pole, laying
-						AnimArray[23] = "ZazAPCAO001"	;Tight Cage with Pole, kneeling
-							
-							if Nym()
-								if AnimArray[23]	;what for???
-								
-								else
-								Debug.Messagebox("Array NONE") 
-								endif 
-							endif 
-						Debug.SendAnimationEvent(akactor, AnimArray[NewPose])
-						;Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor (FollowerDevices Outdoor): "+NewPose)
-
-						
-						endif
-							
-						;OUT DOOR
-						;"ZazAPCAO262"	;Wheel very High
-						
-						;FURO
-						;ZazAPFSA003	with all the stuff and penetration
-						;ZazAPFSA004 with all the stuff and penetration
-		
-		
-						;NAILED TO Cross
-						;ZazAPCAO251	;T
-						;ZazAPCAO251	;Legs open
-						
-				endif		
-			endif ;DD Stuff	
-						
-		;	Debug.Trace("NAKED DEFEAT calmquest["+storqst.Defeat_ID+"]: PlayPoseOnActor ("+PosingActor+") "+Type+" - Pose:"+NewPose)
-			
-			;SAVE LAST POSE 	
-			;#posa2
-			
-			
-			NymTrace("PlayPoseOnActor("+PosingActor+") - Type: "+type+" - DefeatStateBindings: "+cfgqst.DefeatStateBindings+" - Pose: "+NewPose+" - Restore = "+restore)	
-			
-			NymTrace("PlayPoseOnActor("+PosingActor+") - OldPoseVictims0: "+OldPoseVictims0+" - OldTypeVictims0: "+OldTypeVictims0)					
-		
-			if akactor && akactor == folqst.NakedFollower[0]
-			OldPoseVictims0 = NewPose
-			OldTypeVictims0 = type
-			elseif akactor && akactor == folqst.NakedFollower[1]
-			OldPoseVictims1 = NewPose
-			OldTypeVictims1 = type
-			elseif  akactor && akactor == cfgqst.PlayerRef	;PlayerRef 
-			OldPosePlayer = NewPose
-			OldTypePlayer = type
-			else
-			NymTrace("#ERROR no valid Actor to save posing info to")
-			
-			endif 
-		
-			NymTrace("PlayPoseOnActor("+PosingActor+") - OldPoseVictims0: "+OldPoseVictims0+" - OldTypeVictims0: "+OldTypeVictims0)	
-		
-		endif ;reset	
-	
-	endif 
-endif 
-
+Function PlayPoseOnActor(actor akactor, string type, bool restore)
+    int NewPose
+    int pose
+    string PosingActor = "empty"
+    if akactor == cfgqst.PlayerRef
+        PosingActor = "Player"
+        NymTrace("PlayPoseOnActor: " + type)
+    elseif akactor && akactor == folqst.NakedFollower[0]
+        PosingActor = folqst.Name_Follower01
+    elseif akactor && akactor == folqst.NakedFollower[1]
+        PosingActor = folqst.Name_Follower02
+    else
+        PosingActor = "NOT FOUND"
+    endif
+    NymTrace("PlayPoseOnActor START: " + PosingActor + " Type: " + type + " Restore: " + restore)
+    if PosingActor == "NOT FOUND"
+        NymTrace("PlayPoseOnActor(" + PosingActor + ") - EMPTY CALL - Abort")
+    elseif type == "reset"
+        NymTrace("PlayPoseOnActor(" + PosingActor + ") - Type: " + type)
+        OldPoseVictims0 = 404
+        OldPoseVictims1 = 404
+        OldPosePlayer = 404
+        OldTypeVictims0 = "empty"
+        OldTypeVictims1 = "empty"
+        OldTypePlayer = "empty"
+    else
+        if type == "Random" && !restore
+            if D100(50.0)
+                type = "struggle"
+            else
+                type = "Wait"
+            endif
+        endif
+        if restore
+            if akactor == cfgqst.PlayerRef
+                type = OldTypePlayer
+                NewPose = OldPosePlayer
+            elseif cfgqst.IsDefeatRunning()
+                if VictimCount > 0 && akactor == Victims[0]
+                    type = OldTypeVictims0
+                    NewPose = OldPoseVictims0
+                elseif VictimCount > 0 && akactor == Victims[1]
+                    type = OldTypeVictims1
+                    NewPose = OldPoseVictims1
+                endif
+            elseif folqst.IsWithUs_Follower(0) && akactor == folqst.NakedFollower[0]
+                type = OldTypeVictims0
+                NewPose = OldPoseVictims0
+            elseif folqst.IsWithUs_Follower(1) && akactor == folqst.NakedFollower[1]
+                type = OldTypeVictims1
+                NewPose = OldPoseVictims1
+            endif
+        endif
+        if cfgqst.DefeatTypeScenario == "FastTravel"
+            type = "Offering"
+        endif
+        if !cfgqst.ModDDNG && cfgqst.IsDDScenario()
+        elseif type == "Stop"
+            akactor.PlayIdle(cfgqst.IdlesFixHair[0])
+            type = "None"
+            LastTypePlayer = "None"
+        elseif type == "Player Down"
+            if !restore
+                NewPose = utility.RandomInt(1, 5)
+            endif
+            if NewPose == 1
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[4])
+            elseif NewPose == 2
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[9])
+            elseif NewPose == 3
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[11])
+            elseif NewPose == 4
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[12])
+            elseif NewPose == 5
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[16])
+            endif
+        elseif type == "DD Removal Wiggling"
+            if !restore
+                NewPose = utility.RandomInt(1, 7)
+            endif
+            if NewPose == 1
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[0])
+            elseif NewPose == 2
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[1])
+            elseif NewPose == 3
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])
+            elseif NewPose == 4
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[4])
+            elseif NewPose == 5
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[8])
+            elseif NewPose == 6
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[9])
+            elseif NewPose == 7
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[18])
+            endif
+        elseif type == "DD Removal Resting"
+            if !restore
+                NewPose = utility.RandomInt(1, 3)
+            endif
+            if NewPose == 1
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[5])
+            elseif NewPose == 2
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[6])
+            elseif NewPose == 3
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[7])
+            elseif NewPose == 4
+            elseif NewPose == 5
+            endif
+        elseif type == "Offering"
+            if !restore
+                NewPose = utility.RandomInt(1, 4)
+            endif
+            if NewPose == 3
+                NewPose = 1
+            endif
+            if storqst.IsLocalSlave() && PosingActor == "Player"
+                if NewPose == 2
+                else
+                    cfgqst.DisableHeelsEffectOnActor(akactor, "19723")
+                endif
+            endif
+            if NewPose < 4
+                akactor.PlayIdle(cfgqst.IdlesHumanSurrender[NewPose])
+            elseif NewPose == 4
+                akactor.PlayIdle(cfgqst.IdlesAnimalDefeat[0])
+            endif
+        elseif type == "Orgasm"
+            if cfgqst.DefeatStateBindings == "Armbinder"
+                if !restore
+                    NewPose = utility.RandomInt(1, 3)
+                endif
+                string[] AnimArray = new string[4]
+                AnimArray[0] = "reset"
+                AnimArray[1] = "ZapArmbHorny01"
+                AnimArray[2] = "ZapArmbHorny02"
+                AnimArray[3] = "ZapArmbHorny03"
+                debug.SendAnimationEvent(akactor, AnimArray[NewPose])
+            endif
+        elseif type == "Pee"
+            if cfgqst.DefeatStateBindings == "Armbinder"
+                NewPose = 1
+                if NewPose == 1
+                    debug.SendAnimationEvent(akactor, "ZapArmbHorny03")
+                endif
+            endif
+        elseif type == "receiving"
+            if !restore
+                NewPose = utility.RandomInt(1, 3)
+            endif
+            if NewPose == 1
+                pose = utility.RandomInt(1, 3)
+                if pose == 1
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[10])
+                elseif pose == 2
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[11])
+                elseif pose == 3
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[12])
+                endif
+            elseif NewPose == 2
+                int mangled_pose_9 = utility.RandomInt(1, 5)
+                if mangled_pose_9 == 1
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[4])
+                elseif mangled_pose_9 == 2
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[5])
+                elseif mangled_pose_9 == 3
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[6])
+                elseif mangled_pose_9 == 4
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[16])
+                elseif mangled_pose_9 == 5
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[18])
+                endif
+            elseif NewPose == 3
+                int mangled_pose_10 = utility.RandomInt(1, 3)
+                if mangled_pose_10 == 1
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[0])
+                elseif mangled_pose_10 == 2
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[1])
+                elseif mangled_pose_10 == 3
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])
+                endif
+            elseif NewPose == 4
+                int mangled_pose_11 = utility.RandomInt(1, 5)
+                if mangled_pose_11 == 1
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[19])
+                elseif mangled_pose_11 == 2
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[3])
+                elseif mangled_pose_11 == 3
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])
+                elseif mangled_pose_11 == 4
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[7])
+                elseif mangled_pose_11 == 5
+                    akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[8])
+                endif
+            endif
+        elseif type == "surrender"
+            if !cfgqst.CivilRapeRunning && (cfgqst.DefeatTypeGeneral == "AreHumans" || cfgqst.DefeatTypeGeneral == "AreHumanoids")
+                if !restore
+                    NewPose = utility.RandomInt(1, 6)
+                endif
+                if NewPose == 1
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_01)
+                elseif NewPose == 2
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_02)
+                elseif NewPose == 3
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_03)
+                elseif NewPose == 4
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_04)
+                elseif NewPose == 5
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_05)
+                elseif NewPose == 6
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_06)
+                endif
+            elseif cfgqst.CivilRapeRunning && cfgqst.ProxGuardDetected > 0.0
+                if !restore
+                    NewPose = utility.RandomInt(1, 3)
+                endif
+                if NewPose == 1
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_01)
+                elseif NewPose == 2
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_02)
+                elseif NewPose == 3
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_03)
+                endif
+            elseif cfgqst.DefeatTypeGeneral == "AreAnimals"
+                if !restore
+                    NewPose = utility.RandomInt(0, 2)
+                endif
+                akactor.PlayIdle(cfgqst.IdlesAnimalDefeat[NewPose])
+            else
+                if !restore
+                    NewPose = utility.RandomInt(1, 6)
+                endif
+                if NewPose == 1
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_01)
+                elseif NewPose == 2
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_02)
+                elseif NewPose == 3
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_03)
+                elseif NewPose == 4
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_04)
+                elseif NewPose == 5
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_05)
+                elseif NewPose == 6
+                    akactor.PlayIdle(cfgqst.IdlesHumanSurrender_06)
+                endif
+            endif
+        elseif type == "struggle"
+            if cfgqst.DefeatStateBindings == "Armbinder"
+                if !restore
+                    if storqst.WhippingDuration > 0
+                        NewPose = utility.RandomInt(1, 6)
+                    else
+                        NewPose = utility.RandomInt(1, 15)
+                    endif
+                endif
+                string[] mangled_animarray_12 = new string[16]
+                mangled_animarray_12[0] = "reset"
+                mangled_animarray_12[1] = "ZapArmbStruggle01"
+                mangled_animarray_12[2] = "ZapArmbStruggle02"
+                mangled_animarray_12[3] = "ZapArmbStruggle03"
+                mangled_animarray_12[4] = "ZapArmbStruggle04"
+                mangled_animarray_12[5] = "ZapArmbStruggle09"
+                mangled_animarray_12[6] = "ZapArmbStruggle10"
+                mangled_animarray_12[7] = "ZapArmbStruggle07"
+                mangled_animarray_12[8] = "ZapArmbStruggle08"
+                mangled_animarray_12[9] = "ZapArmbStruggle05"
+                mangled_animarray_12[10] = "ZapArmbStruggle06"
+                mangled_animarray_12[11] = "ZapArmbStruggle11"
+                mangled_animarray_12[12] = "ZapArmbStruggle12"
+                mangled_animarray_12[13] = "ZapArmbStruggle13"
+                mangled_animarray_12[14] = "ZapArmbStruggle14"
+                mangled_animarray_12[15] = "ZapArmbStruggle15"
+                debug.SendAnimationEvent(akactor, mangled_animarray_12[NewPose])
+            elseif cfgqst.DefeatStateBindings == "XCross"
+                NewPose = 1
+                debug.SendAnimationEvent(akactor, "ZapXCrossStruggle01")
+            elseif cfgqst.DefeatStateBindings == "Wheel"
+                NewPose = 1
+                debug.SendAnimationEvent(akactor, "B_B_TiltWFF_A1_S1")
+            elseif cfgqst.DefeatStateBindings == "Stockade"
+                NewPose = 1
+                debug.SendAnimationEvent(akactor, "Anubs_VS_A1_S1")
+            elseif cfgqst.DefeatStateBindings == "Pillory"
+                if !restore
+                    NewPose = utility.RandomInt(0, 16)
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatPilloryStruggle[NewPose])
+            elseif cfgqst.DefeatStateBindings == "Yoke"
+                if !restore
+                    if storqst.WhippingDuration > 0
+                        NewPose = utility.RandomInt(1, 5)
+                        if NewPose == 1
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[0])
+                        elseif NewPose == 2
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[1])
+                        elseif NewPose == 3
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])
+                        elseif NewPose == 4
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[3])
+                        elseif NewPose == 5
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[8])
+                        endif
+                    else
+                        NewPose = utility.RandomInt(0, 16)
+                    endif
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatYokeStruggle[NewPose])
+            elseif cfgqst.DefeatStateBindings == "Cuffs" || cfgqst.DefeatStateBindings == "DDs"
+                if !restore
+                    if storqst.WhippingDuration > 0
+                        NewPose = utility.RandomInt(1, 6)
+                        if NewPose == 3
+                            NewPose = 4
+                        endif
+                        if NewPose == 1
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[0])
+                        elseif NewPose == 2
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[1])
+                        elseif NewPose == 3
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[2])
+                        elseif NewPose == 4
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[4])
+                        elseif NewPose == 5
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[8])
+                        elseif NewPose == 6
+                            akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[9])
+                        endif
+                    else
+                        NewPose = utility.RandomInt(0, 9)
+                        if NewPose == 3
+                            NewPose = 4
+                        endif
+                    endif
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffsStruggle[NewPose])
+            elseif cfgqst.DefeatStateBindings == "Unbound"
+                if !restore
+                    NewPose = utility.RandomInt(0, 16)
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[NewPose])
+            else
+                if !restore
+                    NewPose = utility.RandomInt(0, 16)
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[NewPose])
+            endif
+        elseif type == "Wait"
+            if cfgqst.DefeatStateBindings == "Armbinder"
+                if !restore
+                    NewPose = utility.RandomInt(1, 15)
+                endif
+                string[] mangled_animarray_13 = new string[16]
+                mangled_animarray_13[0] = "reset"
+                mangled_animarray_13[1] = "ZapArmbPose01"
+                mangled_animarray_13[2] = "ZapArmbPose02"
+                mangled_animarray_13[3] = "ZapArmbPose03"
+                mangled_animarray_13[4] = "ZapArmbPose04"
+                mangled_animarray_13[5] = "ZapArmbPose05"
+                mangled_animarray_13[6] = "ZapArmbPose06"
+                mangled_animarray_13[7] = "ZapArmbPose07"
+                mangled_animarray_13[8] = "ZapArmbPose08"
+                mangled_animarray_13[9] = "ZapArmbPose09"
+                mangled_animarray_13[10] = "ZapArmbPose10"
+                mangled_animarray_13[11] = "ZapArmbPose11"
+                mangled_animarray_13[12] = "ZapArmbPose12"
+                mangled_animarray_13[13] = "ZapArmbPose13"
+                mangled_animarray_13[14] = "ZapArmbPose14"
+                mangled_animarray_13[15] = "ZapArmbPose15"
+                debug.SendAnimationEvent(akactor, mangled_animarray_13[NewPose])
+            elseif cfgqst.DefeatStateBindings == "Wheel"
+                NewPose = 1
+                debug.SendAnimationEvent(akactor, "ZazAPCAO263")
+            elseif cfgqst.DefeatStateBindings == "Stockade"
+                NewPose = 1
+                debug.SendAnimationEvent(akactor, "B_Billyy_StockadeFuckMachine_A1_S1")
+            elseif cfgqst.DefeatStateBindings == "XCross"
+                if !restore
+                    NewPose = utility.RandomInt(1, 3)
+                endif
+                string[] mangled_animarray_14 = new string[4]
+                mangled_animarray_14[0] = "reset"
+                mangled_animarray_14[1] = "ZapXCrossPose01"
+                mangled_animarray_14[2] = "ZapXCrossPose01b"
+                mangled_animarray_14[3] = "B_Billyy_XCrossFuck_A1_S1"
+                debug.SendAnimationEvent(akactor, mangled_animarray_14[NewPose])
+            elseif cfgqst.DefeatStateBindings == "Pillory"
+                if !restore
+                    NewPose = utility.RandomInt(0, 12)
+                endif
+                if akactor.PlayIdle(cfgqst.IdlesDefeatPillory[NewPose])
+                endif
+            elseif cfgqst.DefeatStateBindings == "Yoke"
+                if !restore
+                    NewPose = utility.RandomInt(0, 14)
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatYoke[NewPose])
+            elseif cfgqst.DefeatStateBindings == "Cuffs"
+                if !restore
+                    NewPose = utility.RandomInt(0, 19)
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatCuffs[NewPose])
+            elseif cfgqst.DefeatStateBindings == "Unbound"
+                if !restore
+                    NewPose = utility.RandomInt(0, 16)
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[NewPose])
+            else
+                if !restore
+                    NewPose = utility.RandomInt(0, 16)
+                endif
+                akactor.PlayIdle(cfgqst.IdlesDefeatUnbound[NewPose])
+            endif
+        elseif type == "FollowerAuction"
+            if !restore
+                NewPose = utility.RandomInt(1, 6)
+            endif
+            string[] mangled_animarray_15 = new string[7]
+            mangled_animarray_15[0] = "reset"
+            mangled_animarray_15[1] = "ZazAPCAO307"
+            mangled_animarray_15[2] = "ZazAPCAO306"
+            mangled_animarray_15[3] = "ZazAPCAO304"
+            mangled_animarray_15[4] = "ZazAPCAO303"
+            mangled_animarray_15[5] = "ZazAPCAO301"
+            mangled_animarray_15[6] = "ZazAPCAO302"
+            debug.SendAnimationEvent(akactor, mangled_animarray_15[NewPose])
+        elseif type == "FollowerDevices"
+            if cfgqst.PlayerRef.IsInInterior()
+                if !restore
+                    NewPose = utility.RandomInt(1, 37)
+                endif
+                string[] mangled_animarray_16 = new string[37]
+                mangled_animarray_16[0] = "reset"
+                mangled_animarray_16[1] = "ZazAPCAO309"
+                mangled_animarray_16[2] = "ZazAPCAO308"
+                mangled_animarray_16[3] = "ZazAPCAO307"
+                mangled_animarray_16[4] = "ZazAPCAO306"
+                mangled_animarray_16[5] = "ZazAPCAO305"
+                mangled_animarray_16[6] = "ZazAPCAO304"
+                mangled_animarray_16[7] = "ZazAPCAO303"
+                mangled_animarray_16[8] = "ZazAPCAO302"
+                mangled_animarray_16[9] = "ZazAPCAO301"
+                mangled_animarray_16[10] = "ZazAPCAO007"
+                mangled_animarray_16[11] = "ZazAPCAO006"
+                mangled_animarray_16[12] = "ZazAPCAO005"
+                mangled_animarray_16[13] = "ZazAPCAO306"
+                mangled_animarray_16[14] = "ZazAPCAO205"
+                mangled_animarray_16[15] = "ZazAPCAO204"
+                mangled_animarray_16[16] = "ZazAPCAO203"
+                mangled_animarray_16[17] = "ZazAPCAO202"
+                mangled_animarray_16[18] = "ZazAPCAO201"
+                mangled_animarray_16[19] = "ZazAPCAO011"
+                mangled_animarray_16[20] = "ZazAPCAO009"
+                mangled_animarray_16[21] = "ZazAPCAO003"
+                mangled_animarray_16[22] = "ZazAPCAO002"
+                mangled_animarray_16[23] = "ZazAPCAO001"
+                mangled_animarray_16[24] = "ZazAPCAO304"
+                mangled_animarray_16[25] = "ZazAPCAO303"
+                mangled_animarray_16[26] = "ZazAPCAO261"
+                mangled_animarray_16[27] = "ZazAPCAO262"
+                mangled_animarray_16[28] = "ZazAPCAO263"
+                mangled_animarray_16[29] = "ZazAPCAO025"
+                mangled_animarray_16[30] = "ZazAPCAO024"
+                mangled_animarray_16[31] = "ZazAPCAO023"
+                mangled_animarray_16[32] = "ZazAPCAO016"
+                mangled_animarray_16[33] = "ZazAPCAO015"
+                mangled_animarray_16[34] = "ZazAPCAO014"
+                mangled_animarray_16[35] = "ZazAPCAO013"
+                mangled_animarray_16[36] = "ZazAPCAO012"
+                debug.SendAnimationEvent(akactor, mangled_animarray_16[NewPose])
+            else
+                if !restore
+                    NewPose = utility.RandomInt(1, 24)
+                endif
+                string[] mangled_animarray_17 = new string[24]
+                mangled_animarray_17[0] = "reset"
+                mangled_animarray_17[1] = "ZazAPCAO205"
+                mangled_animarray_17[2] = "ZazAPCAO204"
+                mangled_animarray_17[3] = "ZazAPCAO203"
+                mangled_animarray_17[4] = "ZazAPCAO202"
+                mangled_animarray_17[5] = "ZazAPCAO201"
+                mangled_animarray_17[6] = "ZazAPCAO211"
+                mangled_animarray_17[7] = "ZazAPCAO212"
+                mangled_animarray_17[8] = "ZazAPCAO261"
+                mangled_animarray_17[9] = "ZazAPCAO262"
+                mangled_animarray_17[10] = "ZazAPCAO263"
+                mangled_animarray_17[11] = "ZazAPCAO025"
+                mangled_animarray_17[12] = "ZazAPCAO024"
+                mangled_animarray_17[13] = "ZazAPCAO023"
+                mangled_animarray_17[14] = "ZazAPCAO016"
+                mangled_animarray_17[15] = "ZazAPCAO015"
+                mangled_animarray_17[16] = "ZazAPCAO014"
+                mangled_animarray_17[17] = "ZazAPCAO013"
+                mangled_animarray_17[18] = "ZazAPCAO012"
+                mangled_animarray_17[19] = "ZazAPCAO011"
+                mangled_animarray_17[20] = "ZazAPCAO009"
+                mangled_animarray_17[21] = "ZazAPCAO003"
+                mangled_animarray_17[22] = "ZazAPCAO002"
+                mangled_animarray_17[23] = "ZazAPCAO001"
+                if Nym()
+                    if mangled_animarray_17[23]
+                    else
+                        debug.Messagebox("Array NONE")
+                    endif
+                endif
+                debug.SendAnimationEvent(akactor, mangled_animarray_17[NewPose])
+            endif
+        endif
+        NymTrace("PlayPoseOnActor(" + PosingActor + ") - Type: " + type + " - DefeatStateBindings: " + cfgqst.DefeatStateBindings + " - Pose: " + NewPose + " - Restore = " + restore)
+        NymTrace("PlayPoseOnActor(" + PosingActor + ") - OldPoseVictims0: " + OldPoseVictims0 + " - OldTypeVictims0: " + OldTypeVictims0)
+        if akactor && akactor == folqst.NakedFollower[0]
+            OldPoseVictims0 = NewPose
+            OldTypeVictims0 = type
+        elseif akactor && akactor == folqst.NakedFollower[1]
+            OldPoseVictims1 = NewPose
+            OldTypeVictims1 = type
+        elseif akactor && akactor == cfgqst.PlayerRef
+            OldPosePlayer = NewPose
+            OldTypePlayer = type
+        else
+            NymTrace("#ERROR no valid Actor to save posing info to")
+        endif
+        NymTrace("PlayPoseOnActor(" + PosingActor + ") - OldPoseVictims0: " + OldPoseVictims0 + " - OldTypeVictims0: " + OldTypeVictims0)
+    endif
 EndFunction
 
 
@@ -20404,18 +18950,22 @@ capqst.RemovePunishmentItems()
 EndFunction 
 
 Function StartSexEffects()
-
-	if GroupTypePlayer == ("DwarvenBallistas") || GroupTypePlayer == ("DwarvenCenturions") || GroupTypePlayer == ("DwarvenSpheres") || GroupTypePlayer == ("DwarvenSpiders") || GroupTypePlayer == ("StormAtronach")
-	defqst.SexEffect01 = 2	;shock
-	elseif GroupTypePlayer == ("FrostAtronach") || GroupTypePlayer == ("Wisps") || GroupTypePlayer == ("WispMothers")
-	defqst.SexEffect01 = 3	;frost
-	elseif GroupTypePlayer == ("FlameAtronach") 
-	defqst.SexEffect01 = 4	;flames
-	endif 
-	
-	NymTrace("defqst.SexEffect01 = "+defqst.SexEffect01)
-	
-EndFunction 
+    if cfgqst.ModDEM && storqst.IsDemonicCreature(Rapers[0], "Rapers[0]")
+        if Rapers[0].IsInFaction(cfgqst.FactionsHumanoid[12])
+            defqst.SexEffect01 = 6
+        endif
+    elseif GroupTypePlayer == "DwarvenBallistas" || GroupTypePlayer == "DwarvenCenturions" || GroupTypePlayer == "DwarvenSpheres" || GroupTypePlayer == "DwarvenSpiders"
+        defqst.SexEffect01 = 6
+    elseif GroupTypePlayer == "StormAtronach"
+        defqst.SexEffect01 = 2
+    elseif GroupTypePlayer == "FrostAtronach" || GroupTypePlayer == "Wisps" || GroupTypePlayer == "WispMothers"
+        defqst.SexEffect01 = 3
+    elseif GroupTypePlayer == "FlameAtronach"
+        defqst.SexEffect01 = 4
+    elseif GroupTypePlayer == "Chaurus" || GroupTypePlayer == "ChaurusHunters" || GroupTypePlayer == "ChaurusReapers" || GroupTypePlayer == "Spiders" || GroupTypePlayer == "LargeSpiders"
+        defqst.SexEffect01 = 5
+    endif
+EndFunction
 
 
 Function StopSexEffects()
@@ -20568,11 +19118,10 @@ EndFunction
 
 Function UpdateRaperGroups()
 
-	;Universal Attempt to FIX the fucking Groups 
+	;THIS NO LONGER IN USE!!!!
 	
+	NymBox("THIS FIRED (UPDATE RAPER GROUPS()")
 	
-
-
 	int i = 4
 	DebugTrace("UpdateRaperGroups() SelectedGroup: "+SelectedGroup)
 
@@ -20586,7 +19135,7 @@ Function UpdateRaperGroups()
 			while i > 0
 			i -= 1
 				if RapersA[i] && RapersA[i].IsInFaction(cfgqst.NakedGhostFaction)
-				RapersA[i].disable()
+				RapersA[i].DisableNowait()
 				RapersA[i].delete()
 				endif 
 			endwhile 
@@ -20602,7 +19151,7 @@ Function UpdateRaperGroups()
 			while i > 0
 			i -= 1
 				if RapersB[i] && RapersB[i].IsInFaction(cfgqst.NakedGhostFaction)
-				RapersB[i].disable()
+				RapersB[i].DisableNowait()
 				RapersB[i].delete()
 				endif 
 			endwhile 
@@ -20619,7 +19168,7 @@ Function UpdateRaperGroups()
 			while i > 0
 			i -= 1
 				if RapersC[i] && RapersC[i].IsInFaction(cfgqst.NakedGhostFaction)
-				RapersC[i].disable()
+				RapersC[i].DisableNowait()
 				RapersC[i].delete()
 				endif 
 			endwhile 
@@ -20633,10 +19182,10 @@ Function UpdateRaperGroups()
 		
 		elseif SelectedGroup == "CreaturesA"
 
-		while i > 0
+			while i > 0
 			i -= 1
 				if CreaturesA[i] && CreaturesA[i].IsInFaction(cfgqst.NakedGhostFaction)
-				CreaturesA[i].disable()
+				CreaturesA[i].DisableNowait()
 				CreaturesA[i].delete()
 				endif 
 			endwhile 
@@ -20653,7 +19202,7 @@ Function UpdateRaperGroups()
 			while i > 0
 			i -= 1
 				if CreaturesB[i] && CreaturesB[i].IsInFaction(cfgqst.NakedGhostFaction)
-				CreaturesB[i].disable()
+				CreaturesB[i].DisableNowait()
 				CreaturesB[i].delete()
 				endif 
 			endwhile 
@@ -20667,10 +19216,10 @@ Function UpdateRaperGroups()
 			
 		elseif SelectedGroup == "CreaturesC"
 		
-					while i > 0
-			i -= 1
+				while i > 0
+				i -= 1
 				if CreaturesC[i] && CreaturesC[i].IsInFaction(cfgqst.NakedGhostFaction)
-				CreaturesC[i].disable()
+				CreaturesC[i].DisableNowait()
 				CreaturesC[i].delete()
 				endif 
 			endwhile 
@@ -20687,7 +19236,7 @@ Function UpdateRaperGroups()
 					while i > 0
 			i -= 1
 				if CreaturesD[i] && CreaturesD[i].IsInFaction(cfgqst.NakedGhostFaction)
-				CreaturesD[i].disable()
+				CreaturesD[i].DisableNowait()
 				CreaturesD[i].delete()
 				endif 
 			endwhile 
@@ -20703,7 +19252,7 @@ Function UpdateRaperGroups()
 			while i > 0
 			i -= 1
 				if CreaturesE[i] && CreaturesE[i].IsInFaction(cfgqst.NakedGhostFaction)
-				CreaturesE[i].disable()
+				CreaturesE[i].DisableNowait()
 				CreaturesE[i].delete()
 				endif 
 			endwhile 
@@ -20718,7 +19267,7 @@ Function UpdateRaperGroups()
 			while i > 0
 			i -= 1
 				if CreaturesF[i] && CreaturesF[i].IsInFaction(cfgqst.NakedGhostFaction)
-				CreaturesF[i].disable()
+				CreaturesF[i].DisableNowait()
 				CreaturesF[i].delete()
 				endif 
 			endwhile 
@@ -20739,7 +19288,7 @@ Function UpdateRaperGroups()
 		if (cfgqst.DefeatTypeGeneral == "AreHumans") && (RapersACount == 0) && (RapersBCount == 0) && (RapersCCount == 0)
 			if (CreaturesACount > 0) || (CreaturesBCount > 0) || (CreaturesCCount > 0) || (CreaturesDCount > 0) || (CreaturesECount > 0) || (CreaturesFCount > 0)
 			cfgqst.DefeatTypeGeneral = "AreFunny"
-			cfgqst.DefeatType = "Humans"
+			cfgqst.DefeatType = "Funny"
 			else 		
 			cfgqst.AbortAll = true 		
 			endif 
@@ -20760,6 +19309,152 @@ Function UpdateRaperGroups()
 	/;
 
 Endfunction
+
+Function StartEstrusSex(string sMode, bool bFuckFollowers)
+	
+		DebugTrace("StartEstrusSex("+sMode+")")
+		
+		 Utility.Wait(2.0)	;time to find spot
+			cfgqst.FadeToBlack(true)
+		 Utility.Wait(1.0)
+		 
+			;	if D100(5)
+			;	StripPlayer()	;stuff destroyed? --> since its gamey now... YES please
+				;#ESTRUS. does this work?
+					
+				int EstrusTraptype = Utility.RandomInt(0,3)	
+				int ECTrap = ModEvent.Create("ECStartAnimation"); Int 			Int does not have to be named "ECTrap" any name would do
+				;if (ECTrap)
+				ModEvent.PushForm(ECTrap, cfgqst.PlayerRef)             	; Form			Pass the calling form to the event
+				ModEvent.PushForm(ECTrap, cfgqst.PlayerRef) 				; Form	 		The animation target
+				ModEvent.PushInt(ECTrap, EstrusTraptype)    	; Int			The animation required   -1 = Impregnation only with No Amimation ,  0 = Tentacles, 1 = Machines 2 = Slime 3 = Ooze
+				ModEvent.PushBool(ECTrap, false)             	; Bool			Apply the linked EC effect (Ovipostion for Tentacles, Slime & Ooze, Exhaustion for Machine) 
+				ModEvent.Pushint(ECTrap, 1000)               	; Int			Alarm radius in units (0 to disable) 
+				ModEvent.PushBool(ECTrap, true)             	; Bool			Use EC (basic) crowd control on hostiles if the Player is trapped
+				ModEvent.Send(ECtrap)	
+				
+				Utility.Wait(1.0)
+	
+				if bFuckFollowers
+					if folqst.IsWithus_Follower(0)
+					EstrusTraptype = Utility.RandomInt(0,3)
+					int ECFTrap1 = ModEvent.Create("ECStartAnimation")
+					ModEvent.PushForm(ECFTrap1, folqst.NakedFollower[0])             	; Form			Pass the calling form to the event
+					ModEvent.PushForm(ECFTrap1, folqst.NakedFollower[0]) 				; Form	 		The animation target
+					ModEvent.PushInt(ECFTrap1, EstrusTraptype)    	; Int			The animation required   -1 = Impregnation only with No Amimation ,  0 = Tentacles, 1 = Machines 2 = Slime 3 = Ooze
+					ModEvent.PushBool(ECFTrap1, false)             	; Bool			Apply the linked EC effect (Ovipostion for Tentacles, Slime & Ooze, Exhaustion for Machine) 
+					ModEvent.Pushint(ECFTrap1, 1000)               	; Int			Alarm radius in units (0 to disable) 
+					ModEvent.PushBool(ECFTrap1, true)             	; Bool			Use EC (basic) crowd control on hostiles if the Player is trapped
+					ModEvent.Send(ECFTrap1)
+					endif
+					
+				Utility.Wait(1.0)	
+				
+					if folqst.IsWithus_Follower(1)
+					EstrusTraptype = Utility.RandomInt(0,3)	
+					int ECFTrap2 = ModEvent.Create("ECStartAnimation")
+					ModEvent.PushForm(ECFTrap2, folqst.NakedFollower[1])             	; Form			Pass the calling form to the event
+					ModEvent.PushForm(ECFTrap2, folqst.NakedFollower[1]) 				; Form	 		The animation target
+					ModEvent.PushInt(ECFTrap2, EstrusTraptype)    	; Int			The animation required   -1 = Impregnation only with No Amimation ,  0 = Tentacles, 1 = Machines 2 = Slime 3 = Ooze
+					ModEvent.PushBool(ECFTrap2, false)             	; Bool			Apply the linked EC effect (Ovipostion for Tentacles, Slime & Ooze, Exhaustion for Machine) 
+					ModEvent.Pushint(ECFTrap2, 1000)               	; Int			Alarm radius in units (0 to disable) 
+					ModEvent.PushBool(ECFTrap2, true)             	; Bool			Use EC (basic) crowd control on hostiles if the Player is trapped
+					ModEvent.Send(ECFTrap2)
+					endif
+				endif 
+				Utility.Wait(2.0)	
+				cfgqst.FadeToBlack(false)
+
+				;----- Stripping Player during Estrus Animation
+				
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 31)
+				cfgqst.Strip(31, cfgqst.PlayerRef)	;Head
+				defqst.PlaySoundStripCloth()
+				endif 
+				
+				if cfgqst.IsFucking(cfgqst.PlayerRef)
+				Utility.Wait(6.0)
+				endif 
+
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 52)
+				cfgqst.Strip(52, cfgqst.PlayerRef)	;bikini bottom	-> dont use (why not?) --> SexlabNoStrip Keyword should solve this
+				defqst.PlaySoundStripCloth()
+				Utility.Wait(0.5)
+				Endif
+				
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 49)
+				cfgqst.Strip(49, cfgqst.PlayerRef)	;savage bikini thong
+				defqst.PlaySoundStripCloth()
+				Endif	
+				
+				if cfgqst.IsFucking(cfgqst.PlayerRef)
+				Utility.Wait(6.0)
+				endif 
+
+				if storqst.IsSlotOccupied(cfgqst.PlayerRef, 32)
+				cfgqst.Strip(32, cfgqst.PlayerRef)	;body
+				defqst.PlaySoundStripCloth()
+				endif 
+				
+				
+				if cfgqst.IsFucking(cfgqst.PlayerRef)
+				Utility.Wait(10.0)
+				endif 
+				
+				if D100(60)
+					if storqst.IsSlotOccupied(cfgqst.PlayerRef, 33)
+					cfgqst.Strip(33, cfgqst.PlayerRef)	;gauntlets
+					defqst.PlaySoundStripCloth()
+					Utility.Wait(0.5)
+					endif 
+				endif 
+
+
+				if cfgqst.IsFucking(cfgqst.PlayerRef)
+				Utility.Wait(15.0)
+				endif 
+				
+				if D100(50)
+					if storqst.IsSlotOccupied(cfgqst.PlayerRef, 37)
+					cfgqst.Strip(37, cfgqst.PlayerRef)	;boots
+					defqst.PlaySoundStripCloth()
+					endif 
+				endif
+			
+				if cfgqst.IsFucking(cfgqst.PlayerRef)
+				Utility.Wait(4.0)
+					
+					if storqst.IsSlotOccupied(cfgqst.PlayerRef, 57)
+					cfgqst.Strip(57, cfgqst.PlayerRef) 	;pauldron
+					defqst.PlaySoundStripCloth()
+					endif 
+				
+				endif 
+				
+				if cfgqst.IsFucking(cfgqst.PlayerRef)
+				Utility.Wait(3.0)
+
+					if storqst.IsSlotOccupied(cfgqst.PlayerRef, 53)
+					cfgqst.Strip(53, cfgqst.PlayerRef) 	;steel thigh armor	-> dont use (why not?)	--> SexlabNoStrip Keyword should solve this
+					endif 
+				endif 
+				
+				if Nym() && D100(50)
+					if storqst.IsSlotOccupied(cfgqst.PlayerRef, 42)
+					cfgqst.Strip(42, cfgqst.PlayerRef) 	;circlet
+					endif 
+				endif 
+				
+				if cfgqst.IsFucking(cfgqst.PlayerRef)
+				Utility.Wait(3.0)	
+					if storqst.IsSlotOccupied(cfgqst.PlayerRef, 46)
+					cfgqst.Strip(46, cfgqst.PlayerRef) 	;harness
+					endif 
+				endif 
+				
+				
+				
+EndFunction 
 
 
 int Property UpdateRapersCount Auto 
@@ -20783,13 +19478,23 @@ Bool Function UpdateSingleRaper(String GroupName, int Count, actor akActor)			;#
 		elseif !akActor.Is3DLoaded()
 		NymTrace("UpdateSingleRaper ["+GroupName+"]["+Count+"]["+akActorName+"] %NOTE --> no 3DLoaded")
 			akActor.MoveTo(cfgqst.PlayerRef)
-			Utility.Wait(0.1)
+			Utility.Wait(0.2)
+			
+			if Nym()
+			Utility.Wait(0.5)
+			akActor.Enable()
+			akActor.EvaluatePackage()
+			Utility.Wait(0.5)
+			endif 
+			
 			if !akActor.Is3DLoaded()
 			NymTrace("UpdateSingleRaper ["+GroupName+"]["+Count+"]["+akActorName+"] %NOTE --> STILL no 3DLoaded")
+			return false
 			else 
 			NymTrace("UpdateSingleRaper ["+GroupName+"]["+Count+"]["+akActorName+"] %NOTE --> MOVED -> 3DLoaded")
+			return true
 			endif 
-		return true
+		
 		else 
 		NymTrace("UpdateSingleRaper ["+GroupName+"]["+Count+"]["+akActorName+"] VALID")
 		return true 
@@ -21239,6 +19944,27 @@ Bool Function UpdateGroup(String GroupName)		;#UpdateGroup
 
 EndFunction 
 
+;/
+[02/20/2026 - 01:41:51AM] NAKED DEFEAT calmquest[1001]: (#msg DEBUG) FillAggressorGroup [CreaturesA][2] START
+[02/20/2026 - 01:41:51AM] error: Cannot access an element of a None array
+stack:
+	[nade_CalmQuest (5F0B7967)].nade_calmquest_qf_scr.FillAggressorGroup() - "-------------------------" Line 21315
+	[nade_CalmQuest (5F0B7967)].nade_calmquest_qf_scr.SelectAggressor() - "-------------------------" Line 10073
+	[nade_CalmQuest (5F0B7967)].nade_calmquest_qf_scr.StartRapeSequence() - "-------------------------" Line 18358
+	[nade_CalmQuest (5F0B7967)].nade_calmquest_qf_scr.Fragment_3() - "-------------------------" Line 4985
+[02/20/2026 - 01:41:51AM] error: Cannot access an element of a None array
+stack:
+	[nade_CalmQuest (5F0B7967)].nade_calmquest_qf_scr.FillAggressorGroup() - "-------------------------" Line 21315
+	[nade_CalmQuest (5F0B7967)].nade_calmquest_qf_scr.SelectAggressor() - "-------------------------" Line 10073
+	[nade_CalmQuest (5F0B7967)].nade_calmquest_qf_scr.StartRapeSequence() - "-------------------------" Line 18358
+	[nade_CalmQuest (5F0B7967)].nade_calmquest_qf_scr.Fragment_3() - "-------------------------" Line 4985
+[02/20/2026 - 01:41:51AM] NAKED DEFEAT calmquest[1001]: (#msg DEBUG) FillAggressorGroup [CreaturesA] NO ACTORS! -> Updating the Group
+[02/20/2026 - 01:41:51AM] NAKED DEFEAT calmquest[1001]: (#msg DEBUG) UpdateGroup [CreaturesA] START
+[02/20/2026 - 01:41:51AM] NAKED DEFEAT calmquest[1001]: (#msg DEBUG) UpdateGroup [CreaturesA] AFTER Group Size: 2
+[02/20/2026 - 01:41:51AM] error: Cannot access an element of a None array
+
+/;
+
 Bool Function FillAggressorGroup(String GroupName, int GroupCount)		;#FillAggressorGroup
 	DebugTrace("FillAggressorGroup ["+GroupName+"]["+GroupCount+"] START")
 	;##PRIO 
@@ -21474,3 +20200,2047 @@ EndFunction
 	;Try doing Debug.SendAnimationEvent("AnimObjectUnequip", player) and see if it works out 🙂
 	;(there are also payloads called AnimObjLoad & AnimObjDraw for doing the opposite)
 
+;/
+00Continue
+00NextClip
+00PreviousClip
+00ResetClip
+00TransClip
+0.5secondBlend
+1HM_CameraNoTurn_to_1HM_CameraTurnLeft
+1HM_CameraNoTurn_to_1HM_CameraTurnRight
+1HM_CameraTurnLeft_to_1HM_CameraNoTurn
+1HM_CameraTurnLeft_to_1HM_CameraTurnRight
+1HM_CameraTurnRight_to_1HM_CameraNoTurn
+1HM_CameraTurnRight_to_1HM_CameraTurnLeft
+1HM_Shield_Equip_Out
+1HM_Shield_Equip_OutMoving
+1HM_Unequip
+2_CameraOverrideStart
+2_CameraOverrideStop
+2_CamHit
+2_DeathEmote
+2_deathStop
+2_Decapitate
+2_FootScuffLeft
+2_FootScuffRight
+2_HitFrame
+2HM_Equip
+2HM_Unequip
+2HWKillMoveA
+2_KillActor
+2_KillMoveEnd
+2_KillMoveStart
+2_pairedStop
+2_PairEnd
+2_SoundPlay
+2_SoundPlay.NPCKill1HMBandit
+2_SoundPlay.NPCKill1HMD
+2_SoundPlay.NPCKill1HMDualWieldA
+2_SoundPlay.NPCKillS1OASD
+2_SoundPlay.PHYGenericDirtMediumH
+2_SoundPlay.WPNSwingBladeMedium
+2_SpellRelease
+2_SpellStart
+3rdPersonState_to_1stPersonState
+Activate01
+ActivationDone
+AddCharacterControllerToWorld
+AddRagdollToWorld
+AddToInventory
+AlchemyStir
+AnimateToRagdoll to Fully Ragdoll
+AnimObjDraw
+AnimObjDraw.AnimObjectSkeletonKey
+AnimObjDraw.DecapitationHeadGore
+AnimObjDraw.DecapitationNeckGore
+AnimObjectEquip
+AnimObjectIdleStop
+AnimObjectStop
+AnimObjectUnequip
+AnimObjLoad
+AnimObjLoad.AnimObjectSkeletonKey
+AnimObjLoad.DecapitationHeadGore
+AnimObjLoad.DecapitationNeckGore
+AOBarTableMugDrink.hkx_to_RandomTableMug
+AOBarTablePassOut.hkx_to_AOBarTablePassOutIdle.hkx
+AOBarTablePassOutIdle.hkx_to_RandomDrinkOrPassOut
+AOBarTablePassOutWake.hkx00_to_AOBarTableMugDrink.hkx00
+ArmsCrossedIdle
+arrowAttach
+arrowDetach
+arrowRelease
+attackAnticipateReady
+AttackPower2HMForwardSprint
+AttackPower2HWForwardSprint
+AttackPowerBackward_FXstart
+AttackPowerDirectionalStart
+AttackPowerForward_FXstart
+AttackPowerLeft_FXstart
+attackPowerRight_FXstart
+AttackPowerStanding_FXstart
+attackPowerStart_2HMSprint
+attackPowerStart_2HWSprint
+attackPowerStartBackLeftHand
+attackPowerStartBackward
+attackPowerStartDualWield
+attackPowerStartForward
+attackPowerStartForwardH2HLeftHand
+attackPowerStartForwardH2HRightHand
+attackPowerStartForwardLeftHand
+attackPowerStartH2HCombo
+attackPowerStartInPlace
+attackPowerStartInPlaceLeftHand
+attackPowerStartLeft
+attackPowerStartLeftHand
+attackPowerStartLeftLeftHand
+attackPowerStart_MC_1HMLeft
+attackPowerStart_MC_1HMRight
+attackPowerStartRight
+attackPowerStartRightLeftHand
+attackPowerStart_Sprint
+attackPowerStart_SprintLeftHand
+attackRelease
+attackReleaseDwarven
+attackReleaseL
+attackStart
+attackStart_Attack1
+attackStart_Attack2
+attackStartBite
+attackStartBiteLeft
+attackStartBiteRight
+attackStartDualWield
+AttackStartH2HLeft
+AttackStartH2HRight
+attackStartLeftHand
+attackStart_MC
+attackStart_MC_1HMLeft
+attackStart_MC_1HMRight
+attackStartSprint
+attackStartSprintLeftHand
+AttackState to RecoilState
+attackStop
+AttackWinEnd
+AttackWinEndLeft
+AttackWinMid
+AttackWinStart
+AttackWinStartLeft
+Axe_Equip
+Axe_Unequip
+BarDrinkingStart
+bashExit
+bashFail
+bashPowerStart
+bashRelease
+bashStart
+bashStop
+BeginAttackOutro
+BeginCast
+BeginCastLeft
+BeginCastRight
+BeginCastVoice
+BeginWeaponDraw
+BeginWeaponSheathe
+Bellows
+biteStop
+BlackSmith_Enter_Out
+BlacksmithForgeRestart
+BlacksmithSharpeningWheelIdle
+BlacksmithSharpeningWheelSpin
+bleedOutEnterOut
+bleedOutMagicReadyStart
+BleedOut_MRhSelfPreCharge_to_BleedOutMRh_SelfChargeState
+bleedOutStart
+bleedOutStop
+bleedOut_TransInEnd
+bleedOut_TransOutEnd
+bleedOutWeaponOutStart
+blockAnticipateStart
+blockAnticipateStop
+BlockBashSprint
+blockHitStart
+blockHitStop
+blockStart
+blockStartOut
+blockStop
+blockStopInstant
+blockStopOut
+BoatRideFadeOut
+BoundStandingCut
+BoundStandingCutNPC
+BoundWeap_Unequip
+bowAttackStart
+BowDraw
+bowDrawn
+bowDrawStart
+bowEnd
+Bow_Equip
+Bow_EquipOut
+BowRelease
+BowReleaseFast
+bowReset
+Bow_Unequip
+bowZoomStart
+bowZoomStop
+BrakeStart
+BrakeStop
+CameraNoTurn
+CameraOverrideStart
+CameraOverrideStop
+CameraTurnLeft
+CameraTurnRight
+CamHit
+cannedTurnLeft180
+cannedTurnLeft90
+cannedTurnRight180
+cannedTurnRight90
+cannedTurnStart
+cannedTurnStop
+cannedTurnStrafeLeft90
+cannedTurnStrafeRight90
+CaptainTalk
+CartExit
+CastOKStart
+CastOKStop
+CastStop
+ChairBaseVar1ToBaseVar1
+ChairBaseVar2Instant
+ChairBaseVar2ToBaseVar1
+ChairCrossedVar1Instant
+ChairCrossedVar1ToBaseVar1
+ChairCrossedVar2Instant
+ChairCrossedVar2ToBaseVar1
+ChairDrinkingStart
+ChairEatingSoupStart
+ChairEatingStart
+ChairEatingStart_VampireMeat
+ChairEatingStop
+ChairEnterState_to_FrontSitState
+ChairIdle
+Chair_IdleArmsCrossedVar2Random
+ChairIdleState_to_TableDrinkState
+ChairIdleState_to_TablePassOutState
+ChairLeftBaseVar2Instant
+ChairLeftCrossedVar1Instant
+ChairLeftCrossedVar2Instant
+ChairLeftLookDownEnterInstant
+ChairLookDownEnterInstant
+ChairLookDownEnterInstantLeft
+ChairLookDownToBaseVar1
+ChairNextClip
+ChairRandomSelect
+ChairReadingIdles
+ChairReadingStart
+ChairRightBaseVar2Instant
+ChairRightCrossedVar1Instant
+ChairRightCrossedVar2Instant
+ChairRightLookDownEnterInstant
+ChairVampireEatingStart
+Close
+CombatReady_BreathExhaleLong
+CombatReady_BreathExhaleShort
+CombatReady_ShoutExhaleMedium
+combatStanceStart
+combatStanceStop
+CountDownTick
+CounterArmToRight
+CounterLeftToRight
+CounterRight
+CounterRightToArm
+CounterRightToLeft
+crossbowAttackStart
+crossbowDwarvenAttackStart
+CyclicCrossBlend
+CyclicFreeze
+Dag_Equip
+Dag_Unequip
+DeathAnim
+DeathEmote
+deathStop
+Decapitate
+DefaultSprintSyncBlend
+DefaultSyncSprintBlend
+DialogueAngry
+DialogueGeneric
+DialogueHappy
+DialogueNeutral
+DisableBumper
+Discard
+Dismount_ATR
+DismountEnd
+DLC01CoffinEnterInstant
+DLC01WalkForward
+DLC1SeranaHoldsVyrthur
+DLC1WayShrinePour
+DLC1WayShrineScoop
+DodgeBack
+DodgeLeft
+DodgeRight
+DragonMountEnter
+DragonMountEnterInstant
+DragonMountExit
+DragonMountExitOut
+DrinkBloodChaliceStart
+DrunkStart
+DrunkStop
+DualMagic_DeflectWardStart
+DualMagic_PreAimConChargeState_to_DualMagic_ChargeLoopState
+DualMagic_PreSelfCharge_to_DualMagic_SelfChargeLoop
+DualMagic_SpellAimedConcentrationStart
+DualMagic_SpellAimedStart
+DualMagic_SpellSelfConcentrationStart
+DualMagic_SpellSelfStart
+DualMagic_WardStart
+EnableBumper
+end
+EndAnimatedCamera
+EndAnimatedCameraDelta
+Event00
+Event01
+Event05
+Event21
+EventCounter
+EventForStreamingInspectionOnly
+ExecutionNextClip
+ExitCartBegin
+ExitCartEnd
+fallBegin
+fallStart
+Fall to Land
+FireSpitCookingIdle
+FireSpitCookingSpin
+FireSpitCookingStir
+FlinchStart
+FootBack
+FootFront
+FootLeft
+FootLeft2
+FootLeft3
+FootRight
+FootRight2
+FootRight3
+FootScuffLeft
+FootScuffRight
+FootSprintLeft
+FootSprintRight
+forwardFallFromJump
+forwardFallStart
+forwardJumpStart
+forwardLandEnd
+FreeCaptive
+furnitureEnterInstant
+Getup
+GetUpBegin
+GetUpEnd
+GetUpExit
+GetUpInWater
+GetUpStart
+globalWeapOutLeftReplaceForceEquip
+globalWeapOutRightReplaceForceEquip
+Ground_Dismount_Dragon
+Hammer
+HeadStart
+HeadTrackingOff
+HeadTrackingOn
+HitFrame
+HorseDeath
+HorseDismount
+HorseEnter
+HorseEnterInstant
+HorseEnterOut
+HorseEnterSwim
+HorseExit
+HorseExitOut
+HorseExitSwim
+HorseIdle
+HorseLocomotion
+HorseSprint
+HugA
+Idle
+Idle_1stPersonWoozyGetUpFromBed
+Idle_A_baseTrans
+IdleActivateCoffinPuzzle
+IdleActivateDoor
+IdleActivatePickUp
+IdleActivatePickUpLow
+idle_A_DialogueAngry
+IdleAlchemyEnter
+IdleAlchemyEnterInstant
+idle_A_left_longTrans
+idle_A_leg_shift
+IdleAltarEnter		;WORKS., FLOATING in coffing
+IdleAltarEnterInstant
+IdleAltarExit
+IdleAltStart
+IdleAngry
+IdleAngryLeft
+IdleAngryNeutralHD
+IdleAngryNeutralHDLeft
+IdleApplaud2
+IdleApplaud3
+IdleApplaud4
+IdleApplaud5
+IdleApplaudSarcastic
+idle_A_pull_pants
+IdleArmsCrossed
+idle_A_scratch_back
+idle_A_shakeout
+idle_A_shoulders
+idle_A_shouldersVar1
+idle_A_sigh_var1Trans
+idle_A_sigh_var2Trans
+idle_A_soft_rightTrans
+IdleAstridEnter				;WORKS , NICE FLAT ON GROUND X---- Y USE
+idle_A_swat_flies
+idle_A_sway_fastTrans
+IdleBarCounterEnter
+IdleBarCounterEnterInstant
+IdleBarCounterWipe
+IdleBarDrinkingStart
+idle_B_baseTrans
+IdleBedEnterInstant
+IdleBedEnterStart
+IdleBedEnterToSleep
+IdleBedExitStart
+IdleBedExitToStand
+IdleBedGetUp
+IdleBedLeftEnterInstant
+IdleBedLeftEnterStart
+IdleBedLeftExitStart
+IdleBedQuickExitStart
+IdleBedRightEnterInstant
+IdleBedRightEnterStart
+IdleBedRightExitStart
+IdleBedRightQuickExitStart
+IdleBedRollFrontEnterInstant
+IdleBedRollFrontEnterStart		;WORKS
+IdleBedRollFrontExitStart
+IdleBedRollLeftEnterInstant
+IdleBedRollLeftEnterStart
+IdleBedRollLeftExitStart
+IdleBedRollRightEnterInstant
+IdleBedRollRightEnterStart
+IdleBedRollRightExitStart
+IdleBedSleeping
+IdleBeggar			;#CHECKTHIS
+IdleBeggar_Exit
+IdleBlackSmithEnterInstant
+IdleBlacksmithForgeEnter
+IdleBlackSmithingEnterStart
+IdleBlessingKneelEnter
+IdleBlessingKneelEnterInstant
+idle_B_long_leftTrans
+IdleBloodPortalActivate
+IdleBlowHornImperial
+IdleBlowHornStormcloak
+IdleBook_OnePage
+IdleBook_PageTurn
+IdleBook_Read				;WORKS!!! where to use?
+IdleBook_ReadTG06
+IdleBoundKneesEnterInstant
+IdleBoundKneesStart
+IdleBoyRitual
+IdleBoyRitual_Exit
+IdleBoyRitualStand
+IdleBracedPain			;WORKS, GREET with light bowing
+idle_B_sighTrans
+idle_B_sway_rightTrans
+IdleCannibalFeedCrouching
+IdleCannibalFeedStanding
+IdleCarryBucketFillEnter
+IdleCarryBucketPourEnter
+IdleCartBenchEnter
+IdleCartBenchEnterInstant
+IdleCartDriverExit
+IdleCartDriverIdle
+IdleCartDriverIdleStill
+IdleCartDriverSway
+IdleCartExitInstant
+IdleCartPlayerExit
+IdleCartPlayerIdle
+IdleCartPrisonerAExit
+IdleCartPrisonerAIdle
+IdleCartPrisonerASway
+IdleCartPrisonerBExit
+IdleCartPrisonerBIdle
+IdleCartPrisonerBSway
+IdleCartPrisonerCExit
+IdleCartPrisonerCIdle
+IdleCartPrisonerCSway
+IdleCartPrisonerDExit
+IdleCartPrisonerDIdle
+IdleCartPrisonerDSway
+IdleCartPrisonerFloorExit
+IdleCartPrisonerFloorIdle
+IdleCartTravelDriverEnter
+IdleCartTravelDriverEnterInstant
+IdleCartTravelPlayerEnter
+IdleCartTravelPlayerEnterInstant
+idleChairArmsCrossedVar1
+idleChairArmsCrossedVar2
+IdleChairBook_OnePage
+IdleChairCHILDEnterInstant
+IdleChairCHILDFrontEnter
+IdleChairCHILDFrontExit
+IdleChairCHILDLeftEnter
+IdleChairCHILDLeftExit
+IdleChairCHILDRightEnter
+IdleChairCHILDRightExit
+IdleChairEnterInstant
+IdleChairEnterStart
+IdleChairEnterStop
+IdleChairEnterToSit
+IdleChairExitStart
+IdleChairExitToStand
+IdleChairFrontEnter
+IdleChairFrontExit
+IdleChairFrontQuickExit
+IdleChairGetUp
+IdleChairGive
+IdleChairLeftEnter
+idleChairLeftExit
+IdleChairLeftQuickExit
+idleChairLookDown
+IdleChairRightEnter
+idleChairRightExit
+IdleChairRightQuickExit
+idleChairShoulderFlex
+IdleChairSitting
+IdleChairVar1
+idleChairVar2
+IdleChairWrite
+IdleChildApologize
+IdleChildCryingEnd
+IdleChildCryingStart
+IdleChildFidget
+IdleChildLayOnFloor
+IdleChildLayOnFloorInstant
+IdleChildLegsOutStart
+IdleChildPlayDirt
+IdleChildPlayDoll
+IdleChildShy
+IdleChildSitOnKnees
+IdleChildSitOnKneesInstant
+IdleChildTaunt1
+IdleChildTaunt2
+IdleChildTaunt3
+IdleChildTaunt4
+IdleChildWhineKick
+IdleChildWhineStompFeet
+IdleChiselKneelingEnter			;WORKS. NAGELN - CRUFICITATION!!!
+IdleChiselKneelingEnterInstant
+IdleChiselStandingEnter			;WORKS. NAGELN
+IdleChiselStandingEnterInstant
+IdleChiselWiggle
+IdleCiceroAgitated
+IdleCiceroDance1
+IdleCiceroDance2
+IdleCiceroDance3
+IdleCiceroHappy
+IdleCivilWarCheer
+IdleCleanSword
+IdleClimbLedge
+IdleCO2Ceremony1Welcome
+IdleCO2Ceremony2Blessing
+IdleCO2Ceremony3Chest
+IdleCoffinEnter
+IdleCoffinEnterInstant
+IdleCoffinExit
+IdleCoffinHorzEnter
+IdleCoffinHorzEnterInstant
+IdleCoffinVertEnter
+IdleCoffinVertEnterInstant
+IdleCombatLookingAroundStart
+IdleCombatShieldStart
+IdleCombatSpecialStart
+IdleCombatStart
+IdleCombatStretchingStart
+IdleCombatWeaponCheckStart
+IdleComeThisWay
+IdleCookingPotEnter
+IdleCookingPotEnterInstant
+IdleCookingSpitEnter
+IdleCookingSpitEnterInstant
+IdleCount
+IdleCounterEnterInstant
+IdleCounterStart
+IdleCowerEnter
+IdleCowerEnterInstant
+IdleCowering			;MWROKS
+IdleCoweringEnterInstant
+IdleCraftingCookingPotAddIngredient
+IdleCraftingCookingPotTalkA
+IdleCraftingCookingPotTalkB
+IdleDA02BoethiahPostEnter
+IdleDA02BoethiahPostEnterInstant
+IdleDefaultStart
+IdleDialogueAngryStart				;WORKS
+IdleDialogueDefensiveHandGesture	;WORKS
+IdleDialogueExpressiveStart
+IdleDialogueHandOnChinGesture
+IdleDialogueHappyStart
+IdleDialogueLock
+IdleDialogueMovingTalkA
+IdleDialogueMovingTalkB
+IdleDialogueMovingTalkC
+IdleDialogueMovingTalkD
+IdleDialogueStart
+IdleDialogueUnlock
+IdleDialogueWelcomeHandGesture
+idleDisbelief01Exit
+idleDisbelief01Start
+idleDisbelief02Exit
+idleDisbelief02Start
+idleDisbeliefEnd
+idleDisbeliefStart
+IdleDLC02BoatRide
+IdleDLC02FallOnKnees
+IdleDLC02MiraakDeath
+IdleDLC02MiraakDeathFinish
+IdleDLC02TentacleWordBurnBegin
+IdleDLC02TentacleWordBurnEnd
+IdleDLC02TentacleWordBurnStart
+IdleDLC1BossExplosion1stP
+IdleDLC2PickaxeEnter
+IdleDLC2PickaxeEnterInstant
+IdleDLC2PickaxeFloorEnter
+IdleDLC2PickaxeFloorEnterInstant
+IdleDLC2PickaxeTableEnter
+IdleDLC2PickaxeTableEnterInstant
+IdleDLC2TentacleWarpBook
+IdleDrink				;WORKS, DRINK FROM CUP
+IdleDrinkFromFountain
+idleDrinkingStandingStart
+IdleDrinkPotion			;WORKS. use for ALCHEMY job
+IdleDrumStart
+IdleDrunk_TurnL
+IdleDrunk_TurnR
+IdleDrunk_Walk
+IdleDwemerExtractorEnter
+idleEatingStandingStart			;EAT BREAD
+idleEatingStandingStart_DLC1Vampire
+IdleEatSoup
+IdleEnchanting
+IdleEnchantingCraft
+IdleEnchantingEnter
+IdleEnchantingEnterInstant
+IdleEnchantingGem
+IdleExamine
+IdleExecutioneeChop
+IdleExecutioneeIdle
+IdleExecutioneeIdleEnterInstant
+IdleExecutionerAlduinReaction
+IdleExecutionerAlduinReactionDeath
+IdleExecutionerChop
+IdleExecutionerChop_Player
+IdleExecutionerIdle
+IdleExecutionerIdleEnterInstant
+IdleExecutionGuardIdle
+IdleExecutionGuardIdleEnterInstant
+idleExit
+IdleFeedChicken			;WORKS, basket and then thors stuff. WORKS
+IdleFluteStart
+IdleForceDefaultState
+IdleFreaDisbelief2LoopStop
+idleFreaDisbeliefEnd
+idleFreaDisbeliefLoopStop
+IdleFreaReaction2Start
+idleFreaReactionStart
+idleFreaSorrowExit
+idleFreaSorrowLoopEnter
+IdleFreaSorrowLoopEnter
+IdleFreaSorrowLoopEnterInstant
+IdleFurnitureExit
+IdleFurnitureExitSlow
+IdleFurnitureExitTriggered
+IdleFurnitureStart
+IdleGetAttention			;WORKS, WINK LOL
+IdleGive
+IdleGiveMQ105Horn
+IdleGrainMillEnter
+IdleGrainMillEnterInstant	
+IdleGrave_01					;#CHECKTHIS	
+IdleGrave_02					;#CHECKTHIS
+idleGrazing
+IdleGreybeardMeditateEnter
+IdleGreybeardMeditateEnterInstant
+IdleGreybeardWordTeach
+IdleHammerCarpenterTableEnter		;NOT WORKING
+IdleHammerCarpenterTableEnterInstant	NOT WORKING
+IdleHammer_Table			;#CHECKTHIS
+IdleHammerTableEnter	NOT WORKING
+IdleHammerTableEnterInstant
+IdleHammer_Wall			;#NOT WORKING
+IdleHammerWallEnter		;#>>>>>>>>>>>>>>>>>>>>>>> WORKS!!!
+IdleHammerWallEnterInstant
+IdleHandCut						NICE - kneeling down, play whole scene (for Travel Ritual?)
+IdleHandCutStandingStart		NICE - no fixed camera, use for Ritual???
+IdleHandsBehindBack
+IdleHandsBehindBackEnterInstant
+IdleHandsBehindBackExit
+IdleHandsHipsBehavior
+IdleHDLeft
+IdleHDLeftAngry
+IdleHDRight
+IdleHDRightAngry
+idleHeadshake
+IdleHHLeft
+IdleHHRight
+IdleHideLEnter
+IdleHideLEnterInstant
+IdleHideREnter
+IdleHideREnterInstant
+IdleHoe
+Idle_In
+IdleInjured
+IdleJarlChairEnter
+IdleJarlChairEnterInstant
+IdleKneeling 	;#WORKS; kneel down, reach with hand
+IdleKneelingEnter
+IdleKneelingEnterInstant
+IdleLadderEnter
+IdleLadderEnterInstant
+IdleLaugh
+IdleLaydown
+IdleLayDownEnter
+IdleLaydown_Enter
+IdleLayDownEnterInstant
+IdleLaydown_Exit
+IdleLeanTable
+IdleLeanTableEnter
+IdleLeanTableEnterInstant
+IdleLeftChairEnterStart
+IdleLeverFloorPull
+IdleLeverPushEnterInstant
+IdleLeverPushStart
+IdleLightSconce
+IdleListenStart
+IdleListenStartAngry
+IdleLockPick
+IdleLookFar
+idleLooseSweepingStart
+IdleLounge
+IdleLounge_Exit
+IdleLuteStart
+IdleMagic_01
+IdleMesmerize			;WORKS, torkeln
+IdleMesmerizeStop
+IdleMillLoadEnterInstant
+IdleMillLoadStart
+IdleMQ201Drink
+IdleMQ201HoldingDrinkTray
+IdleMQ201ToastStart
+IdleMQ203EsbernBookEnter
+IdleMQ203EsbernBookEnterInstant
+IdleMQ206FelldirRitualEnter
+IdleMQ206FelldirRitualEnterInstant
+IdleMQ206FelldirShowScroll
+IdleMT_DoorBang
+IdleNervous			;WORKS, use for PublishPUNISH?
+IdleNeutral
+IdleNeutralHD
+IdleNeutralHDLeft
+IdleNeutralLeft
+IdleNeutralRight
+IdleNocturnalEnter
+IdleNocturnal_Exit
+IdleNocturnal_IdleA
+IdleNocturnal_IdleAMirror
+IdleNocturnal_IdleB
+IdleNocturnal_LookLeft
+IdleNocturnal_LookRight
+IdleNocturnal_Rise
+IdleNoteRead
+IdleOffsetCarryPotServe
+IdleOffsetStop
+IdleOut
+Idle_Out
+IdleOvenEnter				;WORKS; BAKERY WHERE?
+IdleOvenEnterInstant
+idlePawing
+idlePet
+IdlePickaxeEnter
+IdlePickaxeEnterInstant
+IdlePickaxeFloorEnter
+IdlePickaxeFloorEnterInstant
+IdlePickaxe_Table
+IdlePickaxeTableEnter
+IdlePickaxeTableEnterInstant
+IdlePickaxe_Wall
+IdlePickup_Ground			;WORKS
+IdlePlayer
+IdlePointClose
+IdlePointFar_01
+IdlePointFar_02
+IdlePray						;WORKS, (Worship/BEG)
+IdlePrayCrouchedEnter			;WORKS,	(Worship/BEG)
+IdlePrayCrouchedEnterInstant
+IdlePresentSkeletonKey
+IdlePrisonerBeat			;;WORKS, - FIST FACE ---> USE
+IdlePullChain
+9
+IdleQuickStop
+IdleRailLeanEnter
+IdleRailLeanEnterInstant
+IdleRailLeanExit
+idleRandomStart
+IdleReadElderScroll
+IdleReadElderScroll3rdP
+IdleReadElderScrollEnd
+IdleReadElderScrollLonger
+IdleReady
+idleRearUp
+IdleRFPickUpScroll
+IdleRightChairEnterStart
+IdleRitualSkull1
+IdleRitualSkull2
+IdleRitualSkull3
+IdleRitualSpellRelease
+IdleRitualSpellStart
+IdleRitualStart
+IdleSalute				;WORKS,
+idlesAToIdlesBTransEnd
+idlesAToIdlesBTransStart
+idlesBToIdlesATransEnd
+idlesBToIdlesATransStart
+IdleScrapeTreeBark					;WORKS,
+IdleSearchChestEnter			;WORKS,
+IdleSearchChestEnterInstant
+IdleSearchingChest
+IdleSearchingTable		;WORKS,
+IdleSearchTableEnter
+IdleSearchTableEnterInstant
+IdleSell				;WORKS, OFFER POTION
+IdleShackled_01
+IdleShackled_01_exit
+IdleShackled_02
+IdleShackleWallEnterInstant
+IdleSharpeningWheelEnterInstant
+IdleSharpeningWheelStart
+IdleSilentBow
+IdleSit_CrossLegged
+IdleSitCrossLeggedEnter
+IdleSitCrossLeggedEnterInstant
+IdleSitLedge
+IdleSitLedgeEnter
+IdleSitLedge_Enter
+IdleSitLedgeEnterInstant
+IdleSitLedge_Exit
+IdleSleepNod
+IdleSmelterEnter				;WORKS, shoveling!
+IdleSmelterEnterInstant			;WORKS, shoveling!
+IdleSmelterEnterPlayer
+IdleSnapToAttention						;WORKS, WOW!
+IdleSnowElfPrinceAscensionBurning
+IdleSnowElfPrinceBigSpell
+IdleSnowElfPrinceBigSpellRelease
+IdleSnowElfPrinceChairDialogue
+IdleSnowElfPrinceChairEnter
+IdleSnowElfPrinceChairEnterInstant
+IdleSnowElfPrinceFireAndForget
+IdleSoupDeath
+IdleStaticPoseAStart
+IdleStaticPoseBStart
+IdleStaticPoseCStart
+IdleStonePickUpEnter
+IdleStonePickUpEnterInstant
+IdleStonePutDownEnter
+IdleStoolBackExit
+IdleStoolEnter
+IdleStoolEnterInstant
+IdleStoolEnterPlayer
+IdleStop
+IdleStopInstant
+IdleStudy
+IdleSurrender					;WORKS
+IdleT02AscendFemale				;WORKS !!! NICE, getting lifted up (for floating mage stuff)
+IdleT02AscendMale
+IdleTableBackExit
+IdleTableDrinkAndMugEnter
+IdleTableDrinkEnter
+IdleTableEnter
+IdleTableEnterInstant
+IdleTableEnterPlayer
+IdleTableLeanPoint
+IdleTableMugEnter
+IdleTablePassOutEnter
+IdleTake
+IdleTalkAndUseItem
+IdleTanningEnter
+IdleTanningEnterInstant
+IdleTauntA
+IdleTauntB
+IdleTelvanniTowerFloatDown
+IdleTelvanniTowerFloatUp
+IdleTG03UseMeadBarrel
+IdleTG03UseMeadBarrelEnterInstant
+IdleTG06FlipPage
+IdleTG06TranslationEnter
+IdleTG06TranslationEnterInstant
+IdleTG08_Phase1
+IdleTG08_Phase1_EnterInstant
+IdleTG08_Phase2
+IdleTG08_Phase3
+IdleTG08_Phase4
+IdleTG08_Phase5
+IdleTGFalmerStatueEnter
+IdleTGStatueEnterInstant
+IdleUncontrollableCough
+IdleValericaWalkForward			;WORKS, WoW, we can focewalk forwards
+IdleVampireFeastVictim			;WORKS, laying floating in AIr
+IdleVampireLordTransformation
+IdleVar1Start
+IdleWalkingCameraEnd
+IdleWalkingCameraStart
+IdleWalkThroughWallEnter
+IdleWalkThroughWallEnterInstant
+IdleWallCornerPeekLEnter
+IdleWallCornerPeekLEnterInstant
+IdleWallCornerPeekREnter
+IdleWallCornerPeekREnterInstant
+IdleWallLeanEnterInstant
+IdleWallLeanStart
+IdleWallSoldierEnter
+IdleWallSoldierEnterInstant
+IdleWallSoldierExit
+IdleWarmArms
+IdleWarmHands
+IdleWarmHandsCrouched			;WORKS
+IdleWarmHands_Crouched_Details
+IdleWarmHands_Crouched_Details_exit
+IdleWarmHands_Crouched_Pot_Details
+IdleWarmHands_Crouched_Pot_Details_exit
+IdleWarmHands_Details
+IdleWarmHands_Details_exit
+IdleWarmHandsStanding		;WORKS
+IdleWave
+IdleWayShrineWaterPourEnter
+IdleWayShrineWaterScoopEnter
+IdleWebAlert
+IdleWebAlertOut
+IdleWebEnterInstant
+IdleWebExit
+IdleWebExitQuickTurn
+IdleWebThrashShort
+IdleWebThrashShort2
+IdleWerewolfTransformation
+IdleWipeBrow
+IdleWoodChopEnterInstant
+IdleWoodChopStart
+IdleWoodChopStop
+IdleWoodPickUpEnter
+IdleWoodPickUpEnterInstant
+IdleWoodPutDownEnter
+IdleWoodPutDownStart
+IdleWounded_01
+IdleWounded_02
+IdleWounded_03
+IdleWriteLedgerChargenEnter
+IdleWriteLedgerEnter
+IdleWriteLedgerEnterInstant
+IdleWriteLedgerWrite
+IdleWriteTableChairEnterInstant
+IdleWriteTableChairLeftEnter
+IdleWriteTableChairLeftExit
+IdleWriteTableChairRightEnter
+IdleWriteTableChairRightExit
+IdleWriteTableStandingEnter
+IdleWriteTableStandingEnterInstant
+Initiate
+InitiateEnd
+InitiateStart
+InitiateWinBegin
+InitiateWinEnd
+InterruptCast
+Intialize
+jumpBegin
+JumpDirectionalStart
+JumpDown
+JumpFall
+jumpFallBegin
+JumpFallDirectional
+JumpFastEnd
+JumpFastLeft
+JumpFastRight
+JumpForwardEnd
+JumpForwardStart
+JumpLand
+JumpLandDirectional
+JumpLandEnd
+JumpLandFailSafe
+JumpLandFast
+JumpLandSoft
+JumpSoftEnd
+JumpStandingStart
+JumpUp
+KillActor
+KillingBlow
+KillMove
+KillMove1HMBackStab
+KillMove1HMDecap
+KillMove1HMDecapBleedOut
+KillMove1HMDecapKnife
+KillMove1HMGrappleStab
+KillMove1HMRepeatStabDown
+KillMove1HMStabDownChest
+KillMove1HMStabUpFace
+KillMove2HM3Slash
+KillMove2HMDecap
+KillMove2HMDecapBleedOut
+KillMove2HMSlash
+KillMove2HMStabA
+KillMove2HMStabFromBehind
+KillMove2HMUnderSwingLeg
+KillMove2HWA
+KillMove2HWB
+KillMove2HWChopKick
+KillMove2HWDecapBleedOut
+KillMove2HWHackFromBehind
+KillMove2HWHeadButt
+KillMoveB
+KillMoveC
+KillMoveD
+KillMoveDLC02RipHeartOut
+KillMoveDLC1SeranaHoldsVyrthur
+KillMoveDualWieldA
+KillMoveDWDecap
+KillMoveDWDualSlash
+KillMoveDWXSlash
+KillMoveE
+KillMoveEnd
+KillMoveF
+KillMoveG
+KillMove_Ground_Bite_Grapple
+KillMoveH
+KillMoveH2HBodySlam
+KillMoveH2HComboA
+KillMoveH2HKneeThrow
+KillMoveH2HSlamA
+KillMoveH2HSneakNeckBreak
+KillMoveH2HSneakSleeper
+KillMoveH2HSuplex
+KillMoveI
+KillMoveJ
+KillMoveK
+KillMoveL
+KillMoveM
+KillMoveSabreCat
+KillMoveShieldBashSlash
+KillMoveShortA
+KillMoveShortB
+KillMoveShortC
+KillMoveShortD
+KillMoveSneakBackA
+KillMoveStart
+KillMoveVampireLordFeedBack
+KillMoveVampireLordFeedFront
+KillWerewolfPairedFeedingWithHuman
+KillWerewolfPairedHeadSmash
+KillWerewolfPairedHeadThrow
+KillWerewolfPairedMaulingWithHuman
+landEnd
+landForwardStart
+landStart
+landStart_FromClip
+LandTest to DefaultState
+LeftDirectionSwitch
+LeftMagicSneakStop
+Lever_PlayerPush
+LeverPushStart
+LooseDialogueResponseNegative
+LooseDialogueResponsePositive
+M2h_Ready
+Mac_Equip
+Mac_Unequip
+MagicCastStop
+Magic_Equip
+Magic_Equip_Out
+Magic_Equip_OutMoving
+MagicEventOut
+MagicForceEquip
+MagicForceEquipLeft
+MagicForceEquipRight
+Magic_Shield_Equip
+Magic_Solo_Equip
+Magic_Torch_IdleLocomotion_to_Magic_Torch_Sprint
+Magic_Torch_Sprint_to_Magic_Torch_IdleLocomotion
+Magic_Unequip_Out
+Magic_Unequip_OutMoving
+MagicWeap_ForceEquip
+MC 1HM AttackRight01 to MC 1HM AttackRight02
+MC 1HM AttackRight02 to MC 1HM AttackRight01
+MC 1HM AttackRight Anticipation to MC 1HM PowerAttackRight.hkx
+MC 1HM AttackRight to PowerAttackState
+MC_1HM_PowerAttack_Release
+MC 1HM PowerAttackRight.hkx to MC 1HM PowerAttackRight.hkx00
+MC 1HM PowerAttackRight Release to MC 1HM PowerAttackRight.hkx
+MC 1HM RaiseWeapon to MC 1HM PowerAttackRight.hkx
+MC_shoutStart
+MC_WeapOutRightReplaceForceEquip
+MillLogPileLoadStart
+MLh_1HM_Equip_Out
+MLh_1hm_Equip_OutMoving
+MLH_BeginCast_Event_end
+MLh_Behavior_State_to_MRh_Behavior_State
+MLhBehavior_to_BothHands
+MLh_BleedOut_TransOutEnd
+MLh_DeflectWardPreChargeState_to_MLh_DeflectWardChargeLoopState
+MLh_DeflectWardStart
+MLh_DeflectWardStart_end
+MLh_Equipped_Event
+MLh_Equipped_Event_end
+MLh_PreAimedConcentrationOut
+MLh_PreAimedConState_to_MLh_AimedConcentrationState
+MLh_PreAimedOut
+MLh_PreChargeOut
+MLh_PreChargeState_to_MLh_ChargeLoopState
+MLh_PreReadyState_to_MLh_ReadyLoopState
+MLh_PreSelfConOut
+MLh_PreSelfConState_to_MLh_SelfConcentrationState
+MLh_PreWardChargeState_to_MLh_WardChargeState
+MLh_PreWardLoopOut
+MLh_PreWardLoopState_to_MLh_WardLoopState
+MLh_Ready
+MLh_SpellAimedConcentrationStart
+MLh_SpellAimedConcentrationStart_end
+MLh_SpellAimedStart
+MLh_SpellAimedStart_end
+MLh_SpellCastStart_EnterNotify
+MLh_SpellCastStart_ExitNotify
+MLh_SpellCharge_EnterNotify
+MLh_SpellEquipped_EnterNotify
+MLh_SpellFire_Event
+MLh_SpellReady_EnterNotify
+MLh_SpellReady_Event
+MLh_SpellReady_Event_end
+MLh_SpellRelease_Event
+MLh_SpellRelease_Event_end
+MLh_SpellReleaseState_to_MLh_SpellChargeState
+MLh_SpellReleaseState_to_State04
+MLh_SpellSelfConcentrationStart
+MLh_SpellSelfConcentrationStart_end
+MLh_SpellSelfStart
+MLh_SpellSelfStart_end
+MLh_SpellTelekinesisStart
+MLh_WardStart
+MLh_WardStart_end
+MLh_Weap_attackStart_end
+MLh_WinEnd
+MLh_WinStart
+MotionDrivenDialogueAngry
+MotionDrivenDialogueGeneric
+MotionDrivenDialogueNextClip
+MotionDrivenIdle
+MotionDrivenIdle1
+MountedStaggerStart
+MountedSwimStart
+MountedSwimStop
+MountEnd
+moveBackward
+moveDefault
+moveForward
+moveSlow
+moveStart
+moveStartAlt
+moveStartAltOut
+moveStop
+MRh_AimedConcentrationState_to_State02
+MRh_And_MLh_to_MRh_Shield
+MRh_And_MLh_to_MRh_Solo
+MRh_BeginCast_Event_end
+MRh_bleedOut_TransOutEnd
+MRh_Cast_State_to_MRh_Readied_State
+MRh_DeflectWardPreChargeState_to_MRh_DeflectWardChargeLoopState
+MRh_DeflectWardStart
+MRh_DeflectWardStart_End
+MRh_Equipped_Event
+MRh_Equipped_Event_end
+MRhIdle_end
+MRh_PreAimedConcentrationOut
+MRh_PreAimedConcentration_to_MRh_AimedConcentration
+MRh_PreAimedCon_to_MRh_AimedCon
+MRh_PreChargeOut
+MRh_PreChargeState_to_MRh_ChargeLoopState
+MRh_PreCharge_to_MRh_ChargeLoop
+MRh_PreSelfConcentrationState_to_MRh_SelfConcentration
+MRh_PreSelfConOut
+MRh_PreSelfConState_to_MRh_SelfConcentration
+MRh_PreWardChargeState_to_MRh_WardCharge_State
+MRh_PreWardLoopOut
+MRh_PreWardLoopState_to_MRh_WardLoopState
+MRh_Ready
+MRh_SelfPreChargeState_to_MRh_SelfChargeLoopState
+MRhShield_Equip_Out
+MRh_Shield_to_MRh_And_MLh
+MRh_Shield_to_MRh_Solo
+MRh_Solo_to_MRh_And_MLh
+MRh_Solo_to_MRh_Shield
+MRh_SpellAimedConcentrationStart
+MRh_SpellAimedConcentrationStart_end
+MRh_SpellAimedStart
+MRh_SpellAimedStart_end
+MRh_SpellCastStart_EnterNotify
+MRh_SpellCastStart_ExitNotify
+MRh_SpellCharge_EnterNotify
+MRh_SpellEquipped_EnterNotify
+MRh_SpellFire_Event
+MRh_SpellReady_EnterNotify
+MRh_SpellReady_Event
+MRh_SpellReady_Event_end
+MRh_SpellRelease_Event
+MRh_SpellRelease_Event_end
+MRh_SpellSelfConcentrationStart
+MRh_SpellSelfConcentrationStart_end
+MRh_SpellSelfStart
+MRh_SpellSelfStart_end
+MRh_SpellTelekinesisStart
+MRh_Standing_Cast_State_to_MRh_Moving_Cast_State
+MRh_Unequip_Out
+MRh_WardCharge_State_to_MRh_WardLoop_State
+MRh_WardStart
+MRh_WardStart_end
+MRh_WinEnd
+MRh_WinStart
+MS12BedDeath
+MT_BeggarIdle
+MT_BeggarSit
+MT_BeggarStand
+MT_Behavior_State_to_1HM_Equip_State00
+MT_Behavior_State_to_MLh_Equip_State
+MT_bleedOut_TransOutEnd
+MT_BreathExhaleLong
+MT_BreathExhaleMedium
+MT_BreathExhaleShort
+MT Drinking_to_AnimObjectDrinkingIdleStop.hkx
+MT Eating_to_AnimObjectEatingIdleStop.hkx
+MT_HandCut
+MT_idle_A_to_B_trans_to_MT_IdlesB
+MT_idle_B_to_A_trans_to_MT_IdlesA
+MT_IdlesA_to_MT_idle_A_to_B_trans
+MT_IdlesB_to_MT_idle_B_to_A_trans
+MT_Standing_State_to_NPC_Turns_State
+MT_Standing_State_to_NPC_Turns_State00
+MT_Standing_State_to_NPC_Turns_State01
+MT_Standing_State_to_NPC_Turns_State02
+MT_Standing_State_to_NPC_Turns_State03
+MT_Standing_State_to_NPC_Turns_State04
+MT_Standing_State_to_NPC_Turns_State05
+MT_Standing_State_to_NPC_Turns_State06
+MTState
+MT_Torch_IdleLocomotion_to_MT_Torch_Sprint
+MT_Torch_Sprint_to_MT_Torch_IdleLocomotion
+na_DualMagic_BeginCast_Event
+na_MLH_BeginCast_Event
+na_MLh_Weap_attackStart
+na_MRh_BeginCast_Event
+na_PowerAttack_Start
+NextClip
+NoOpEventForStreamingOnly
+NPCAddRagdollToWorld
+NPCAnimObjDraw
+NPCAttach
+NPC_BumpedFromBack
+NPC_BumpedFromLeft
+NPC_BumpedFromRight
+NPC_BumpEnd
+NPC_BumpFromFront
+NPCCamHit
+NPCDecapitate
+NPCDetach
+NPCDragonMountExitOut
+NPCFootLeft
+NPCFootScuffLeft
+NPCFootScuffRight
+NPCHitFrame
+NPCHorseDeathOut
+NPCHorseExit
+NPCHorseExitOut
+NPCHumanEat
+NPCHumanSweepA
+NPCHumanSweepB
+NPCKill1HMD
+NPCKillActor
+NPCKillDLC2HeartStone
+NPCKillMoveEnd
+NPCKillMoveStart
+NPCpairedStop
+NPCPairEnd
+NPCPlayFXLeft
+NPCPlayFXRight
+NPCshoutStart
+NPCSoundPlay.NPCHorseDismount
+NPCSoundPlay.NPCHorseMount
+NPCSoundPlay.NPCKill1HMD
+NPCSoundPlay.NPCKill1HMKillMoveDragonRodeoStab
+NPCSoundPlay.NPCKillBodyfall
+NPCSoundPlay.NPCKillChop
+NPCSoundPlay.NPCKillDLC2HeartStone
+NPCSoundPlay.NPCKillGore
+NPCSoundPlay.NPCKillMelee
+NPCSoundPlay.NPCKillMeleeB
+NPCSoundPlay.NPCKillShove
+NPCSoundPlay.NPCKillSlash
+NPCSoundPlay.NPCKillSmash
+NPCSoundPlay.NPCKillStabIn
+NPCSoundPlay.NPCKillStabOut
+NPCSoundPlay.NPCKillStruggle
+NPCSoundPlay.NPCKillSwordSpin
+NPCSoundPlay.NPCVampireLordFeed
+NPCSoundPlay.NPCWolfAttackPower
+NPCSoundPlay.NPCWolfDeath
+NPCSoundPlay.QSTSeranaVyrthurMagicEscape
+NPCSoundPlay.WPNBashShieldHSD
+NPCSoundPlay.WPNBashShieldLSD
+NPCSoundPlay.WPNBlockBlade2HandVsOtherSD
+NPCStopHorseCamera
+NPCtailHorseDismount
+NPCtailHorseMount
+NPCTFXManBreath
+NPCTFXSwordBlood
+NPCTFXVoicePush
+NPC_TurnLeft180
+NPC_TurnLeft90
+NPC_TurnRight180
+NPC_TurnRight90
+NPC_TurnToWalkLeft180
+NPC_TurnToWalkLeft90
+NPC_TurnToWalkRight180
+NPC_TurnToWalkRight90
+NPCVampireFeedEnd
+NPCweaponSwing
+OffsetArmsCrossedStart
+OffsetBoundStandingCartStart
+OffsetBoundStandingCut
+OffsetBoundStandingPlayerInstant
+OffsetBoundStandingStart				;WORKS
+OffsetCarryBasketStart				;No Item
+OffsetCarryBucketStart					;No Item
+OffsetCarryFlowerBasketPickStart			;WORKS
+OffsetCarryLogStart								;No Item
+OffsetCarryMQ201DrinkR		
+OffsetCarryMQ201DrinkTray				;WORKS
+OffsetCarryPotStart						;WORKS!!!
+OffsetFlowerBasketStart					;WORKS!!!
+OffsetStop
+OffsetWoodStart		;No Item
+Open
+pa_2HWKillMoveA
+pa_DLC1SeranaHoldsVyrthur
+pa_EndAnimatedCamera
+pa_ExtractWerewolfSpirit
+pa_Ground_Mount_Dragon
+pa_HorseDeath
+pa_HorseDismount
+pa_HorseEnter
+pa_HorseEnterSwim
+pa_HorseExit
+pa_HorseExitSwim
+pa_HugA
+PairedKillTarget
+pairedStop
+PairEnd
+PairEndSwim
+pa_KillingBlow
+pa_KillMove
+pa_KillMove1HMBackStab
+pa_KillMove1HMBearB
+pa_KillMove1HMBenthicLurkerSlash
+pa_KillMove1HMBoarSmash
+pa_KillMove1HMBoarStab
+pa_KillMove1HMChaurusFlyerKick
+pa_KillMove1HMChaurusFlyerStomp
+pa_KillMove1HMDecap
+pa_KillMove1HMDecapBleedOut
+pa_KillMove1HMDecapKnife
+pa_KillMove1HMDragonRodeoSlash
+pa_KillMove1HMDragonRodeoStab
+pa_KillMove1HMDragonRodeoStabShort
+pa_KillMove1HMDwarvenBallistaSlash
+pa_KillMove1HMFalmerA
+pa_KillMove1HMFalmerB
+pa_KillMove1HMFalmerC
+pa_KillMove1HMGiantB
+pa_KillMove1HMGiantBleedOutA
+pa_KillMove1HMGrappleStab
+pa_KillMove1HMHagravenA
+pa_KillMove1HMHagravenB
+pa_KillMove1HMRepeatStabDown
+pa_KillMove1HMRieklingFaceStab
+pa_KillMove1HMRieklingSlash
+pa_KillMove1HMScribSlash
+pa_KillMove1HMScribStab
+pa_KillMove1HMSpiderSmashA
+pa_KillMove1HMSpiderStabA
+pa_KillMove1HMSprigganA
+pa_KillMove1HMSprigganB
+pa_KillMove1HMStabDownChest
+pa_KillMove1HMStabUpFace
+pa_KillMove1HMSteamCenturionA
+pa_KillMove1HMSteamCenturionB
+pa_KillMove1HMTrollB
+pa_KillMove1HMVBSlowBackStab
+pa_KillMove1HMVBSoccerKick
+pa_KillMove1HMWolfA
+pa_KillMove1HMWolfB
+pa_KillMove1HMWWGrabHeadStabSlash
+pa_KillMove1HMWWKidneyStab
+pa_KillMove1HMWWKneeSlashFaceStab
+pa_KillMove2HM3Slash
+pa_KillMove2HMBearA
+pa_KillMove2HMBearB
+pa_KillMove2HMBenthicLurkerStab
+pa_KillMove2HMBoarSlash
+pa_KillMove2HMChaurusFlyerStabDown
+pa_KillMove2HMDecap
+pa_KillMove2HMDecapBleedOut
+pa_KillMove2HMDragonSlash
+pa_KillMove2HMDraugrA
+pa_KillMove2HMDwarvenBallistaSlash
+pa_KillMove2HMFalmerA
+pa_KillMove2HMFalmerB
+pa_KillMove2HMGiantA
+pa_KillMove2HMHagravenA
+pa_KillMove2HMRieklingSlash
+pa_KillMove2HMSabreCatA
+pa_KillMove2HMSabreCatB
+pa_KillMove2HMScribSlash
+pa_KillMove2HMSlash
+pa_KillMove2HMSpiderSlamA
+pa_KillMove2HMSprigganA
+pa_KillMove2HMStabA
+pa_KillMove2HMStabFromBehind
+pa_KillMove2HMSteamCenturionA
+pa_KillMove2HMTrollA
+pa_KillMove2HMTrollB
+pa_KillMove2HMUnderSwingLeg
+pa_KillMove2HMVBBlockAndSlash
+pa_KillMove2HMWolfA
+pa_KillMove2HMWolfB
+pa_KillMove2HMWWGutStab
+pa_KillMove2HWA
+pa_KillMove2HWB
+pa_KillMove2HWBearA
+pa_KillMove2HWBenthicLurkerSlash
+pa_KillMove2HWBoarSmash
+pa_KillMove2HWChaurusFlyerPullDownSlash
+pa_KillMove2HWChopKick
+pa_KillMove2HWDecapBleedOut
+pa_KillMove2HWDragonRodeoSlash
+pa_KillMove2HWDragonSlash
+pa_KillMove2HWDraugrA
+pa_KillMove2HWDwarvenBallistaSlash
+pa_KillMove2HWFalmerA
+pa_KillMove2HWGiantA
+pa_KillMove2HWHackFromBehind
+pa_KillMove2HWHagravenA
+pa_KillMove2HWHeadButt
+pa_KillMove2HWRieklingSmash
+pa_KillMove2HWSabreCatA
+pa_KillMove2HWScribSmash
+pa_KillMove2HWSpiderSlamA
+pa_KillMove2HWSprigganA
+pa_KillMove2HWSteamCenturionA
+pa_KillMove2HWTrollA
+pa_KillMove2HWVBBackBreaker
+pa_KillMove2HWWolfA
+pa_KillMove2HWWWEvadeSlash
+pa_KillMoveB
+pa_KillMoveBearA
+pa_KillMoveC
+pa_KillMoveD
+pa_KillMoveDLC02RipHeartOut
+pa_KillMoveDLC1SeranaHoldsVyrthur
+pa_KillMoveDragonA
+pa_KillMoveDragonB
+pa_KillMoveDraugr
+pa_KillMoveDraugrB
+pa_KillMoveDraugrShortA
+pa_KillMoveDraugrShortB
+pa_KillMoveDualWieldA
+pa_KillMoveDWDecap
+pa_KillMoveDWDualSlash
+pa_KillMoveDWXSlash
+pa_KillMoveE
+pa_KillMoveF
+pa_KillMoveG
+pa_KillMoveGiantA
+pa_KillMove_Ground_Bite_Grapple
+pa_KillMoveH
+pa_KillMoveH2HBodySlam
+pa_KillMoveH2HComboA
+pa_KillMoveH2HKneeThrow
+pa_KillMoveH2HNeckBreak
+pa_KillMoveH2HSlamA
+pa_KillMoveH2HSneakNeckBreak
+pa_KillMoveH2HSneakSleeper
+pa_KillMoveH2HSuplex
+pa_KillMoveI
+pa_KillMoveJ
+pa_KillMoveK
+pa_KillMoveL
+pa_KillMoveM
+pa_KillMoveSabreCat
+pa_KillMoveSabreCatShortA
+pa_KillMoveSabreCatShortB
+pa_KillMoveShieldBashSlash
+pa_KillMoveShortA
+pa_KillMoveShortB
+pa_KillMoveShortC			;LOL WOW EXPLORE THIS (I died)
+pa_KillMoveShortD
+pa_KillMoveSneakBackA
+pa_KillMoveTrollA
+pa_OffsetBoundStandingCut
+PassOutContinue				;TEST
+PassOutStart
+PassOutStop
+PassoutToTableDrink	
+PassOutToTableMug	
+pa_StartAnimatedCamera	;TEST
+PathTweenerEnd
+pa_TrailerSh12
+pa_TrailerSh16
+pa_TrailerSh19
+pa_TrailerSh20
+pa_TrailerSh22
+pa_TrailerSh23
+pa_TrailerSh24
+pa_TrailerSh25
+pa_TrailerSh27
+pa_VampireFeedStanding_Back
+pa_VampireFeedStanding_Front
+pa_WerewolfPairedFeedingWithHuman
+pa_WW_CutWrist
+PickNewHead
+PickNewIdle
+PickNewTail
+PickUp
+PitchChaseStart
+PitchChaseStop
+PitchOverrideEnd
+PitchOverrideStart
+PlayerOnBlock
+PlayFXLeft
+PlayFXRight
+PlayImod
+Pour
+PowerAttack_Start_end
+PowerAttackStop
+preHitFrame
+PreOut
+Pull
+QSTDLC2BoatArrivalBells01
+QSTDLC2BoatArrivalBells02
+QSTDLC2BoatArrivalCreakA01
+QSTDLC2BoatArrivalCreakA02
+QSTDLC2BoatArrivalCreakA03
+QSTDLC2BoatArrivalCreakB01
+QSTDLC2BoatArrivalCreakB02
+QSTDLC2BoatArrivalCreakB03
+QSTDLC2BoatArrivalCreakB04
+QSTDLC2BoatArrivalCreakC01
+QSTDLC2BoatArrivalSD
+QSTDLC2BoatArrivalWaves
+QSTStornDeathExit
+QSTStornDeathIntro
+QSTStornDeathLP
+Ragdoll
+RagdollInstant
+RandomDrinkOrPassOut_to_AOBarTablePassOut.hkx
+RandomReset
+RandomTableDrink_to_RandomTableIdle
+RandomTableIdle_to_RandomTableDrink
+RandomTableMug_to_AOBarTableMugDrink.hkx
+Reanimated
+ReanimateExit
+ReanimateStart
+rearUpEnd
+recoilLargeStart
+recoilStart
+recoilStop
+Reload
+ReloadFast
+reloadStart
+reloadStop
+RemoveCharacterControllerFromWorld
+RemoveFromInventory
+Reset
+returnToDefault
+reverseDirection
+RF_GuardedDismissive_In
+RF_GuardedInterested_In
+RF_GuardedPleading_In
+RF_GuardedStart
+RF_GuardedThrowHands_In
+RF_Idle_In
+RF_Idle_Out
+RF_MoodChangeGuarded
+RF_MoodChangeOpen
+RF_MoodChange_Out
+RF_MoodChangePlayful
+RF_MoodChangeSerious
+RF_NextClip
+RF_OpenDismissive_In
+RF_OpenInterested_In
+RF_OpenPleading_In
+RF_OpenStart
+RF_OpenThrowHands_In
+RF_PlayfulDismissive_In
+RF_PlayfulInterested_In
+RF_PlayfulPleading_In
+RF_PlayfulStart
+RF_PlayfulThrowHands_In
+RF_Reaction_Out
+RF_SeriousDismissive_In
+RF_SeriousInterested_In
+RF_SeriousPleading_In
+RF_SeriousStart
+RF_SeriousThrowHands_In
+RF_Shock01
+RF_Shock02
+RF_Shock03
+RF_Shock_Guarded
+RF_Shock_Open
+RF_Shock_Playful
+RF_Shock_Serious
+RF_Talk_In
+RF_Talk_Out
+RightDirectionSwitch
+RightMagicSneakStop
+RitualSpellAimConcentrationStart
+RitualSpellOut
+RitualSpell_PreChargeOut
+RitualSpellStart
+Root_Default_State_to_State01
+Root_Torch_State_to_Root_Default_State
+selfTransEvent
+SetRace
+ShackleOpen
+ShdEquip
+shoutLoopingRelease
+shoutRelease
+shoutReleaseSlowTime
+ShoutSprintLongestStart
+ShoutSprintLongStart
+ShoutSprintMediumStart
+ShoutSprintShortStart
+shoutStart
+shoutStop
+SlaveIdle
+SlavePull
+SlavePush
+SlaveWoodChop
+SlaveWoodChopIdle
+slowdownStart
+SneakSprintStartRoll
+SneakStart
+SneakStop
+Sound
+SoundPlay
+SoundPlay.FSTSwimSwim
+SoundPlay.FSTSwimTread
+SoundPlay.MUSBardDrum01
+SoundPlay.MUSBardDrum02
+SoundPlay.MUSBardDrum03
+SoundPlay.MUSBardFlute01
+SoundPlay.MUSBardFlute01LPM
+SoundPlay.NPCHorseDismount
+SoundPlay.NPCHorseMount
+SoundPlay.NPCHumanAlchemyPound
+SoundPlay.NPCHumanAlchemyStir
+SoundPlay.NPCHumanAlchemyTap
+SoundPlay.NPCHumanAventusStabHard
+SoundPlay.NPCHumanAventusStabSoft
+SoundPlay.NPCHumanBartenderWipe
+SoundPlay.NPCHumanBasteMeat
+SoundPlay.NPCHumanBlacksmithForgeQuench
+soundPlay.NPCHumanBlacksmithForgeQuenchDrop
+SoundPlay.NPCHumanBlacksmithForgeTake
+SoundPlay.NPCHumanBlacksmithHammer
+SoundPlay.NPCHumanBlacksmithHammerDistant
+SoundPlay.NPCHumanBlacksmithRepairHammer
+SoundPlay.NPCHumanBlacksmithRepairHammerDistant
+SoundPlay.NPCHumanBladeGrindLPM
+SoundPlay.NPCHumanBladeGrindPedalLPM
+SoundPlay.NPCHumanBookPageTurn
+SoundPlay.NPCHumanBucketFill
+SoundPlay.NPCHumanBucketPour
+SoundPlay.NPCHumanCartExitA
+SoundPlay.NPCHumanCartExitB01
+SoundPlay.NPCHumanCartExitB02
+SoundPlay.NPCHumanCartExitB03
+SoundPlay.NPCHumanCartExitB04
+SoundPlay.NPCHumanCartExitC01
+SoundPlay.NPCHumanCartExitC02
+SoundPlay.NPCHumanCartExitC03
+SoundPlay.NPCHumanCartExitC04
+SoundPlay.NPCHumanChiselHammer
+SoundPlay.NPCHumanChiselHammerDistant
+SoundPlay.NPCHumanClap
+SoundPlay.NPCHumanCombatIdleA
+SoundPlay.NPCHumanCombatIdleB
+SoundPlay.NPCHumanCombatIdleC
+SoundPlay.NPCHumanCombatIdleShieldHit
+SoundPlay.NPCHumanCombatShieldBash
+SoundPlay.NPCHumanCombatShieldBashPower
+SoundPlay.NPCHumanCombatShieldBashSD
+SoundPlay.NPCHumanCombatShieldBlock
+SoundPlay.NPCHumanCombatShieldBlockRelease
+SoundPlay.NPCHumanCombatShieldRelease
+SoundPlay.NPCHumanCombatTorchBash
+SoundPlay.NPCHumanCombatTorchBashPower
+SoundPlay.NPCHumanEat
+SoundPlay.NPCHumanEatSoupSlurp
+SoundPlay.NPCHumanEatSoupSpoon
+SoundPlay.NPCHumanExecutionerChopA
+SoundPlay.NPCHumanExecutionerChopB
+SoundPlay.NPCHumanExecutionerPushA
+SoundPlay.NPCHumanExecutionerPushB
+SoundPlay.NPCHumanExecutionerPushPlayer
+SoundPlay.NPCHumanHoeA
+SoundPlay.NPCHumanHoeB
+SoundPlay.NPCHumanHoeC
+SoundPlay.NPCHumanHornImperial
+SoundPlay.NPCHumanHornImperialDistant
+SoundPlay.NPCHumanHornStormcloak
+SoundPlay.NPCHumanHornStormcloakDistant
+SoundPlay.NPCHumanLeatherScrape
+SoundPlay.NPCHumanPickAxe
+SoundPlay.NPCHumanPickAxeDistant
+SoundPlay.NPCHumanScrapeBark
+SoundPlay.NPCHumanShovel
+SoundPlay.NPCHumanShovelDump
+SoundPlay.NPCHumanSpoonPotTap
+SoundPlay.NPCHumanStirPot
+SoundPlay.NPCHumanSweepA
+SoundPlay.NPCHumanSweepB
+SoundPlay.NPCHumanVampireFeedTableA
+SoundPlay.NPCHumanVampireFeedTableB
+SoundPlay.NPCHumanWoodChop
+SoundPlay.NPCHumanWoodChopDistant
+SoundPlay.NPCHumanWoodDrop
+SoundPlay.NPCHumanWoodPickup
+SoundPlay.NPCHumanWoodPlace
+SoundPlay.NPCHumanWorkbenchHammer
+SoundPlay.NPCHumanWorkbenchHammerDistant
+SoundPlay.NPCKill1HMBandit
+SoundPlay.NPCKill1HMD
+SoundPlay.NPCKill1HMDualWieldA
+SoundPlay.NPCKill1HMKillMoveDragonRodeoStab
+SoundPlay.NPCKillBodyfall
+SoundPlay.NPCKillChop
+SoundPlay.NPCKillDLC2HeartStone
+SoundPlay.NPCKillGore
+SoundPlay.NPCKillMelee
+SoundPlay.NPCKillMeleeB
+SoundPlay.NPCKillShove
+SoundPlay.NPCKillSlash
+SoundPlay.NPCKillSmash
+SoundPlay.NPCKillStabIn
+SoundPlay.NPCKillStabOut
+SoundPlay.NPCKillStruggle
+SoundPlay.NPCKillSwordSpin
+SoundPlay.NPCVampireLordFeed
+SoundPlay.NPCWerewolfTransformation
+SoundPlay.NPCWolfAttackPower
+SoundPlay.NPCWolfDeath
+SoundPlay.OBJBlacksmithForge
+SoundPlay.OBJLeverNordic01PullSD
+SoundPlay.OBJLeverNordic01ReturnSD
+SoundPlay.OBJMetalRotateRack
+SoundPlay.PHYGenericDirtMediumH
+SoundPlay.QSTDLC2BoatArrivalBells01
+SoundPlay.QSTDLC2BoatArrivalBells02
+SoundPlay.QSTDLC2BoatArrivalCreakA01
+SoundPlay.QSTDLC2BoatArrivalCreakA02
+SoundPlay.QSTDLC2BoatArrivalCreakA03
+SoundPlay.QSTDLC2BoatArrivalCreakB01
+SoundPlay.QSTDLC2BoatArrivalCreakB02
+SoundPlay.QSTDLC2BoatArrivalCreakB03
+SoundPlay.QSTDLC2BoatArrivalCreakB04
+SoundPlay.QSTDLC2BoatArrivalCreakC01
+SoundPlay.QSTDLC2BoatArrivalWaves
+SoundPlay.QSTSeranaVyrthurMagicEscape
+SoundPlay.QSTStornDeathExit
+SoundPlay.QSTStornDeathIntro
+SoundPlay.QSTStornDeathLP
+SoundPlay.QSTTG09PresentKey
+SoundPlay.WPNAxe1HandDraw
+SoundPlay.WPNAxe1HandSheathe
+SoundPlay.WPNBashShieldHSD
+SoundPlay.WPNBashShieldLSD
+SoundPlay.WPNBlade1HandSmallDraw
+SoundPlay.WPNBlade1HandSmallSheathe
+SoundPlay.WPNBlockBlade2HandVsOtherSD
+SoundPlay.WPNBowFire
+SoundPlay.WPNBowNock
+SoundPlay.WPNBowNockSD
+SoundPlay.WPNBowPullLPM
+SoundPlay.WPNBowSheathe
+SoundPlay.WPNBowZoomIn
+SoundPlay.WPNBowZoomOut
+SoundPlay.WPNCrossbowAim
+SoundPlay.WPNCrossbowReload
+SoundPlay.WPNCrossbowReloadQuickShotPerk
+SoundPlay.WPNLeftHandDraw
+SoundPlay.WPNLeftHandSheathe
+SoundPlay.WPNMace1HandDraw
+SoundPlay.WPNMace1HandSheathe
+SoundPlay.WPNStaffHandDraw
+SoundPlay.WPNStaffHandSheathe
+SoundPlay.WPNSwingBladeMedium
+SoundPlay.WPNSwingUnarmed
+SoundPlay.WPNUnarmedDraw
+SoundPlay.WPNUnarmedSheathe
+SoundStop
+SoundStop.MUSBardDrum01
+SoundStop.MUSBardDrum02
+SoundStop.MUSBardDrum03
+SoundStop.MUSBardFlute01LPM
+SoundStop.NPCHumanBladeGrindLPM
+SoundStop.NPCHumanBladeGrindPedalLPM
+SoundStop.QSTStornDeathLP
+SoundStop.WPNBowPullLPM
+SpectatorCheer
+SpectatorClap
+SpectatorGawk
+SpectatorTalking
+SpeedSample_MagicCastLocomotion
+SpeedSample_MagicLocomotion
+SpellRelease
+SpellReleaseState_to_SpellChargeState
+SpellReleaseState_to_State00
+SpellStart
+SprintStart
+SprintStop
+StaffBashExit
+StaffBashRelease
+StaffBashStart
+staggerIdleStart
+StaggerPlayer
+StaggerPlayerBow
+staggerStart
+staggerStop
+standingJumpStart
+standingRearUp
+StartAnimatedCamera
+StartAnimatedCameraDelta
+StartIdleAnimationDriven
+State02_to_MRh_AimedConcentrationChargeState
+Stf_Equip
+StfMagic_PreChargeOut
+Stf_Unequip
+StopHorseCamera
+StrafeBackLeft
+StrafeBackRight
+StrafeOut
+StrafeReturn
+StrafeReverseLeft
+StrafeReverseRight
+StrafeStartLeft
+StrafeStartRight
+StrafeStartRunLeft
+StrafeStartRunRight
+StrafeStartTrotLeft
+StrafeStartTrotRight
+StrafeStartWalkLeft
+StrafeStartWalkRight
+StrafeStopLeft
+StrafeStopRight
+StrafeStopRunLeft
+StrafeStopRunRight
+StrafeWalkLeft
+streamingQuery
+streamingQuery_attackStart
+streamingQuery_attackStartLeft
+StreamingTest
+swimForceEquip
+SwimStart
+SwimStartFromRagdoll
+SwimStop
+SyncLeft
+syncPoint
+SyncRight
+T02Ascend
+TableDrinkAndMugEnter
+TableDrinkEnter
+TableDrinkStart
+TableDrinkState_to_ChairIdleState
+TableDrinkState_to_TableMugState
+TableDrinkState_to_TablePassOutState
+TableDrinkStop
+TableMugEnter
+TableMugStart
+TableMugState_to_TableDrinkState
+TableMugState_to_TableDrinkState00
+TableMugState_to_TablePassOutState
+TableMugStop
+TablePassOutEnter
+TablePassOutState_to_ChairIdleState
+TablePassOutState_to_TableDrinkState
+TablePassOutState_to_TableDrinkState00
+TablePassOutState_to_TableDrinkState01
+TablePassOutState_to_TableMugState
+TablePassOutState_to_TableMugState00
+TablePassOutState_to_TableMugState01
+tailBarTableIdle
+tailBedLeftIdle
+tailBedRightIdle
+tailBedrollFrontIdle
+tailBedrollLeftIdle
+tailBedrollRightIdle
+tailChairIdle
+tailCombatIdle
+tailCombatLocomotion
+tailCombatState
+tailCrouch
+tailEquip
+tailHorseDismount
+tailHorseMount
+tailKneel
+tailKneelEnter
+tailKneelExit
+tailLayDown
+tailLayDownEnter
+tailLayDownExit
+tailMTIdle
+tailMTLocomotion
+tailMTState
+tailSharpeningWheel
+tailSharpeningWheelEnter
+tailSharpeningWheelExit
+tailSitCrossLegged
+tailSitCrossLeggedEnter
+tailSitCrossLeggedExit
+tailSitLedge
+tailSitLedgeEnter
+tailSitLedgeExit
+tailSneakIdle
+tailSneakLocomotion
+tailSprint
+TailStart
+tailStoolIdle
+tailUnequip
+Temper
+testDialogueIdleBStart
+testEffectStart
+testEffectStop
+testIdleLoop
+testIdleStart
+testMagic
+TestSit_EnterBed
+TestSit_EnterChair
+TestSit_GetUp
+TestSit_StartLoop
+TestSit_Stop
+TFXManBreath
+TFXSwordBlood
+TFXVoicePush
+TG05_GetUp
+TG05_KnockOut
+TG05_StabPlayer
+to_1HM_AttackRightDefault_State
+to_ChairBaseVar1Shoulders
+to_Chair_IdleBaseVar1
+to_DialogueAngryBase
+to_DialogueResponseNegative
+to_DialogueResponsePositive
+to_FurnitureState
+to_MT_Default_State
+to_MT_idle_A_base
+to_MT_idle_A_left_long
+to_MT_idle_A_sigh_var1
+to_MT_idle_A_sigh_var2
+to_MT_idle_A_soft_right
+to_MT_idle_A_sway_fast
+to_MT_idle_B_base
+to_MT_idle_B_long_left
+to_MT_idle_B_sigh
+to_MT_idle_B_sway_right
+Tor_1stP_Locomotion_to_Torch_Standing
+torchEquip
+torchEquip_1hm
+torchForceEquip
+Torch_Standing_to_Tor_1stP_Locomotion
+torchUnequip
+torchUnequip_1hm
+ToTableDrinkState
+TPlay01
+TPlay02
+TrailerSh07
+TrailerSh08
+TrailerSh09
+TrailerSh11
+TrailerSh12
+TrailerSh13
+TrailerSh15
+TrailerSh16
+TrailerSh19
+TrailerSh20
+TrailerSh22
+TrailerSh23
+Trailer_Sh24
+TrailerSh25
+TrailerSh27
+TransitionOut
+trigger04
+turnDefault
+turnFast
+TurnInPlaceEnd
+turnLeft
+turnLeftFast
+turnLeftSlow
+turnRight
+turnRightFast
+turnRightSlow
+turnSlow
+turnStart
+turnStop
+TurnToWalkEnd
+Unequip
+UnequipNoAnim
+Unequip_Out
+Unequip_OutMoving
+VampireFeedEnd
+VampireFeedingBedLeft
+VampireFeedingBedRight
+VampireFeedingBedRollLeft
+VampireFeedingBedRollRight
+VampireFeedStanding_Back
+VampireFeedStanding_Front
+VampireLordChangePlayer
+VehicleExit
+Voice_SpellFire_Event
+WallLeanEnterInstant
+wardAbsorb
+WardBreak
+WardFXRecoilEnd
+WeapEquip
+WeapEquip_Out
+WeapEquip_OutMoving
+Weap_Equip_State_to_Magic_Equip_State
+WeapForceEquip
+weaponDraw
+weaponLeftSwing
+weaponSheathe
+weaponSwing
+WeapOutLeftReplaceForceEquip
+WeapOutRightReplaceForceEquip
+WeapSneakStop
+WeapSoloEquip
+Weap_Unequip_State_to_Magic_Equip_State
+Weap_Unequip_State_to_MT_Behavior_State
+Weap_Unequip_State_to_MT_Behavior_State00
+WerewolfTransformation
+WindowEnd
+WindowStart
+ZeroOutCameraPitch
+
+ 
+
+
+/;
+
+; ---- added in Naked Defeat 6.51 ----
+bool SpawningActorsActive
+bool VehiclePlaced = false
+objectreference Property SafetyPlatform Auto

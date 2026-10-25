@@ -140,6 +140,8 @@ EndFunction
 
 Function RemoveSceneProtectors()
 
+	storqst.SceneProtectorsPlaced = false	
+
 	if TheSceneProtector_01
 	NymMessage("Remove Scene Protector 01a")
 	TheSceneProtector_01.DisableNoWait()
@@ -152,7 +154,6 @@ Function RemoveSceneProtectors()
 	TheSceneProtector_02.Delete()
 	TheSceneProtector_02 = None
 	endif
-	storqst.SceneProtectorsPlaced = false 	;allow protectors to be placed again in the next scene
 EndFunction
 
 Function Fragment_2()				;#whipscene	#20 ;##Start		;WHIPSCENE START
@@ -200,14 +201,19 @@ Function Fragment_2()				;#whipscene	#20 ;##Start		;WHIPSCENE START
 				if CheckWhipper() 
 					
 					PlaceSceneProtectors()
-
+					
 					AddCane()
 					if cfgqst.AlreadyImmobilized	;we dont want this in some situations.
 					MoveWhipperToPlayer()
-					endif
+					endif 
 					SaveWhipperStats()
+					
+					if storqst.DynamicWhipping
+					WhippingSpeed_SET(-0.6)
+					else 
 					AdjustAttackSpeed(true)
-					WhipperStateApplied = true 	;so CleanupWhipper() knows there is something to restore
+					endif 
+					WhipperStateApplied = true 	;so WhipppingCleanUp() knows there is something to restore
 					
 					RegisterForSingleUpdate(1.0)
 					;RegisterForSingleUpdate(5.0)	
@@ -224,7 +230,7 @@ Function Fragment_2()				;#whipscene	#20 ;##Start		;WHIPSCENE START
 			endif
 		else
 			Debug.Trace("NAKED DEFEAT whipquest_00: no actor found")
-			Debug.Notification("<font color='#ff0000'>Nobody there to whip you.</font>")		;MESSAGE
+			;Debug.Notification("<font color='#ff0000'>Nobody there to whip you.</font>")		;MESSAGE
 			Debug.Trace("NAKED DEFEAT Notification: Nobody there to whip you.")	
 			SetStage(100)
 		endif	
@@ -232,6 +238,7 @@ Function Fragment_2()				;#whipscene	#20 ;##Start		;WHIPSCENE START
 
 EndFunction
 
+Float WhipperWeaponSpeedMultOriginal
 Float WhipperWeaponSpeedMultCurrent
 Float WhipperWeaponSpeedMultDebuff
 
@@ -241,6 +248,7 @@ Function AdjustAttackSpeed(bool apply)
 
 	if apply	
 	WhipperWeaponSpeedMultCurrent = TheWhipper.GetActorValue("WeaponSpeedMult")
+	WhipperWeaponSpeedMultOriginal = WhipperWeaponSpeedMultCurrent
 	NymTrace("WhipperWeaponSpeedMultCurrent A1: "+WhipperWeaponSpeedMultCurrent)
 	;a.SetAV("WeaponSpeedMult", 0.5)
 	
@@ -257,13 +265,64 @@ Function AdjustAttackSpeed(bool apply)
 	;PlayerSpeedMultDebuff = 40 - PlayerSpeedMultCurrent
 	;PlayerRef.ModAV("SpeedMult", PlayerSpeedMultDebuff)
 	;PlayerRef.ModActorValue("CarryWeight", 2.0)
-	;PlayerRef.ModActorValue("CarryWeight", -2.0)
+	;PlayerRef.ModActorValue("Carr9yWeight", -2.0)
 	else
 	NymTrace("WhipperWeaponSpeedMultCurrent A2: "+WhipperWeaponSpeedMultCurrent)
-	TheWhipper.ModActorValue("WeaponSpeedMult", WhipperWeaponSpeedMultDebuff)
+	TheWhipper.ModActorValue("WeaponSpeedMult", WhipperWeaponSpeedMultDebuff)  ;RESET TO ORIGINAL 
 	NymTrace(" WhipperWeaponSpeedMultCurrent B2: "+WhipperWeaponSpeedMultCurrent)
 	endif 
 EndFunction
+
+
+Function WhippingSpeed_SET(float fSpeedTarget)
+	
+	;get current value
+	WhipperWeaponSpeedMultCurrent = TheWhipper.GetActorValue("WeaponSpeedMult")
+	;save orignal value 
+	WhipperWeaponSpeedMultOriginal = WhipperWeaponSpeedMultCurrent
+	NymTrace("WhippingSpeed_SET A1: "+WhipperWeaponSpeedMultCurrent)
+
+	;calculate total debuff			
+	WhipperWeaponSpeedMultDebuff = WhipperWeaponSpeedMultCurrent + fSpeedTarget
+	NymTrace("WhippingSpeed_SET "+WhipperWeaponSpeedMultDebuff)
+	
+	;apply debuff
+	TheWhipper.ModActorValue("WeaponSpeedMult", -WhipperWeaponSpeedMultDebuff)
+	
+	;double check 
+	WhipperWeaponSpeedMultCurrent = TheWhipper.GetActorValue("WeaponSpeedMult")
+	NymTrace("WhippingSpeed_SET B1: "+WhipperWeaponSpeedMultCurrent)
+
+EndFunction 
+
+Function WhippingSpeed_CHANGE(float fSpeedTarget)
+    WhippingSpeed_RESET()
+    WhipperWeaponSpeedMultCurrent = TheWhipper.GetActorValue("WeaponSpeedMult")
+    WhipperWeaponSpeedMultOriginal = WhipperWeaponSpeedMultCurrent
+    NymTrace("WhippingSpeed_CHANGE A1: " + WhipperWeaponSpeedMultCurrent)
+    WhipperWeaponSpeedMultDebuff = WhipperWeaponSpeedMultCurrent + fSpeedTarget
+    NymTrace("WhippingSpeed_CHANGE " + WhipperWeaponSpeedMultDebuff)
+    TheWhipper.ModActorValue("WeaponSpeedMult", -WhipperWeaponSpeedMultDebuff)
+    WhipperWeaponSpeedMultCurrent = TheWhipper.GetActorValue("WeaponSpeedMult")
+    NymTrace("WhippingSpeed_CHANGE B1: " + WhipperWeaponSpeedMultCurrent)
+    CurrentWhippingSpeed = fSpeedTarget
+EndFunction
+
+
+Function WhippingSpeed_RESET()
+
+	NymTrace("WhippingSpeed_RESET(CURRENT) A: "+WhipperWeaponSpeedMultCurrent)
+	TheWhipper.ModActorValue("WeaponSpeedMult", WhipperWeaponSpeedMultDebuff)  ;RESET TO ORIGINAL 
+	NymTrace(" WhippingSpeed_RESET(CURRENT) B: "+WhipperWeaponSpeedMultCurrent)
+	NymTrace(" WhippingSpeed_RESET(ORIG) B: "+WhipperWeaponSpeedMultOriginal)
+	
+EndFunction
+
+
+
+
+
+
 
 Function Fragment_1()								;############ STAGE 10 ############			#START
 Debug.Trace("NAKED DEFEAT: whipquest_00 stage 10")
@@ -289,20 +348,24 @@ EndFunction
 Function Fragment_0()								;############ STAGE 1000 ############		#endofquest
 ;shutdown stage
 
+	WhipppingCleanUp()
+
 	TeleportAttempts = 0
 
 	cfgqst.WhipAgain = false
+	storqst.WhipHitCount = 0
+	storqst.WhippingDuration = 0
+	storqst.TempWhipChance = 0
 	;Debug.SetGodMode(false)
 
-	RemoveSceneProtectors()
-	CleanupWhipper()	;abort paths (stage 21 -> 1000) used to skip stage 25: whipper kept Cane, WhippingFaction, zeroed Stamina and the WeaponSpeedMult debuff
+;	RemoveSceneProtectors()
 
 	if cfgqst.ModPrecision
 	cfgqst.PrecisionCollision(TheWhipper, true)
 	cfgqst.PrecisionCollision(cfgqst.PlayerRef, true)
 	endif 
 		
-storqst.WhippingQuest_00_Running = false
+	storqst.WhippingQuest_00_Running = false
 
 Debug.Trace("NAKED DEFEAT: whipquest_00 stage 1000")
 Stop()
@@ -330,37 +393,67 @@ endif
 EndFunction
 
 
+Function WhipppingCleanUp()
+	Debug.Trace("NAKED DEFEAT: WhipppingCleanUp()")
+
+	RemoveSceneProtectors()
+
+	;WhipppingCleanUp()
+
+	Whipping = false
+	cfgqst.WhipAgain = false
+	storqst.WhipHitCount = 0
+	if TheWhipper
+
+		;#P+ patch: only undo what Fragment_2 actually applied. On an abort before the whipping started
+		;(stage 21 -> 1000), or with TheWhipper still set from an earlier scene, the speed/stat restore
+		;would re-apply a stale WeaponSpeedMult debuff and stamina values to that actor.
+		if WhipperStateApplied
+		WhipperStateApplied = false
+			if storqst.DynamicWhipping
+			WhippingSpeed_RESET()
+			else
+			AdjustAttackSpeed(false)
+			endif
+		ResetWhipperStats()
+		endif
+
+	TheWhipper.RemoveFromFaction(WhippingFaction)
+	RemoveCane()
+	endif
+EndFunction
+
 ;bool LoopWhipScene
 
 Function Fragment_5()			;END OF WHIPPING		;############ STAGE 25 ############		;#whip end
 Debug.Trace("NAKED DEFEAT: whipquest_00 stage 25 (end of whipping)")
 
+
+;/
+	WhipppingCleanUp()	
 	RemoveSceneProtectors()
+	
+	if Nym()
+	WhippingSpeed_RESET()
+	else 
+	AdjustAttackSpeed(false)
+	endif 
+
+	WhipppingCleanUp()
 
 	Whipping = false
 	cfgqst.WhipAgain = false
-
-	CleanupWhipper()
-
-SetStage(1000)
-
-EndFunction
-
-bool WhipperStateApplied = false
-
-Function CleanupWhipper() 	;restores everything Fragment_2 changed on TheWhipper. Safe to call from any exit path (idempotent).
-
-	if WhipperStateApplied
-	WhipperStateApplied = false
-		if TheWhipper
-		AdjustAttackSpeed(false)
-		ResetWhipperStats()
-		TheWhipper.RemoveFromFaction(WhippingFaction)
-		endif
+	storqst.WhipHitCount = 0
+	TheWhipper.RemoveFromFaction(WhippingFaction)
 	RemoveCane()
-	endif
-
+	ResetWhipperStats()
+	/;
+					
+	SetStage(1000)
+	
 EndFunction
+
+bool WhipperStateApplied = false 	;#P+ patch: set by Fragment_2 once the whipper's speed/stats were changed, cleared by WhipppingCleanUp()
 
 Function Startwhipquest_00()	;this starts Capturequest from Stage 500 calmquest
 
@@ -389,6 +482,12 @@ EndFunction
 
 Function MoveWhipperToPlayer()
 	
+	Float fDistance = 100.0
+	
+	if Nym()
+	fDistance = 80.0
+	endif 
+	
 	int Mode = 1
 	Float zOffset
 	if cfgqst.SexScene
@@ -400,15 +499,15 @@ Function MoveWhipperToPlayer()
 	NyMTrace("MoveWhipperToPlayer(Mode = "+Mode+")")
 	
 	if Mode == 1 ;front
-	TheWhipper.MoveTo(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 115.0, abMatchRotation = false)
+	TheWhipper.MoveTo(cfgqst.PlayerRef, fDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), fDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 115.0, abMatchRotation = false)
 	zOffset = TheWhipper.GetHeadingAngle(cfgqst.PlayerRef)
 	TheWhipper.SetAngle(TheWhipper.GetAngleX(), TheWhipper.GetAngleY(), TheWhipper.GetAngleZ() + zOffset)
 	elseif Mode == 2 ;side
-	TheWhipper.MoveTo(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()+90), cfgqst.PlayerRef.GetHeight() - 115.0, abMatchRotation = false)
+	TheWhipper.MoveTo(cfgqst.PlayerRef, fDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()+90), fDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()+90), cfgqst.PlayerRef.GetHeight() - 115.0, abMatchRotation = false)
 	zOffset = TheWhipper.GetHeadingAngle(cfgqst.PlayerRef)
 	TheWhipper.SetAngle(TheWhipper.GetAngleX(), TheWhipper.GetAngleY(), TheWhipper.GetAngleZ() + zOffset)
 	elseif Mode == 3 ;back
-	TheWhipper.MoveTo(cfgqst.PlayerRef, -100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), -100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 115.0, abMatchRotation = false)
+	TheWhipper.MoveTo(cfgqst.PlayerRef, -fDistance * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), -fDistance * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 115.0, abMatchRotation = false)
 	zOffset = TheWhipper.GetHeadingAngle(cfgqst.PlayerRef)
 	TheWhipper.SetAngle(TheWhipper.GetAngleX(), TheWhipper.GetAngleY(), TheWhipper.GetAngleZ() + zOffset)
 	endif 
@@ -436,21 +535,23 @@ Bool Function CheckWhipper()		;#check
 		;if !folqst.IsPresentFollower(TheWhipper)		<--- no no, control this externally via the WhippingFaction
 			if TheWhipper.IsEnabled()
 				if !TheWhipper.IsDead()
-					if cfgqst.IsHumanoid(TheWhipper)
-						if cfgqst.ShowDebugMessages
-							Debug.Notification("Whipper (01) = "+cfgqst.GetLeveledActorBaseName(TheWhipper))
-						endif	
-						return true
-					else
-						Debug.Notification("Whipper (01) = Non-humanoid ("+cfgqst.GetLeveledActorBaseName(TheWhipper)+")")
-						return false
-					endif
+				
+
+					;if cfgqst.IsHumanoid(TheWhipper)
+					;	if cfgqst.ShowDebugMessages
+					;		Debug.Notification("Whipper (01) = "+cfgqst.GetLeveledActorBaseName(TheWhipper))
+					;	endif	
+					return true
+					;else
+					;	Debug.Notification("Whipper (01) = Non-humanoid ("+cfgqst.GetLeveledActorBaseName(TheWhipper)+")")
+					;	return false
+					;endif
 				else
-					Debug.Notification("Whipper (01) = Dead ("+cfgqst.GetLeveledActorBaseName(TheWhipper)+")")
+					NymMessage("Whipper (01) = IS Dead ("+cfgqst.GetLeveledActorBaseName(TheWhipper)+")")
 					return false
 				endif
 			else
-				Debug.Notification("Whipper (01) = Disabled actor ("+cfgqst.GetLeveledActorBaseName(TheWhipper)+")")
+				NymMessage("Whipper (01) = IS Disabled actor ("+cfgqst.GetLeveledActorBaseName(TheWhipper)+")")
 				return false
 			endif	
 		;else
@@ -458,7 +559,7 @@ Bool Function CheckWhipper()		;#check
 		;	return false
 		;endif	
 	else
-	Debug.Notification("Whipper (01) is (none)")	;MESSAGE
+	NymMessage("Whipper (01) is (none)")	;MESSAGE
 	return false
 	endif
 EndFunction
@@ -600,107 +701,142 @@ EndFunction
 int TeleportAttempts = 0
 
 Function ManageWhipperDistance()
+
+	;we need to account for the PLAYER moving away too.....
+	
+	
+	Float Difference
 	
 	if cfgqst.AlreadyImmobilized
 	DistanceCURRENT = TheWhipper.GetDistance(cfgqst.PlayerRef)
-	NymTrace("DistanceCURRENT: "+DistanceCURRENT)
+	NymTrace("DistanceCURRENT -Player Immoblized: "+DistanceCURRENT)
 	
-	Float Difference = DistanceSTART - DistanceCURRENT
+	Difference = DistanceSTART - DistanceCURRENT
 	
-		if Difference > 50 && TeleportAttempts < 4
+		if ((Difference > 50) || (Difference < 60)) && TeleportAttempts < 4
 		TeleportAttempts += 1
 		Utility.Wait(3.0)
 		MoveWhipperToPlayer()
 		endif 
+		
+	else
+	
+	DistanceCURRENT = TheWhipper.GetDistance(cfgqst.PlayerRef)
+	NymTrace("DistanceCURRENT - Player can move: "+DistanceCURRENT)
+	
+	Difference = DistanceSTART - DistanceCURRENT
+	
+		if Difference > 75 
+		storqst.WhippingDuration = 0
+		endif 
+		
 	endif
 	
 EndFunction 
 
-Event OnUpdate()	;#update
-NymTrace("OnUpdate("+WaitTicks+") WhippingDuration("+storqst.WhippingDuration+")")
 
-	if storqst.WhippingQuest_00_Running
-	WaitTicks += 1
+Bool SlaveWhippedWhileWorking
 
-		ManageWhipperStats()
-		ManageWhipperDistance()
-
-		if (Tick3 == 3)
-		NymTrace("Whipping Moan")
-		Tick3 = 0
-		SendModEvent("Moan")
-		else 
-		Tick3 += 1
-		endif 
-		
-		if Nym()
-			if PO3_SKSEFunctions.IsPowerAttacking(TheWhipper)
-			NymTrace("Whipper is PowerAttacking")
-		;	cfgqst.PlayerRef.PushActorAway(TheWhipper, 0.01)
-		;	TheWhipper.EvaluatePackage()
-			endif 
-		endif
-		
-		if storqst.WhippingDuration > 0
-		storqst.WhippingDuration -= 1
-		endif
-
-		if storqst.WhippingQuest_00_Running && storqst.WhippingDuration > 0
-		RegisterForSingleUpdate(1)
-		else
-		SetStage(25) ;END OF WHIPPING
-		endif
-	else 
-	SetStage(25)
-	
-	
-	endif
-	
-	;TELEPORT WHIPPER: SUX 
-	;whipscene maintenance
-	
-	;if cfgqst.PlayerRef.GetDistance(whipper) < 60
-	;whipper.MoveTo(cfgqst.PlayerRef, 100.0 * Math.Sin(cfgqst.PlayerRef.GetAngleZ()), 100.0 * Math.Cos(cfgqst.PlayerRef.GetAngleZ()), cfgqst.PlayerRef.GetHeight() - 50.0, abMatchRotation = false)
-	;endif
-			
-	;calmquest whipping (rodeo)		
-	;/	
-	if ShortWhipping
-	whiptimer -= 1
-	ShortWhipping = false
-			if whiptimer < 1.0
-			Whipping = false	
-			SetStage(25)
-			endif 
-			
-	elseif 
-	cfgqst.SexFinished = false
-	Whipping = false
-	SetStage(25)
-	
-
-	elseif cfgqst.WhipAgain	 
-	whiptimer -= 3.0
-	
-	
-		if !tattoosapplied && (whiptimer < 10.0)
-		AddWhipmarks()	
-		tattoosapplied = true
-		elseif whiptimer < 1.0
-		Whipping = false
-		tattoosapplied = false
-		SetStage(25)		
-		
-			;REMOVE Scene Protectors					
-	
-			endif
-		endif
-	endif
-	/;
-
-;whiptimer = cfgqst.DefeatWhipTime
-
+Event OnUpdate()
+    int i
+    NymTrace("OnUpdate(" + WaitTicks + ") WhippingDuration(" + storqst.WhippingDuration + ")")
+    if storqst.WhippingQuest_00_Running
+        if storqst.SlaveAtWork && !SlaveWhippedWhileWorking
+            SlaveWhippedWhileWorking = true
+        elseif SlaveWhippedWhileWorking && !storqst.SlaveAtWork
+            storqst.WhippingDuration = 0
+        endif
+        if cfgqst.IsFucking(TheWhipper)
+            storqst.WhippingDuration = 0
+        endif
+        if storqst.DynamicWhipping
+            bool ForceReset = false
+            if !(CurrentWhippingSpeed == -0.6)
+                ForceReset = true
+            endif
+            if D100(25.0) || ForceReset
+                i = utility.RandomInt(1, 4)
+                if ForceReset
+                    ForceReset = false
+                    i = 3
+                endif
+                if i == 1
+                    WhippingSpeed_RESET()
+                elseif i == 2
+                    WhippingSpeed_CHANGE(-0.4)
+                elseif i == 3
+                    WhippingSpeed_CHANGE(-0.6)
+                elseif i == 4
+                    WhippingSpeed_CHANGE(-0.8)
+                endif
+            endif
+        endif
+        WaitTicks = WaitTicks + 1
+        ManageWhipperStats()
+        ManageWhipperDistance()
+        if Tick3 == 3
+            NymTrace("Whipping Moan")
+            Tick3 = 0
+            if Nym() && D100(20.0)
+                int ji = utility.RandomInt(1, 10)
+                if ji == 1
+                    storqst.PlayVoiceOnActor(TheWhipper, "Take this!", "")
+                elseif ji == 2
+                    storqst.PlayVoiceOnActor(TheWhipper, "Your screams are delicious", "")
+                elseif ji == 3
+                    storqst.PlayVoiceOnActor(TheWhipper, "This will teach you", "")
+                elseif ji == 4
+                    storqst.PlayVoiceOnActor(TheWhipper, "Let me warm you up a bit", "")
+                elseif ji == 5
+                    storqst.PlayVoiceOnActor(TheWhipper, "Scream louder", "")
+                elseif ji == 6
+                    storqst.PlayVoiceOnActor(TheWhipper, "Your screams make me hard", "")
+                elseif ji == 7
+                    storqst.PlayVoiceOnActor(TheWhipper, "Beg me to stop", "")
+                elseif ji == 8
+                    storqst.PlayVoiceOnActor(TheWhipper, "Not so happy now, eh?", "")
+                elseif ji == 9
+                    storqst.PlayVoiceOnActor(TheWhipper, "Sore Pussy needs Titties to match", "")
+                elseif ji == 10
+                    storqst.PlayVoiceOnActor(TheWhipper, "I should whip you to death", "")
+                endif
+            endif
+        else
+            Tick3 = Tick3 + 1
+        endif
+        if Nym()
+            if po3_sksefunctions.IsPowerAttacking(TheWhipper)
+                NymTrace("Whipper is PowerAttacking")
+            endif
+        endif
+        if storqst.WhippingDuration > 0
+            storqst.WhippingDuration = storqst.WhippingDuration - 1
+        endif 	;#P+ patch: no SetStage(25) here, the else below already ends the whipping (it used to be set twice in one update)
+        if storqst.WhippingQuest_00_Running && storqst.WhippingDuration > 0
+            RegisterForSingleUpdate(1.0)
+        else
+            SetStage(25)
+        endif
+    else
+        SetStage(25)
+    endif
 EndEvent
+
+bool Function D100(float chance)	;#diceroll	;#d100
+
+;if we roll equal or below the send "chance" it will return true (so D100(95)) is a 95% of "TRUE")
+
+int i = Utility.RandomInt(1, 100)
+int c = chance as int
+
+NymTrace("Chance: "+c+" D100 "+i)
+
+if i <= chance
+return true
+else
+return false
+endif
+EndFunction
 
 
 Function NymMessage(String Text2)		;#NymMessage
@@ -786,3 +922,6 @@ remove vehicle
 remove floor
 	
 /;
+
+; ---- added in Naked Defeat 6.51 ----
+float CurrentWhippingSpeed
